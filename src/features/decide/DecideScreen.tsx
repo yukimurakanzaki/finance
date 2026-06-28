@@ -1,23 +1,40 @@
+import { useState } from 'react'
+import { SpendingLens } from './SpendingLens'
+import { IncomeLog } from './IncomeLog'
+
+type Tab = 'lens' | 'income'
+
 export function DecideScreen() {
+  const [tab, setTab] = useState<Tab>('lens')
+
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Sub-tab bar */}
       <div style={{
-        background: 'var(--bg-2)', borderRadius: 12,
-        border: '1px solid var(--border-1)', padding: 20,
+        display: 'flex', gap: 6, padding: '12px 16px',
+        borderBottom: '1px solid var(--border-1)', background: 'var(--bg-1)',
+        flexShrink: 0,
       }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 8 }}>
-          Decision Lens
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-          Before you spend, ask: which lane does this serve?<br />
-          Income-producing assets compound. Protected living is maintenance.
-          Lifestyle inflation is the enemy.
-        </div>
-        <div style={{ marginTop: 16, padding: 12, background: 'var(--amber-surface)', borderRadius: 8, border: '1px solid var(--amber-border)' }}>
-          <div style={{ fontSize: 11, color: 'var(--amber-text)' }}>
-            Full spending lens, raise tracker, and milestone viewer — coming in next sprint.
-          </div>
-        </div>
+        {([['lens', 'Spending Lens'], ['income', 'Income Log']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+              flex: 1, padding: '7px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
+              fontSize: 12, fontWeight: tab === id ? 600 : 400, fontFamily: 'var(--font-ui)',
+              background: tab === id ? 'var(--amber)' : 'var(--bg-2)',
+              color: tab === id ? '#000' : 'var(--ink-2)',
+              transition: 'background .15s, color .15s',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px' }}>
+        {tab === 'lens' && <SpendingLens />}
+        {tab === 'income' && <IncomeLog />}
       </div>
     </div>
   )
