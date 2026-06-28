@@ -9,9 +9,10 @@ import { AllowanceEditor } from './AllowanceEditor'
 import { PinSetup } from './PinSetup'
 import { AssumptionsEditor } from './AssumptionsEditor'
 import { RestoreBackup } from './RestoreBackup'
+import { CategoryManager } from './CategoryManager'
 import { BottomSheet } from '@components/BottomSheet'
 
-type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | null
+type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | null
 
 export function MoreScreen() {
   const { start: startReconcile } = useReconcileStore()
@@ -61,6 +62,7 @@ export function MoreScreen() {
       <MenuRow label="Recurring Register" sub="Pipe, bills, subs — what's committed monthly" onClick={() => setSheet('recurring')} />
       <MenuRow label={pinLabel} sub={pinSub} onClick={() => setSheet('pin')} />
       <MenuRow label="FI Assumptions" sub="Target, return rates, inflation" onClick={() => setSheet('assumptions')} />
+      <MenuRow label="Categories" sub="Tag transactions by lane for import auto-match" onClick={() => setSheet('categories')} />
 
       <SectionLabel style={{ marginTop: 12 }}>Data</SectionLabel>
       <MenuRow label="Import Transactions" sub="Paste Claude's JSON output" onClick={handleReconcile} />
@@ -91,6 +93,10 @@ export function MoreScreen() {
 
       <BottomSheet open={sheet === 'restore'} onClose={() => setSheet(null)} title="Restore Backup" height="70dvh">
         <RestoreBackup onDone={() => setSheet(null)} />
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'categories'} onClose={() => setSheet(null)} title="Categories" height="90dvh">
+        <CategoryManager />
       </BottomSheet>
     </div>
   )

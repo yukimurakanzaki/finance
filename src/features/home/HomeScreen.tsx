@@ -4,6 +4,7 @@ import { formatRp } from '@lib/currency'
 import { LANE_LABELS, ALL_LANES } from '../../constants/lanes'
 import { AmberBanner } from '@components/AmberBanner'
 import { useAppStore } from '@stores/appStore'
+import { NWChart } from './NWChart'
 
 const LANE_COLORS = {
   income_producing: 'var(--engine)',
@@ -67,6 +68,9 @@ export function HomeScreen() {
           </div>
         )}
       </div>
+
+      {/* Net worth chart */}
+      <NWChart />
 
       {/* FI readout */}
       {fi && (
