@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useAppStore } from '@stores/appStore'
 import { usePinStore } from '@stores/pinStore'
 import { TabBar } from '@components/TabBar'
 import { PinLockScreen } from '@components/PinLockScreen'
+import { QuickLogFAB } from '@components/QuickLogFAB'
 import { HomeScreen } from '@features/home/HomeScreen'
 import { BudgetScreen } from '@features/budget/BudgetScreen'
 import { AssetsScreen } from '@features/assets/AssetsScreen'
@@ -10,13 +12,31 @@ import { MoreScreen } from '@features/more/MoreScreen'
 import { useReconcileStore } from '@stores/reconcileStore'
 import { ReconcileEntryScreen } from '@features/reconcile/ReconcileEntryScreen'
 import { ReconcileConfirmScreen } from '@features/reconcile/ReconcileConfirmScreen'
+import { OnboardingWizard } from '@features/onboarding/OnboardingWizard'
 import { hasPin } from '@lib/crypto'
+import { settingsRepo } from '@db/repositories/settings.repo'
+
+function useSetupComplete() {
+  const [ready, setReady] = useState<boolean | null>(null)
+  useEffect(() => {
+    settingsRepo.get('setup_complete').then((v) => setReady(v === 'true'))
+  }, [])
+  return { ready, markDone: () => setReady(true) }
+}
 
 function AppShell() {
   const { activeTab } = useAppStore()
   const { isInProgress, step } = useReconcileStore()
+  const { ready, markDone } = useSetupComplete()
 
-  // Reconcile overlay when in progress
+  if (ready === null) {
+    return <div style={{ height: '100dvh', background: 'var(--bg-0)' }} />
+  }
+
+  if (ready === false) {
+    return <OnboardingWizard onComplete={markDone} />
+  }
+
   if (isInProgress && activeTab === 'budget') {
     if (step === 'confirm' || step === 'committing') {
       return (
@@ -37,11 +57,11 @@ function AppShell() {
   }
 
   const SCREENS = {
-    home:   { title: 'Home',   subtitle: 'The Scoreboard',     component: <HomeScreen /> },
-    budget: { title: 'Budget', subtitle: 'This workweek',      component: <BudgetScreen /> },
-    assets: { title: 'Assets', subtitle: 'Accounts & assets',  component: <AssetsScreen /> },
+    home:   { title: 'Home',   subtitle: 'The Scoreboard',      component: <HomeScreen /> },
+    budget: { title: 'Budget', subtitle: 'This workweek',       component: <BudgetScreen /> },
+    assets: { title: 'Assets', subtitle: 'Accounts & assets',   component: <AssetsScreen /> },
     decide: { title: 'Decide', subtitle: 'What does this buy?', component: <DecideScreen /> },
-    more:   { title: 'More',   subtitle: '',                   component: <MoreScreen /> },
+    more:   { title: 'More',   subtitle: '',                    component: <MoreScreen /> },
   }
 
   const screen = SCREENS[activeTab]
@@ -53,6 +73,7 @@ function AppShell() {
         {screen.component}
       </div>
       <TabBar />
+      <QuickLogFAB />
     </div>
   )
 }
