@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FI Dashboard — Screen 2 v1.1 (Safe-to-Spend)</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --line:#c9c9c9; --line2:#e4e4e4; --paper:#fdfdfc;
+    --muted:#8a8a8a; --fill:#efefed; --fill2:#f6f6f4;
+    --amber:#b8860b; --amber-bg:#fbf3df; --amber-line:#e3c97f;
+    --note:#6b6b6b; --noteband:#f0f1ee; --good:#5a5a5a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  .mono{font-family:"SF Mono",ui-monospace,"Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace}
+  body{background:#e9e9e6;color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;line-height:1.4;padding:28px 16px 60px}
+  header.pagehead{max-width:760px;margin:0 auto 26px;border-bottom:1.5px solid var(--ink);padding-bottom:14px}
+  header.pagehead h1{font-size:18px;letter-spacing:.3px;font-weight:650}
+  header.pagehead p{font-size:12.5px;color:var(--note);margin-top:5px}
+
+  .stage{max-width:760px;margin:0 auto;display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start;justify-content:center}
+  .col{width:344px}
+  .scr-label{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--note);margin-bottom:8px;font-weight:600}
+  .scr-label b{color:var(--ink)}
+
+  .phone{width:344px;background:var(--paper);border:1.5px solid var(--ink);border-radius:26px;padding:8px}
+  .screen{border:1px solid var(--line2);border-radius:19px;overflow:hidden;height:632px;display:flex;flex-direction:column;background:#fff}
+  .statusbar{height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--line2)}
+  .appbar{padding:11px 15px 9px;border-bottom:1px solid var(--line2)}
+  .appbar h2{font-size:14.5px;font-weight:650}
+  .appbar .sub{font-size:10.5px;color:var(--muted)}
+  .body{flex:1;overflow:hidden;padding:14px 15px}
+  .tabbar{height:50px;border-top:1px solid var(--line2);display:flex;background:var(--fill2)}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9px;color:var(--muted)}
+  .tabbar div .ic{width:17px;height:17px;border:1.4px solid var(--line);border-radius:5px}
+  .tabbar div.on{color:var(--ink);font-weight:600}
+  .tabbar div.on .ic{border-color:var(--ink);background:var(--fill)}
+
+  .chiprow{display:flex;gap:7px;margin-bottom:12px}
+  .seg{flex:1;text-align:center;font-size:11px;padding:6px 0;border:1px solid var(--line);border-radius:7px;color:var(--muted)}
+  .seg.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .gauge{border:1px solid var(--amber-line);background:var(--amber-bg);border-radius:12px;padding:14px}
+  .gauge .gl{font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:#7a5e0a;font-weight:600}
+  .gauge .gbig{font-size:33px;font-weight:600;letter-spacing:-.5px;color:var(--ink);margin-top:2px}
+  .gauge .gbig small{font-size:14px;color:var(--muted);font-weight:500}
+  .gauge .gsub{font-size:11px;color:#7a5e0a;margin-top:3px}
+  /* fuel range track */
+  .range{margin-top:11px}
+  .range .rl{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted);margin-bottom:4px}
+  .track{height:12px;border:1px solid var(--amber-line);border-radius:6px;background:#fff;overflow:hidden;position:relative}
+  .track .used{position:absolute;left:0;top:0;height:100%;background:repeating-linear-gradient(45deg,#efe3c2,#efe3c2 4px,#e8d8ad 4px,#e8d8ad 8px);width:48%}
+  .track .now{position:absolute;top:-3px;height:18px;width:2px;background:var(--amber);left:48%}
+  .recalc{font-size:10px;color:var(--amber);margin-top:7px;display:flex;align-items:center;gap:6px}
+  .recalc .d{width:6px;height:6px;border-radius:50%;background:var(--amber)}
+
+  .hr{height:1px;background:var(--line2);margin:13px 0}
+  .eyebrow{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+
+  /* waterfall */
+  .wf{font-size:11.5px}
+  .wf .wrow{display:flex;justify-content:space-between;padding:5px 0;color:var(--note)}
+  .wf .wrow b{color:var(--ink);font-weight:600}
+  .wf .wrow.top{color:var(--muted)}
+  .wf .wtag{font-size:8px;letter-spacing:.3px;text-transform:uppercase;border:1px solid var(--line);border-radius:4px;padding:1px 4px;color:var(--muted);margin-left:6px}
+  .wf .sumline{border-top:1px solid var(--ink);margin:5px 0}
+  .wf .wrow.result{color:var(--ink);font-weight:700}
+  .wf .carved{background:var(--fill2);border-radius:6px;padding:4px 8px;margin:4px 0;font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between}
+
+  .ann{width:344px;margin-top:11px;background:var(--noteband);border-left:3px solid var(--note);border-radius:0 7px 7px 0;padding:9px 11px}
+  .ann .jt{font-size:10px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:3px}
+  .ann p{font-size:11px;color:var(--note)}
+  .ann .pr{display:inline-block;font-size:10px;color:var(--amber);margin-top:4px}
+
+  .delta{width:344px;background:#fff;border:1px solid var(--line2);border-radius:9px;padding:12px 13px;margin-top:14px}
+  .delta h3{font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:var(--note);margin-bottom:7px}
+  .delta .d{font-size:11.5px;color:var(--note);padding:4px 0;display:flex;gap:8px}
+  .delta .d b{color:var(--ink)}
+  .delta .old{text-decoration:line-through;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="pagehead">
+  <h1>Screen 2 — rebuilt as Safe-to-Spend (v1.1)</h1>
+  <p>Replaces the old fixed "Rp 577k ÷ weeks" governor. This is the fuel-range readout: it knows what's committed, subtracts the weekend, and recalculates the daily ceiling as the week burns down.</p>
+</header>
+
+<div class="stage">
+
+  <!-- the phone -->
+  <div class="col">
+    <div class="scr-label"><b>Budget › Weekly</b> — safe-to-spend governor</div>
+    <div class="phone"><div class="screen">
+      <div class="statusbar"><span>9:41</span><span>▢ ▢ ▢ · Wed</span></div>
+      <div class="appbar"><h2>Budget</h2><div class="sub">This workweek</div></div>
+      <div class="body">
+        <div class="chiprow">
+          <div class="seg">Yearly</div><div class="seg">Monthly</div><div class="seg on">Weekly</div>
+        </div>
+
+        <div class="gauge">
+          <div class="gl">Safe to spend today</div>
+          <div class="gbig mono">Rp 58k<small> /day</small></div>
+          <div class="gsub">Rp 174k left · 3 workdays to payday-week reset</div>
+
+          <div class="range">
+            <div class="rl"><span>Mon</span><span>Fri</span></div>
+            <div class="track"><div class="used"></div><div class="now"></div></div>
+          </div>
+          <div class="recalc"><span class="d"></span> Started at Rp 67k/day — Mon–Tue ran a little hot, so today eased down</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="eyebrow">How this number is built</div>
+        <div class="wf">
+          <div class="wrow top">Pipe + DPLK <span class="wtag">paid first</span><b class="mono">already gone</b></div>
+          <div class="wrow top">Household bills (KPR, electric, jefry)<b class="mono">already gone</b></div>
+          <div class="sumline"></div>
+          <div class="wrow">Personal pool (allowance)<b class="mono">2,500k</b></div>
+          <div class="wrow">− Personal subs (Claude, game)<b class="mono">−265k</b></div>
+          <div class="carved"><span>− Weekend, pre-allocated</span><span class="mono">−800k</span></div>
+          <div class="sumline"></div>
+          <div class="wrow result">= Workweek pool, this week<b class="mono">~334k</b></div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div><div class="ic"></div>Home</div>
+        <div class="on"><div class="ic"></div>Budget</div>
+        <div><div class="ic"></div>Assets</div>
+        <div><div class="ic"></div>Decide</div>
+        <div><div class="ic"></div>More</div>
+      </div>
+    </div></div>
+
+    <div class="ann">
+      <div class="jt">J3 weekly glance · F8 safe-to-spend</div>
+      <p>Pipe and DPLK sit at the top, already gone — savings is never the leftover (Principle 6). The weekend is carved out before the workweek number exists.</p>
+      <span class="pr">▸ amber informs, recalculates — never red, never shames (DECISION-2)</span>
+    </div>
+  </div>
+
+  <!-- what changed -->
+  <div class="col">
+    <div class="delta">
+      <h3>What changed from v1.0</h3>
+      <div class="d"><span>•</span><span><span class="old">Rp 577k ÷ weeks</span>, a fixed stipend that ignored commitments and spending.</span></div>
+      <div class="d"><span>•</span><span>Now <b>derived</b>: pool − subs − weekend, then ÷ workdays left.</span></div>
+      <div class="d"><span>•</span><span><b>Recalculates</b> mid-week — overspend Monday and Tuesday's ceiling drops (fuel-range).</span></div>
+      <div class="d"><span>•</span><span><b>Weekend carved first</b>, so the workweek number is honest.</span></div>
+      <div class="d"><span>•</span><span>Savings (pipe + DPLK) shown <b>at the top</b>, gone before discretionary — not at the bottom as leftover.</span></div>
+    </div>
+
+    <div class="delta">
+      <h3>Numbers shown (illustrative)</h3>
+      <div class="d"><span>Pool</span><b class="mono" style="margin-left:auto">2,500k</b></div>
+      <div class="d"><span>− Subs (Claude ~165k + game)</span><b class="mono" style="margin-left:auto">−265k</b></div>
+      <div class="d"><span>− Weekend allocation</span><b class="mono" style="margin-left:auto">−800k</b></div>
+      <div class="d"><span>÷ ~4.3 workweeks</span><b class="mono" style="margin-left:auto">~334k/wk</b></div>
+      <div class="d"><span>Wed, after Mon–Tue spend</span><b class="mono" style="margin-left:auto">~58k/day</b></div>
+      <div class="d" style="color:#999;font-size:10.5px"><span></span><span>Replace weekend/sub figures with your real ones; KPR/electric/jefry are visibility-only in personal scope.</span></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
