@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FI Dashboard — Dark Design System + Wireframes v1.0</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS — single source of truth
+   All colours, type, spacing must reference these vars.
+   No raw hex values outside this block except in token defs.
+   ============================================================ */
+:root {
+  /* --- Elevation backgrounds (0 = deepest, 4 = highest) --- */
+  --bg-0: #090b10;   /* app shell / page bg                  */
+  --bg-1: #0f1219;   /* card surface                         */
+  --bg-2: #161b25;   /* elevated card / popover              */
+  --bg-3: #1e2433;   /* hover / pressed state                */
+  --bg-4: #252d3f;   /* active / selected                    */
+
+  /* --- Text --- */
+  --ink-1: #e8ecf5;  /* primary copy                         */
+  --ink-2: #8892a8;  /* secondary / supporting               */
+  --ink-3: #4e5668;  /* tertiary / labels / timestamps       */
+
+  /* --- Borders --- */
+  --line-1: #141926;  /* hairline separator                  */
+  --line-2: #1e2b3f;  /* default card border                 */
+  --line-3: #3a4a65;  /* strong / focused border             */
+
+  /* --- Amber — the ONLY accent colour in the app ---
+     Per DECISION-2: governor informs, never alarms.
+     Amber is informative warmth, not danger.           */
+  --amber:         #f0a500;
+  --amber-dim:     #a87200;
+  --amber-text:    #fbbf24;   /* readable amber on dark bg   */
+  --amber-surface: #110d00;   /* card bg when amber state    */
+  --amber-border:  #3d2900;   /* card border when amber      */
+
+  /* --- Lane colours (4-lane Kiyosaki model) ---
+     Intentionally muted — they categorise, not celebrate.
+     Never used for traffic-light status signalling.   */
+  --engine:    #34d399;  --engine-bg:    #021f15;  /* income-producing   */
+  --store:     #fbbf24;  --store-bg:     #130f00;  /* store of value     */
+  --debt:      #64748b;  --debt-bg:      #0d1117;  /* liability (neutral)*/
+  --protected: #818cf8;  --protected-bg: #0f0e2a;  /* protected living   */
+
+  /* --- Typography --- */
+  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+
+  /* --- Radii --- */
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  20px;
+  --r-2xl: 32px;
+
+  /* --- Shadows --- */
+  --shadow-card:  0 1px 3px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+  --shadow-phone: 0 40px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05);
+  --shadow-amber: 0 4px 20px rgba(240,165,0,0.35);
+}
+
+/* ============================================================
+   RESET + BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #060810;
+  color: var(--ink-1);
+  font-family: var(--font-ui);
+  line-height: 1.45;
+  padding: 36px 24px 100px;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: var(--font-mono); }
+
+/* ============================================================
+   PAGE STRUCTURE
+   ============================================================ */
+.page-header {
+  max-width: 1280px;
+  margin: 0 auto 36px;
+  border-bottom: 1px solid var(--line-2);
+  padding-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.page-header h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.1px; }
+.page-header p  { font-size: 11.5px; color: var(--ink-3); margin-top: 4px; }
+.page-header .ver {
+  font-size: 10px; font-family: var(--font-mono);
+  color: var(--ink-3); background: var(--bg-2);
+  border: 1px solid var(--line-2); border-radius: 5px;
+  padding: 3px 8px;
+}
+
+/* ============================================================
+   DESIGN TOKEN REFERENCE STRIP
+   ============================================================ */
+.token-strip {
+  max-width: 1280px;
+  margin: 0 auto 48px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.token-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+}
+.token-card h4 {
+  font-size: 9.5px; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; margin-bottom: 12px;
+}
+.swatch-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.swatch {
+  width: 36px; height: 36px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.swatch-name { font-size: 8.5px; color: var(--ink-3); font-family: var(--font-mono); }
+
+.type-row { display: flex; flex-direction: column; gap: 6px; }
+.type-sample { display: flex; justify-content: space-between; align-items: baseline; }
+.type-sample span:first-child { color: var(--ink-1); }
+.type-sample span:last-child  { font-size: 9.5px; color: var(--ink-3); font-family: var(--font-mono); }
+
+.lane-row-demo { display: flex; gap: 6px; flex-wrap: wrap; }
+.lane-chip {
+  font-size: 10px; font-weight: 600;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid transparent;
+  letter-spacing: 0.2px;
+}
+.lc-engine    { background: var(--engine-bg);    color: var(--engine);    border-color: rgba(52,211,153,0.2);  }
+.lc-store     { background: var(--store-bg);     color: var(--store);     border-color: rgba(251,191,36,0.2);  }
+.lc-debt      { background: var(--debt-bg);      color: var(--debt);      border-color: rgba(100,116,139,0.2); }
+.lc-protected { background: var(--protected-bg); color: var(--protected); border-color: rgba(129,140,248,0.2); }
+
+/* ============================================================
+   PHONE SHELL + SCREEN
+   ============================================================ */
+.stage {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.screen-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.screen-label {
+  font-size: 9.5px; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700;
+}
+.screen-label b { color: var(--ink-2); }
+
+.phone {
+  width: 344px;
+  background: var(--bg-0);
+  border: 1.5px solid var(--line-2);
+  border-radius: 46px;
+  padding: 10px;
+  box-shadow: var(--shadow-phone);
+  position: relative;
+}
+/* Notch pill */
+.phone::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px; height: 26px;
+  background: var(--bg-0);
+  border: 1.5px solid var(--line-2);
+  border-radius: 20px;
+  z-index: 10;
+}
+
+.screen {
+  border-radius: 36px;
+  overflow: hidden;
+  height: 680px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  position: relative;
+}
+
+/* ---- Status bar ---- */
+.sbar {
+  height: 50px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 20px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-1);
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+.sbar .signal { display: flex; gap: 5px; align-items: center; font-size: 11px; color: var(--ink-2); }
+
+/* ---- App bar ---- */
+.app-bar {
+  padding: 4px 20px 12px;
+  border-bottom: 1px solid var(--line-1);
+  flex-shrink: 0;
+}
+.app-bar .title   { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+.app-bar .sub     { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+.app-bar .bar-row { display: flex; justify-content: space-between; align-items: flex-start; }
+.icon-btn {
+  width: 30px; height: 30px;
+  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--ink-2); margin-top: 2px;
+}
+
+/* ---- Scrollable body ---- */
+.body { flex: 1; overflow: hidden; padding: 14px 20px 8px; display: flex; flex-direction: column; }
+
+/* ---- Tab bar ---- */
+.tab-bar {
+  height: 58px; border-top: 1px solid var(--line-1);
+  display: flex; background: var(--bg-1); flex-shrink: 0;
+  padding: 0 4px 10px;
+}
+.tab {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; font-size: 9.5px; color: var(--ink-3);
+  letter-spacing: 0.1px;
+}
+.tab-ic {
+  width: 22px; height: 22px; border-radius: 7px;
+  background: transparent; display: flex; align-items: center;
+  justify-content: center; font-size: 13px;
+}
+.tab.active { color: var(--amber-text); }
+.tab.active .tab-ic { background: var(--amber-surface); }
+
+/* ============================================================
+   SHARED COMPONENTS
+   ============================================================ */
+.seg-ctrl {
+  display: flex; background: var(--bg-2);
+  border: 1px solid var(--line-2); border-radius: 11px;
+  padding: 3px; gap: 2px; margin-bottom: 16px;
+}
+.seg {
+  flex: 1; text-align: center; font-size: 12px;
+  padding: 7px 0; border-radius: 8px; color: var(--ink-3); font-weight: 500;
+}
+.seg.on {
+  background: var(--bg-4); color: var(--ink-1);
+  font-weight: 600; border: 1px solid var(--line-3);
+}
+
+.divider    { height: 1px; background: var(--line-1); margin: 10px 0; }
+.divider-md { height: 1px; background: var(--line-2); margin: 12px 0; }
+
+.eyebrow {
+  font-size: 9.5px; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; margin-bottom: 8px;
+}
+
+/* ============================================================
+   SCREEN 1 — HOME / NET WORTH
+   ============================================================ */
+.nw-hero { margin-bottom: 16px; }
+.nw-label {
+  font-size: 10.5px; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 600; margin-bottom: 3px;
+}
+.nw-date { font-size: 10.5px; color: var(--ink-3); }
+.nw-number {
+  font-family: var(--font-mono);
+  font-size: 42px; font-weight: 700;
+  color: var(--ink-1); letter-spacing: -1.5px; line-height: 1;
+  margin-top: 2px;
+}
+.nw-delta {
+  font-size: 12px; color: var(--engine); margin-top: 5px;
+  display: flex; align-items: center; gap: 5px;
+}
+.delta-pill {
+  font-size: 10px; font-weight: 600; font-family: var(--font-mono);
+  background: var(--engine-bg); color: var(--engine);
+  border: 1px solid rgba(52,211,153,0.2); border-radius: 5px; padding: 1px 6px;
+}
+.nw-fresh { font-size: 10px; color: var(--ink-3); margin-top: 2px; }
+
+.lane-list { display: flex; flex-direction: column; gap: 1px; }
+.lane-row  {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: var(--r-md);
+}
+.lane-row:hover { background: var(--bg-2); }
+.lane-dot  { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.lane-name { font-size: 12px; color: var(--ink-2); flex: 1; }
+.lane-bar-wrap { width: 52px; height: 4px; background: var(--bg-3); border-radius: 2px; overflow: hidden; }
+.lane-bar  { height: 100%; border-radius: 2px; }
+.lane-amt  { font-family: var(--font-mono); font-size: 12px; color: var(--ink-1); font-weight: 500; min-width: 60px; text-align: right; }
+.lane-amt.muted { color: var(--ink-3); }
+
+.fi-card {
+  background: var(--bg-1); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 12px 14px; margin-top: 12px;
+}
+.fi-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; }
+.fi-lbl { font-size: 11.5px; color: var(--ink-2); }
+.fi-val { font-family: var(--font-mono); font-size: 12px; color: var(--ink-1); font-weight: 500; }
+.fi-val.amber { color: var(--amber-text); }
+.fi-val.engine { color: var(--engine); }
+
+/* FI progress bar */
+.fi-progress { margin-top: 10px; }
+.fi-prog-labels {
+  display: flex; justify-content: space-between;
+  font-size: 9px; color: var(--ink-3); margin-bottom: 5px;
+}
+.fi-prog-track {
+  height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; position: relative;
+}
+.fi-prog-fill {
+  position: absolute; left: 0; top: 0; height: 100%;
+  background: linear-gradient(90deg, var(--engine-bg) 0%, var(--engine) 100%);
+  border-radius: 3px; width: 1.8%;  /* 80M / 4420M */
+}
+.fi-prog-target {
+  position: absolute; top: -3px; width: 2px; height: 12px;
+  background: var(--line-3); border-radius: 1px; left: 100%;
+}
+
+/* ============================================================
+   SCREEN 2 — SAFE-TO-SPEND
+   ============================================================ */
+.gauge-card {
+  background: var(--amber-surface);
+  border: 1px solid var(--amber-border);
+  border-radius: 18px; padding: 18px 16px 14px;
+  margin-bottom: 14px; position: relative; overflow: hidden;
+}
+/* Subtle glow behind the number */
+.gauge-card::before {
+  content: '';
+  position: absolute; top: -20px; left: 50%;
+  transform: translateX(-50%);
+  width: 200px; height: 80px;
+  background: radial-gradient(ellipse, rgba(240,165,0,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.gauge-lbl {
+  font-size: 10px; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--amber-dim); font-weight: 700; margin-bottom: 2px;
+}
+.gauge-number {
+  font-family: var(--font-mono);
+  font-size: 52px; font-weight: 700;
+  color: var(--ink-1); letter-spacing: -2px; line-height: 1;
+}
+.gauge-unit { font-size: 18px; color: var(--ink-3); font-weight: 400; letter-spacing: 0; }
+.gauge-sub  { font-size: 11.5px; color: var(--amber-dim); margin-top: 5px; }
+
+/* Day dots */
+.day-dots { display: flex; gap: 6px; margin-top: 14px; align-items: center; justify-content: center; }
+.day-dot  {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid var(--line-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--ink-3); font-weight: 600;
+}
+.day-dot.spent  { background: var(--bg-3); border-color: var(--line-3); color: var(--ink-3); }
+.day-dot.today  { background: var(--amber); border-color: var(--amber); color: #000; font-weight: 700; box-shadow: var(--shadow-amber); }
+.day-dot.future { border-color: var(--line-1); color: var(--ink-3); }
+
+.gauge-note {
+  font-size: 10.5px; color: var(--ink-3); margin-top: 10px;
+  padding-top: 10px; border-top: 1px solid var(--amber-border);
+  display: flex; align-items: flex-start; gap: 6px;
+}
+.gauge-note .dot { width: 5px; height: 5px; background: var(--amber-dim); border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+
+/* Waterfall */
+.waterfall { flex: 1; }
+.wf-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4.5px 0;
+}
+.wf-lbl      { font-size: 11.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+.wf-lbl.dim  { font-size: 11px; color: var(--ink-3); }
+.wf-amt      { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-1); }
+.wf-amt.dim  { font-size: 11px; color: var(--ink-3); }
+.wf-amt.amber{ font-size: 12px; color: var(--amber-text); font-weight: 700; }
+
+.paid-badge {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+  background: var(--engine-bg); color: var(--engine);
+  border: 1px solid rgba(52,211,153,0.2); border-radius: 4px; padding: 1px 5px;
+}
+.wf-sep      { height: 1px; background: var(--line-2); margin: 5px 0; }
+.wf-sep.bold { background: var(--line-3); }
+.wf-carve {
+  background: var(--bg-2); border-radius: 8px;
+  padding: 5px 10px; margin: 3px 0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.wf-carve .wf-lbl { font-size: 11px; color: var(--ink-3); }
+.wf-carve .wf-amt { font-size: 11px; color: var(--ink-3); }
+.wf-row.result .wf-lbl { font-size: 13px; color: var(--ink-1); font-weight: 700; }
+.wf-row.result .wf-amt { font-size: 13.5px; color: var(--amber-text); font-weight: 700; }
+
+/* ============================================================
+   SCREEN 3 — QUICK-LOG SHEET (overlay)
+   ============================================================ */
+.sheet-screen {
+  position: relative; overflow: hidden;
+  border-radius: 36px; height: 680px;
+  background: var(--bg-0);
+  display: flex; flex-direction: column;
+}
+.sheet-bg-blur {
+  position: absolute; inset: 0;
+  background: rgba(9,11,16,0.75);
+  backdrop-filter: blur(2px);
+  z-index: 5;
+  display: flex; align-items: flex-end;
+}
+.sheet {
+  width: 100%;
+  background: var(--bg-2);
+  border-top: 1px solid var(--line-3);
+  border-radius: 22px 22px 0 0;
+  padding: 14px 20px 36px;
+}
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--line-3); border-radius: 2px;
+  margin: 0 auto 18px;
+}
+.sheet-title { font-size: 16px; font-weight: 700; color: var(--ink-1); margin-bottom: 18px; }
+.sheet-ceiling {
+  background: var(--bg-3); border-radius: 10px; padding: 9px 12px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px;
+}
+.sc-lbl { font-size: 11px; color: var(--ink-3); }
+.sc-val { font-family: var(--font-mono); font-size: 13px; color: var(--amber-text); font-weight: 600; }
+
+.amount-row {
+  margin-bottom: 6px;
+}
+.amount-prefix {
+  font-size: 16px; color: var(--ink-3); font-family: var(--font-mono);
+  display: inline-block; margin-right: 4px;
+}
+.amount-display {
+  font-family: var(--font-mono); font-size: 40px; font-weight: 600;
+  color: var(--ink-1); letter-spacing: -1px; display: inline;
+}
+.amount-cursor {
+  display: inline-block; width: 2px; height: 36px; background: var(--amber);
+  vertical-align: middle; margin-left: 2px;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.amount-hint { font-size: 10.5px; color: var(--ink-3); margin-bottom: 14px; margin-top: 2px; }
+.amount-underline { height: 2px; background: var(--amber); margin-bottom: 16px; border-radius: 1px; }
+
+.note-row {
+  background: var(--bg-3); border: 1px solid var(--line-2);
+  border-radius: var(--r-md); padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 16px;
+}
+.note-row .note-icon { font-size: 13px; color: var(--ink-3); }
+.note-row .note-text { font-size: 13px; color: var(--ink-3); }
+
+.btn-primary {
+  width: 100%; background: var(--amber); color: #000;
+  font-size: 15px; font-weight: 700; padding: 15px;
+  border-radius: 13px; text-align: center; letter-spacing: 0.2px;
+  border: none; cursor: pointer;
+}
+.btn-secondary {
+  width: 100%; background: var(--bg-3); border: 1px solid var(--line-2);
+  color: var(--ink-1); font-size: 13px; font-weight: 600; padding: 12px;
+  border-radius: 11px; text-align: center; margin-bottom: 10px;
+}
+
+/* FAB */
+.fab {
+  position: absolute; bottom: 72px; right: 20px; z-index: 2;
+  width: 52px; height: 52px; background: var(--amber);
+  border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; color: #000; font-weight: 300;
+  box-shadow: var(--shadow-amber); line-height: 1;
+}
+
+/* ============================================================
+   SCREEN 4 — RECONCILE IMPORT
+   ============================================================ */
+.import-tabs {
+  display: flex; gap: 0; background: var(--bg-2);
+  border: 1px solid var(--line-2); border-radius: var(--r-md);
+  padding: 3px; margin-bottom: 12px;
+}
+.import-tab {
+  flex: 1; text-align: center; font-size: 12px; font-weight: 600;
+  padding: 7px; border-radius: 8px; color: var(--ink-3);
+}
+.import-tab.on { background: var(--bg-4); color: var(--ink-1); border: 1px solid var(--line-3); }
+
+.paste-zone {
+  background: var(--bg-2); border: 1.5px dashed var(--line-3);
+  border-radius: var(--r-lg); padding: 18px 16px; text-align: center;
+  margin-bottom: 10px;
+}
+.pz-icon  { font-size: 22px; color: var(--ink-3); margin-bottom: 7px; }
+.pz-title { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 3px; }
+.pz-sub   { font-size: 11px; color: var(--ink-3); line-height: 1.5; }
+.pz-tag   {
+  display: inline-block; margin-top: 8px;
+  font-size: 9.5px; font-family: var(--font-mono);
+  background: var(--bg-3); border: 1px solid var(--line-2); border-radius: 5px;
+  padding: 2px 8px; color: var(--ink-3);
+}
+
+.recon-stats {
+  display: flex; gap: 6px; margin-bottom: 10px;
+}
+.rs-chip {
+  flex: 1; background: var(--bg-1); border: 1px solid var(--line-2);
+  border-radius: var(--r-md); padding: 8px 6px; text-align: center;
+}
+.rs-chip.warn { background: var(--amber-surface); border-color: var(--amber-border); }
+.rs-num {
+  font-family: var(--font-mono); font-size: 18px; font-weight: 700;
+  color: var(--ink-1); line-height: 1;
+}
+.rs-chip.warn .rs-num { color: var(--amber-text); }
+.rs-lbl { font-size: 9px; color: var(--ink-3); margin-top: 3px; letter-spacing: 0.2px; }
+
+.recon-row {
+  background: var(--bg-1); border: 1px solid var(--line-1);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 6px;
+}
+.rr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+.rr-date { font-size: 10.5px; color: var(--ink-3); font-family: var(--font-mono); }
+.rr-amount {
+  font-family: var(--font-mono); font-size: 14px;
+  font-weight: 700; color: var(--ink-1);
+}
+.rr-body { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.dir-badge {
+  font-size: 9px; font-weight: 700; padding: 2px 7px;
+  border-radius: 5px; letter-spacing: 0.3px; text-transform: uppercase;
+}
+.dir-out { background: rgba(100,116,139,0.12); color: var(--debt); border: 1px solid rgba(100,116,139,0.2); }
+.dir-in  { background: rgba(52,211,153,0.1);   color: var(--engine); border: 1px solid rgba(52,211,153,0.2); }
+.acct-badge {
+  font-size: 9.5px; color: var(--ink-3); background: var(--bg-3);
+  border-radius: 5px; padding: 2px 7px; border: 1px solid var(--line-2);
+}
+.lp {
+  font-size: 9.5px; font-weight: 600; padding: 2px 7px;
+  border-radius: 5px; border: 1px solid transparent;
+}
+.lp-engine    { background: var(--engine-bg);    color: var(--engine);    border-color: rgba(52,211,153,0.2);  }
+.lp-protected { background: var(--protected-bg); color: var(--protected); border-color: rgba(129,140,248,0.2); }
+.lp-store     { background: var(--store-bg);     color: var(--store);     border-color: rgba(251,191,36,0.2);  }
+.lp-debt      { background: var(--debt-bg);      color: var(--debt);      border-color: rgba(100,116,139,0.2); }
+.rr-cat { font-size: 10px; color: var(--ink-2); }
+.transfer-badge {
+  font-size: 9px; font-weight: 600;
+  background: var(--amber-surface); color: var(--amber-text);
+  border: 1px solid var(--amber-border); border-radius: 5px; padding: 2px 7px;
+  letter-spacing: 0.2px;
+}
+.recon-row.transfer { border-color: var(--amber-border); background: var(--amber-surface); }
+.recon-row.transfer .rr-amount { color: var(--amber-text); }
+
+.approve-btn {
+  display: flex; gap: 8px; margin-bottom: 8px;
+}
+.approve-all {
+  flex: 1; background: var(--engine-bg); border: 1px solid rgba(52,211,153,0.3);
+  color: var(--engine); font-size: 11.5px; font-weight: 700;
+  padding: 10px; border-radius: 10px; text-align: center;
+}
+.confirm-btn {
+  flex: 2; background: var(--amber); color: #000;
+  font-size: 12px; font-weight: 700; padding: 10px;
+  border-radius: 10px; text-align: center;
+}
+
+/* ============================================================
+   SCREEN 5 — PIN LOCK
+   ============================================================ */
+.pin-screen {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  flex: 1; gap: 0; padding: 0 24px;
+}
+.pin-logo {
+  font-size: 13px; font-weight: 700; color: var(--ink-1);
+  letter-spacing: 0.2px; margin-bottom: 36px;
+}
+.pin-logo span { color: var(--amber-text); }
+.pin-title { font-size: 16px; font-weight: 600; color: var(--ink-1); margin-bottom: 6px; }
+.pin-sub   { font-size: 12px; color: var(--ink-3); margin-bottom: 28px; text-align: center; }
+.pin-dots  { display: flex; gap: 14px; margin-bottom: 36px; }
+.pin-dot   {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1.5px solid var(--line-3); background: transparent;
+}
+.pin-dot.filled { background: var(--amber); border-color: var(--amber); }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+.pin-key {
+  background: var(--bg-2); border: 1px solid var(--line-2);
+  border-radius: 14px; padding: 16px; text-align: center;
+  font-size: 20px; font-weight: 600; color: var(--ink-1);
+  line-height: 1;
+}
+.pin-key.clear { background: transparent; border-color: transparent; font-size: 14px; color: var(--ink-3); }
+.pin-key.del   { background: transparent; border-color: transparent; font-size: 16px; color: var(--ink-2); }
+.pin-biometric {
+  margin-top: 20px; font-size: 12px; color: var(--amber-text);
+  display: flex; align-items: center; gap: 6px;
+}
+
+/* ============================================================
+   COMPONENT STATES SHOWCASE (below phones)
+   ============================================================ */
+.comp-section {
+  max-width: 1280px; margin: 52px auto 0;
+  border-top: 1px solid var(--line-2); padding-top: 32px;
+}
+.comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.comp-card {
+  background: var(--bg-1); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 16px 18px;
+}
+.comp-card h4 {
+  font-size: 9.5px; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; margin-bottom: 14px;
+}
+
+/* Amber info card (non-negative pool warning) */
+.amber-banner {
+  background: var(--amber-surface); border: 1px solid var(--amber-border);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.ab-dot { width: 6px; height: 6px; background: var(--amber); border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+.ab-text { font-size: 12px; color: var(--amber-text); line-height: 1.5; }
+.ab-sub  { font-size: 10.5px; color: var(--amber-dim); margin-top: 2px; }
+
+/* Stale data notice */
+.stale-notice {
+  background: var(--bg-2); border-radius: 8px; padding: 8px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.stale-notice .s-dot { width: 5px; height: 5px; background: var(--ink-3); border-radius: 50%; }
+.stale-notice .s-text { font-size: 11px; color: var(--ink-3); }
+
+/* Success toast */
+.toast {
+  background: var(--bg-2); border: 1px solid var(--line-3);
+  border-radius: 12px; padding: 11px 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.toast-icon { font-size: 14px; color: var(--engine); }
+.toast-text { font-size: 12.5px; color: var(--ink-1); font-weight: 500; }
+.toast-sub  { font-size: 10.5px; color: var(--ink-3); }
+
+/* Error row in reconcile */
+.error-row {
+  background: var(--bg-1); border: 1px solid rgba(100,116,139,0.3);
+  border-radius: var(--r-md); padding: 10px 12px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.error-row .e-icon { font-size: 13px; color: var(--debt); margin-top: 1px; }
+.error-row .e-text { font-size: 11.5px; color: var(--ink-2); }
+.error-row .e-field { font-size: 10.5px; color: var(--debt); margin-top: 2px; font-family: var(--font-mono); }
+
+/* Protected badge */
+.protected-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+  background: var(--protected-bg); color: var(--protected);
+  border: 1px solid rgba(129,140,248,0.2); border-radius: 4px; padding: 2px 6px;
+}
+
+/* ============================================================
+   COPYWRITING REFERENCE
+   ============================================================ */
+.copy-section {
+  max-width: 1280px; margin: 52px auto 0;
+  border-top: 1px solid var(--line-2); padding-top: 32px;
+}
+.copy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.copy-card {
+  background: var(--bg-1); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 16px 18px;
+}
+.copy-card h4 {
+  font-size: 9.5px; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; margin-bottom: 12px;
+}
+.copy-item { margin-bottom: 10px; }
+.copy-context { font-size: 9.5px; color: var(--ink-3); font-family: var(--font-mono); margin-bottom: 3px; }
+.copy-text { font-size: 12.5px; color: var(--ink-1); line-height: 1.5; }
+.copy-text.dim { color: var(--ink-2); }
+.copy-text.amber { color: var(--amber-text); }
+.copy-text.engine { color: var(--engine); }
+
+/* section label used in many places */
+.section-heading {
+  font-size: 13px; font-weight: 700; color: var(--ink-1);
+  margin-bottom: 20px; letter-spacing: 0.1px;
+}
+
+/* gap badge */
+.gap-badge {
+  display: inline-block; font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+  vertical-align: middle;
+}
+.gb-closed { background: var(--engine-bg); color: var(--engine); border: 1px solid rgba(52,211,153,0.2); }
+.gb-open   { background: var(--amber-surface); color: var(--amber-text); border: 1px solid var(--amber-border); }
+</style>
+</head>
+<body>
+
+<!-- ===================================================== -->
+<!-- PAGE HEADER                                           -->
+<!-- ===================================================== -->
+<header class="page-header">
+  <div>
+    <h1>FI Dashboard — Design System + Wireframes</h1>
+    <p>Dark mode · Fintech PM · Mobile-first · Single user · Amber-only accent</p>
+  </div>
+  <span class="ver">v1.0 · June 2026</span>
+</header>
+
+<!-- ===================================================== -->
+<!-- SECTION 0: GAP CLOSURES                              -->
+<!-- ===================================================== -->
+<div style="max-width:1280px;margin:0 auto 48px;">
+  <div class="section-heading">Gap Closures — Decisions Made</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;">
+
+    <div class="comp-card">
+      <h4>G-01 · Safe-to-spend null guard <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6"><code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">computeSafeToSpend()</code> returns <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">null</code> (not NaN / 0) when allowance is not set. All consumers render "—" for null. Guard check added before division.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-02 · detectTransfers() O(n²) <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">Move <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">detectTransfers()</code> to a Web Worker. Main thread posts the batch; worker returns flagged rows. Unblocks the UI on 150-row imports. Worker is inline (blob URL) — no build config change needed.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-03 · RecurringItem next_due stale on import <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">After import atomic write, a <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">advanceNextDue()</code> pass runs inside the same Dexie transaction — advances all RecurringItems whose <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">next_due</code> is within the imported date range. No separate step, no silent staleness.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-04 · PIN salt missing → lockout <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">On <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">verifyPin()</code>, if <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">device_salt</code> is missing: force PIN reset flow, not a lockout. New salt generated, user sets new PIN. Old data is still accessible (salt only affects PIN verify, not Dexie encryption).</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-05 · ISO week Monday-start <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6"><code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">useWorkweek()</code> uses explicit ISO 8601 arithmetic: Monday = <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">(day + 6) % 7 === 0</code>. Never uses <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">getDay()</code> raw. Unit-tested for Sun/Mon boundary on both hemispheres.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-06 · Transfer matcher greedy one-to-one <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">Matcher iterates out-rows, for each finds the earliest unmatched in-row with same amount ± 1 day. Marks both consumed. Second in-row with same amount is left unmatched and imports as normal income. Tested with 2 × 500K same-day scenario.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-07 · Account.current_balance staleness <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">Decision: drop <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">Account.current_balance</code> as a stored field. Always derive from transaction sum. Cash / wallet accounts use a <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">manual_balance_override</code> with <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">last_updated_at</code> — used when no transaction history exists for that account.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-08 · Restore prompt — export first <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">Restore modal: Step 1 = "Export current data first" with a one-tap export button. Step 2 = confirmation + file picker. Cannot reach file picker without seeing the export prompt. Prevents irrecoverable overwrites.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-09 · reconcileInProgress flag persistence <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">Flag persisted to localStorage (<code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">reconcile_in_progress: true</code>) at parse start, cleared on confirm or cancel. On cold open, if flag is set, show "You had an import in progress — it was lost. Start again?" — no silent FAB appearance.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-10 · last_exported_at in Dexie <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">Move <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">last_exported_at</code> to an <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">AppSettings</code> Dexie table (single-row key-value store) so it survives localStorage clears alongside the main data.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-11 · Gold revaluation prompt <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">Home screen: if the gold asset's <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">last_valued_at</code> > 30 days, show a one-line inline nudge "Gold last priced 34 days ago — update?" with a direct tap-to-edit. Dismissable per session.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-12 · FI engine pipe source <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6"><code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">computeFIDate()</code> derives <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">pipeMonthly</code> from the sum of active <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">pay_yourself_first</code> RecurringItems — not from IncomeEvent. IncomeEvent is the historical record; RecurringItems are the live source of truth for the projection.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>G-13 · iOS "Add to Home Screen" install instruction <span class="gap-badge gb-closed">CLOSED</span></h4>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.6">On iOS Safari (detect via <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">navigator.standalone === false && /iphone/i.test(navigator.userAgent)</code>), show a bottom banner: "Install: tap <strong>⎋</strong> Share → Add to Home Screen" with a dismiss. Shown once per session until installed.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<!-- SECTION 1: DESIGN TOKENS                             -->
+<!-- ===================================================== -->
+<div style="max-width:1280px;margin:0 auto 48px;border-top:1px solid var(--line-2);padding-top:32px;">
+  <div class="section-heading">Design Tokens</div>
+  <div class="token-strip">
+
+    <div class="token-card">
+      <h4>Backgrounds · Elevation</h4>
+      <div class="swatch-row">
+        <div class="swatch-item"><div class="swatch" style="background:#090b10;"></div><span class="swatch-name">bg-0</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#0f1219;"></div><span class="swatch-name">bg-1</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#161b25;"></div><span class="swatch-name">bg-2</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#1e2433;"></div><span class="swatch-name">bg-3</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#252d3f;"></div><span class="swatch-name">bg-4</span></div>
+      </div>
+    </div>
+
+    <div class="token-card">
+      <h4>Text · Ink Scale</h4>
+      <div class="type-row">
+        <div class="type-sample"><span style="font-size:14px;font-weight:600;color:#e8ecf5;">Primary text</span><span>ink-1 · #e8ecf5</span></div>
+        <div class="type-sample"><span style="font-size:13px;color:#8892a8;">Secondary text</span><span>ink-2 · #8892a8</span></div>
+        <div class="type-sample"><span style="font-size:12px;color:#4e5668;">Labels / timestamps</span><span>ink-3 · #4e5668</span></div>
+      </div>
+    </div>
+
+    <div class="token-card">
+      <h4>Amber · Single Accent</h4>
+      <div class="swatch-row">
+        <div class="swatch-item"><div class="swatch" style="background:#f0a500;"></div><span class="swatch-name">amber</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#fbbf24;"></div><span class="swatch-name">amber-text</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#a87200;"></div><span class="swatch-name">amber-dim</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#3d2900;"></div><span class="swatch-name">amber-border</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#110d00;"></div><span class="swatch-name">amber-surface</span></div>
+      </div>
+    </div>
+
+    <div class="token-card">
+      <h4>Lane Colours · 4-Lane Model</h4>
+      <div class="lane-row-demo">
+        <span class="lane-chip lc-engine">Engine</span>
+        <span class="lane-chip lc-store">Store</span>
+        <span class="lane-chip lc-debt">Debt</span>
+        <span class="lane-chip lc-protected">Protected</span>
+      </div>
+      <p style="font-size:10px;color:var(--ink-3);margin-top:10px;line-height:1.6">Lane colours categorise. They are never used as traffic-light signals. Debt is slate-neutral — never red.</p>
+    </div>
+
+    <div class="token-card">
+      <h4>Typography Scale</h4>
+      <div class="type-row">
+        <div class="type-sample"><span style="font-size:40px;font-family:var(--font-mono);font-weight:700;letter-spacing:-1px;">52px</span><span>Hero number · mono</span></div>
+        <div class="type-sample"><span style="font-size:22px;font-weight:700;letter-spacing:-0.3px;">22px</span><span>Screen title · 700</span></div>
+        <div class="type-sample"><span style="font-size:16px;font-weight:600;">16px</span><span>Sheet title · 600</span></div>
+        <div class="type-sample"><span style="font-size:13px;color:var(--ink-1);">13px</span><span>Body · 400</span></div>
+        <div class="type-sample"><span style="font-size:11px;color:var(--ink-2);">11px</span><span>Supporting · 400</span></div>
+        <div class="type-sample"><span style="font-size:9.5px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-3);font-weight:700;">9.5PX LABEL</span><span>Eyebrow · 700 UC</span></div>
+      </div>
+    </div>
+
+    <div class="token-card">
+      <h4>Borders · Line Scale</h4>
+      <div class="swatch-row">
+        <div class="swatch-item"><div class="swatch" style="background:#141926;"></div><span class="swatch-name">line-1</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#1e2b3f;"></div><span class="swatch-name">line-2</span></div>
+        <div class="swatch-item"><div class="swatch" style="background:#3a4a65;"></div><span class="swatch-name">line-3</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<!-- SECTION 2: PHONE SCREENS                             -->
+<!-- ===================================================== -->
+<div style="max-width:1280px;margin:0 auto 16px;border-top:1px solid var(--line-2);padding-top:32px;">
+  <div class="section-heading">Screens</div>
+</div>
+
+<div class="stage">
+
+  <!-- ==============================
+       SCREEN 1 — HOME / NET WORTH
+       ============================== -->
+  <div class="screen-col">
+    <div class="screen-label"><b>1 · Home</b> — Net Worth + FI Readout</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="sbar">
+          <span class="mono" style="font-size:13px;font-weight:700;">9:41</span>
+          <div class="signal">
+            <span>▲▲▲</span><span>Wi-Fi</span><span>⬛</span>
+          </div>
+        </div>
+
+        <div class="app-bar">
+          <div class="bar-row">
+            <div>
+              <div class="title">Scoreboard</div>
+              <div class="sub">Last reconciled Jun 15</div>
+            </div>
+            <div class="icon-btn">⚙</div>
+          </div>
+        </div>
+
+        <div class="body">
+          <!-- Net worth hero -->
+          <div class="nw-hero">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <div class="nw-label">Net worth</div>
+              <div class="nw-date">Jun 2026</div>
+            </div>
+            <div class="nw-number mono">Rp 80M</div>
+            <div class="nw-delta">
+              <span class="delta-pill">+2.1M</span>
+              <span style="font-size:11.5px;">this month</span>
+            </div>
+            <div class="nw-fresh">Gold priced 34 days ago · <span style="color:var(--amber-text);">update?</span></div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="eyebrow">By lane</div>
+
+          <div class="lane-list">
+            <div class="lane-row">
+              <div class="lane-dot" style="background:var(--engine);"></div>
+              <div class="lane-name">Engine</div>
+              <div class="lane-bar-wrap"><div class="lane-bar" style="width:5%;background:var(--engine);"></div></div>
+              <div class="lane-amt">Rp 3.5M</div>
+            </div>
+            <div class="lane-row">
+              <div class="lane-dot" style="background:var(--store);"></div>
+              <div class="lane-name">Store of value</div>
+              <div class="lane-bar-wrap"><div class="lane-bar" style="width:100%;background:var(--store);"></div></div>
+              <div class="lane-amt">Rp 77M</div>
+            </div>
+            <div class="lane-row">
+              <div class="lane-dot" style="background:var(--protected);"></div>
+              <div class="lane-name">Protected</div>
+              <div class="lane-bar-wrap"><div class="lane-bar" style="width:0%;background:var(--protected);"></div></div>
+              <div class="lane-amt muted">—</div>
+            </div>
+            <div class="lane-row">
+              <div class="lane-dot" style="background:var(--debt);"></div>
+              <div class="lane-name">Debt / liability</div>
+              <div class="lane-bar-wrap"><div class="lane-bar" style="width:0%;background:var(--debt);"></div></div>
+              <div class="lane-amt muted">Enter KPR</div>
+            </div>
+          </div>
+
+          <div class="fi-card">
+            <div class="eyebrow" style="margin-bottom:6px;">FI progress</div>
+            <div class="fi-row"><div class="fi-lbl">Gap to 4.5B</div><div class="fi-val mono">Rp 4.42B</div></div>
+            <div class="fi-row"><div class="fi-lbl">Gap to 6B</div><div class="fi-val mono">Rp 5.92B</div></div>
+            <div class="fi-row"><div class="fi-lbl">FI date (Path B)</div><div class="fi-val amber">≈ 2045</div></div>
+            <div class="fi-row"><div class="fi-lbl">Savings rate</div><div class="fi-val engine">12.8%</div></div>
+
+            <div class="fi-progress">
+              <div class="fi-prog-labels">
+                <span>Now · 80M</span>
+                <span>4.5B goal</span>
+              </div>
+              <div class="fi-prog-track">
+                <div class="fi-prog-fill"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab active"><div class="tab-ic">⬜</div>Home</div>
+          <div class="tab"><div class="tab-ic">⬜</div>Budget</div>
+          <div class="tab"><div class="tab-ic">⬜</div>Assets</div>
+          <div class="tab"><div class="tab-ic">⬜</div>Decide</div>
+          <div class="tab"><div class="tab-ic">⬜</div>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================
+       SCREEN 2 — SAFE-TO-SPEND
+       ============================== -->
+  <div class="screen-col">
+    <div class="screen-label"><b>2 · Budget › Weekly</b> — Safe-to-Spend Governor</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="sbar">
+          <span class="mono" style="font-size:13px;font-weight:700;">9:41</span>
+          <div class="signal"><span>▲▲▲</span><span>Wi-Fi</span><span>⬛</span></div>
+        </div>
+
+        <div class="app-bar">
+          <div class="title">Budget</div>
+          <div class="sub">This workweek</div>
+        </div>
+
+        <div class="body">
+          <div class="seg-ctrl">
+            <div class="seg">Yearly</div>
+            <div class="seg">Monthly</div>
+            <div class="seg on">Weekly</div>
+          </div>
+
+          <!-- Gauge card -->
+          <div class="gauge-card">
+            <div class="gauge-lbl">Safe to spend today</div>
+            <div>
+              <span class="gauge-number mono">Rp 58k</span><span class="gauge-unit">/day</span>
+            </div>
+            <div class="gauge-sub">Rp 174k left · 3 workdays left</div>
+
+            <!-- Day dots: Mon Tue Wed Thu Fri -->
+            <div class="day-dots">
+              <div class="day-dot spent">M</div>
+              <div class="day-dot spent">T</div>
+              <div class="day-dot today">W</div>
+              <div class="day-dot future">T</div>
+              <div class="day-dot future">F</div>
+            </div>
+
+            <div class="gauge-note">
+              <span class="dot"></span>
+              <span>Started at Rp 67k/day — Mon–Tue ran a little hot, recalculated down</span>
+            </div>
+          </div>
+
+          <!-- Waterfall -->
+          <div class="eyebrow">How this number is built</div>
+          <div class="waterfall">
+            <div class="wf-row">
+              <div class="wf-lbl dim">Pipe + DPLK <span class="paid-badge">✓ Paid first</span></div>
+              <div class="wf-amt dim">gone</div>
+            </div>
+            <div class="wf-row">
+              <div class="wf-lbl dim">KPR, electric, jefry <span class="paid-badge">✓ Paid first</span></div>
+              <div class="wf-amt dim">gone</div>
+            </div>
+            <div class="wf-sep bold"></div>
+            <div class="wf-row">
+              <div class="wf-lbl">Personal pool</div>
+              <div class="wf-amt mono">2,500k</div>
+            </div>
+            <div class="wf-row">
+              <div class="wf-lbl">− Subs (Claude, game)</div>
+              <div class="wf-amt mono">−265k</div>
+            </div>
+            <div class="wf-carve">
+              <div class="wf-lbl">− Weekend (pre-allocated)</div>
+              <div class="wf-amt mono">−800k</div>
+            </div>
+            <div class="wf-sep bold"></div>
+            <div class="wf-row">
+              <div class="wf-lbl">Week pool</div>
+              <div class="wf-amt mono">~334k</div>
+            </div>
+            <div class="wf-row">
+              <div class="wf-lbl">− Spent Mon–Tue</div>
+              <div class="wf-amt mono">−160k</div>
+            </div>
+            <div class="wf-sep"></div>
+            <div class="wf-row result">
+              <div class="wf-lbl">÷ 3 workdays = today</div>
+              <div class="wf-amt mono">~58k</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab"><div class="tab-ic">⬜</div>Home</div>
+          <div class="tab active"><div class="tab-ic">⬜</div>Budget</div>
+          <div class="tab"><div class="tab-ic">⬜</div>Assets</div>
+          <div class="tab"><div class="tab-ic">⬜</div>Decide</div>
+          <div class="tab"><div class="tab-ic">⬜</div>More</div>
+        </div>
+
+        <!-- FAB -->
+        <div class="fab">+</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================
+       SCREEN 3 — QUICK-LOG SHEET
+       ============================== -->
+  <div class="screen-col">
+    <div class="screen-label"><b>3 · Quick-Log</b> — FAB Sheet (over Screen 2)</div>
+    <div class="phone">
+      <div class="sheet-screen">
+        <!-- Screen 2 blurred behind -->
+        <div class="sbar" style="position:relative;z-index:1;">
+          <span class="mono" style="font-size:13px;font-weight:700;">9:41</span>
+          <div class="signal"><span>▲▲▲</span><span>Wi-Fi</span><span>⬛</span></div>
+        </div>
+        <!-- Blurred background content -->
+        <div style="flex:1;padding:14px 20px;opacity:0.25;pointer-events:none;filter:blur(1px);">
+          <div class="seg-ctrl" style="margin-bottom:12px;">
+            <div class="seg">Yearly</div><div class="seg">Monthly</div><div class="seg on">Weekly</div>
+          </div>
+          <div class="gauge-card" style="margin-bottom:12px;">
+            <div class="gauge-lbl">Safe to spend today</div>
+            <div class="gauge-number mono" style="font-size:36px;">Rp 58k<span class="gauge-unit">/day</span></div>
+          </div>
+        </div>
+
+        <!-- Sheet overlay -->
+        <div class="sheet-bg-blur">
+          <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Log a spend</div>
+
+            <!-- Ceiling context -->
+            <div class="sheet-ceiling">
+              <div class="sc-lbl">Today's ceiling</div>
+              <div class="sc-val mono">Rp 58,000</div>
+            </div>
+
+            <!-- Amount input -->
+            <div class="amount-row">
+              <span class="amount-prefix">Rp</span>
+              <span class="amount-display mono">25.000</span><span class="amount-cursor"></span>
+            </div>
+            <div class="amount-underline"></div>
+            <div class="amount-hint">Rp 33k remaining after this</div>
+
+            <!-- Note -->
+            <div class="note-row">
+              <span class="note-icon">✎</span>
+              <span class="note-text">Add a note (optional)</span>
+            </div>
+
+            <div class="btn-primary">Log spend</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================
+       SCREEN 4 — RECONCILE IMPORT
+       ============================== -->
+  <div class="screen-col">
+    <div class="screen-label"><b>4 · Reconcile</b> — Paste-from-Claude + Confirm</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="sbar">
+          <span class="mono" style="font-size:13px;font-weight:700;">9:41</span>
+          <div class="signal"><span>▲▲▲</span><span>Wi-Fi</span><span>⬛</span></div>
+        </div>
+
+        <div class="app-bar">
+          <div class="bar-row">
+            <div>
+              <div class="title">Reconcile</div>
+              <div class="sub">June 2026 · 0 of 47 confirmed</div>
+            </div>
+            <div class="icon-btn" style="font-size:10px;color:var(--ink-3);">✕</div>
+          </div>
+        </div>
+
+        <div class="body" style="gap:0;overflow:hidden;">
+
+          <!-- Stats row -->
+          <div class="recon-stats">
+            <div class="rs-chip"><div class="rs-num mono">44</div><div class="rs-lbl">Ready</div></div>
+            <div class="rs-chip warn"><div class="rs-num mono">2</div><div class="rs-lbl">Duplicates</div></div>
+            <div class="rs-chip warn"><div class="rs-num mono">1</div><div class="rs-lbl">Error</div></div>
+            <div class="rs-chip"><div class="rs-num mono">4</div><div class="rs-lbl">Transfers</div></div>
+          </div>
+
+          <!-- Approve + Confirm row -->
+          <div class="approve-btn">
+            <div class="approve-all">Approve all lanes</div>
+            <div class="confirm-btn">Confirm 44 →</div>
+          </div>
+
+          <!-- Transaction rows -->
+          <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+
+            <!-- Normal row -->
+            <div class="recon-row">
+              <div class="rr-head">
+                <span class="rr-date">15 Jun</span>
+                <span class="rr-amount mono">−Rp 45.000</span>
+              </div>
+              <div class="rr-body">
+                <span class="dir-badge dir-out">out</span>
+                <span class="acct-badge">BCA</span>
+                <span class="lp lp-protected">Protected</span>
+                <span class="rr-cat">Daily living</span>
+              </div>
+            </div>
+
+            <!-- Transfer pair row -->
+            <div class="recon-row transfer">
+              <div class="rr-head">
+                <span class="rr-date">15 Jun</span>
+                <span class="rr-amount mono">Rp 500.000</span>
+              </div>
+              <div class="rr-body">
+                <span class="dir-badge dir-out">out</span>
+                <span class="acct-badge">BCA</span>
+                <span class="transfer-badge">↔ Transfer · auto-detected</span>
+              </div>
+            </div>
+
+            <!-- Engine row -->
+            <div class="recon-row">
+              <div class="rr-head">
+                <span class="rr-date">1 Jun</span>
+                <span class="rr-amount mono">−Rp 2.200.000</span>
+              </div>
+              <div class="rr-body">
+                <span class="dir-badge dir-out">out</span>
+                <span class="acct-badge">blu</span>
+                <span class="lp lp-engine">Engine</span>
+                <span class="rr-cat">Reksadana pipe</span>
+              </div>
+            </div>
+
+            <!-- Error row -->
+            <div class="error-row">
+              <span class="e-icon">⚠</span>
+              <div>
+                <div class="e-text">Row 23 — missing field</div>
+                <div class="e-field">direction: null</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab"><div class="tab-ic">⬜</div>Home</div>
+          <div class="tab active"><div class="tab-ic">⬜</div>Budget</div>
+          <div class="tab"><div class="tab-ic">⬜</div>Assets</div>
+          <div class="tab"><div class="tab-ic">⬜</div>Decide</div>
+          <div class="tab"><div class="tab-ic">⬜</div>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================
+       SCREEN 5 — PIN LOCK
+       ============================== -->
+  <div class="screen-col">
+    <div class="screen-label"><b>5 · PIN Lock</b> — Cold open gate</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="sbar">
+          <span class="mono" style="font-size:13px;font-weight:700;">9:41</span>
+          <div class="signal"><span>▲▲▲</span><span>Wi-Fi</span><span>⬛</span></div>
+        </div>
+
+        <div class="pin-screen">
+          <div class="pin-logo">FI <span>▸</span> Scoreboard</div>
+          <div class="pin-title">Enter your PIN</div>
+          <div class="pin-sub">Your data is encrypted on this device</div>
+
+          <div class="pin-dots">
+            <div class="pin-dot filled"></div>
+            <div class="pin-dot filled"></div>
+            <div class="pin-dot filled"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+            <div class="pin-dot"></div>
+          </div>
+
+          <div class="pin-pad">
+            <div class="pin-key">1</div>
+            <div class="pin-key">2</div>
+            <div class="pin-key">3</div>
+            <div class="pin-key">4</div>
+            <div class="pin-key">5</div>
+            <div class="pin-key">6</div>
+            <div class="pin-key">7</div>
+            <div class="pin-key">8</div>
+            <div class="pin-key">9</div>
+            <div class="pin-key clear">Forgot?</div>
+            <div class="pin-key">0</div>
+            <div class="pin-key del">⌫</div>
+          </div>
+
+          <div class="pin-biometric">
+            <span>⬡</span><span>Use biometric</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /stage -->
+
+<!-- ===================================================== -->
+<!-- SECTION 3: COMPONENT STATES                          -->
+<!-- ===================================================== -->
+<div class="comp-section">
+  <div class="section-heading">Component States</div>
+  <div class="comp-grid">
+
+    <div class="comp-card">
+      <h4>Amber Governor — Pool Exhausted (non-red)</h4>
+      <div class="amber-banner">
+        <div class="ab-dot"></div>
+        <div>
+          <div class="ab-text">Safe to spend: Rp 0/day</div>
+          <div class="ab-sub">This week's pool is used up. Weekend budget is still intact.</div>
+        </div>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-3);margin-top:10px;line-height:1.6">Per DECISION-2: no red, no shame. The amber banner replaces the gauge number. Weekend allocation (pre-carved) is unaffected and shown separately.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>Amber Governor — Negative Pool Config Error</h4>
+      <div class="amber-banner">
+        <div class="ab-dot"></div>
+        <div>
+          <div class="ab-text">Committed bills exceed your allowance</div>
+          <div class="ab-sub">Safe to spend shows 0 — check your recurring items.</div>
+        </div>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-3);margin-top:10px;line-height:1.6">No negative figure displayed. Amber is the ceiling. Link to Recurring Items screen inline.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>Stale Data Notice (neutral, not alarming)</h4>
+      <div class="stale-notice">
+        <div class="s-dot"></div>
+        <div class="s-text">Gold last priced 34 days ago · <span style="color:var(--amber-text);">Update price</span></div>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-3);margin-top:10px;line-height:1.6">Muted dot + inline text link. Dismissable per session. Never a blocking modal.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>Success Toast — Import complete</h4>
+      <div class="toast">
+        <span class="toast-icon">✓</span>
+        <div>
+          <div class="toast-text">47 transactions imported</div>
+          <div class="toast-sub">Net worth snapshot saved · Jun 2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <h4>Protected Badge</h4>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="protected-badge">Protected</span>
+        <span style="font-size:11.5px;color:var(--ink-2);">KPR mortgage</span>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-3);margin-top:10px;line-height:1.6">Appears on RecurringItems and Accounts flagged is_protected. Indigo badge — sacred, not a warning. Editing shows the badge but does not block.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>Lane Pills — all four states</h4>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <span class="lp lp-engine">Engine</span>
+        <span class="lp lp-store">Store</span>
+        <span class="lp lp-debt">Debt</span>
+        <span class="lp lp-protected">Protected</span>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-3);margin-top:10px;line-height:1.6">Used on transaction rows, reconcile confirm list, recurring items. Tap to edit lane inline on reconcile screen.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>PIN — Wrong attempt shake state</h4>
+      <div style="display:flex;gap:12px;justify-content:center;padding:12px 0;">
+        <div class="pin-dot filled" style="background:var(--debt);border-color:var(--debt);"></div>
+        <div class="pin-dot filled" style="background:var(--debt);border-color:var(--debt);"></div>
+        <div class="pin-dot filled" style="background:var(--debt);border-color:var(--debt);"></div>
+        <div class="pin-dot filled" style="background:var(--debt);border-color:var(--debt);"></div>
+        <div class="pin-dot filled" style="background:var(--debt);border-color:var(--debt);"></div>
+        <div class="pin-dot filled" style="background:var(--debt);border-color:var(--debt);"></div>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-3);line-height:1.6">Dots turn slate (not red — design principle). Row animates horizontally (CSS shake keyframe). Attempt count shown below in ink-3.</p>
+    </div>
+
+    <div class="comp-card">
+      <h4>Transfer auto-collapse — confirm list chip</h4>
+      <div class="recon-row transfer" style="margin:0;">
+        <div class="rr-head">
+          <span class="rr-date">15 Jun</span>
+          <span class="rr-amount mono" style="font-size:12px;">Rp 500.000</span>
+        </div>
+        <div class="rr-body">
+          <span class="dir-badge dir-out">out</span>
+          <span class="acct-badge">BCA→blu</span>
+          <span class="transfer-badge">↔ Transfer · unflag?</span>
+        </div>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-3);margin-top:10px;line-height:1.6">Amber surface signals "auto-handled." Tap the chip to unflag if incorrect. Excluded from totals unless unflagged.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<!-- SECTION 4: COPYWRITING REFERENCE                     -->
+<!-- ===================================================== -->
+<div class="copy-section">
+  <div class="section-heading">Copywriting Guidelines + Copy Bank</div>
+
+  <!-- Voice rules -->
+  <div style="background:var(--bg-1);border:1px solid var(--line-2);border-radius:var(--r-lg);padding:18px 20px;margin-bottom:20px;">
+    <div style="font-size:10px;letter-spacing:0.7px;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin-bottom:12px;">Voice Rules — 5 constraints</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.6;"><b style="color:var(--ink-1);">Direct, no filler.</b> "Rp 58k today" not "You currently have Rp 58,000 available to spend today!"</div>
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.6;"><b style="color:var(--ink-1);">Show the math.</b> Always expose the calculation. Adi is a PM — he wants to see how the number was built, not just the output.</div>
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.6;"><b style="color:var(--ink-1);">No verdicts.</b> "This delays FI by ~4 days" not "This is a bad purchase." Present the trade-off; let him decide.</div>
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.6;"><b style="color:var(--ink-1);">Amber informs, never scolds.</b> "Ran a little hot Mon–Tue" not "You overspent!" Neutral, factual, forward-looking.</div>
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.6;"><b style="color:var(--ink-1);">No emojis. No exclamations.</b> This is a dashboard, not a social app. Reserve exclamation marks for zero occurrences.</div>
+    </div>
+  </div>
+
+  <div class="copy-grid">
+
+    <div class="copy-card">
+      <h4>Empty States</h4>
+      <div class="copy-item">
+        <div class="copy-context">home — no assets seeded</div>
+        <div class="copy-text">Net worth: —<br><span class="dim">Add your assets to see where you stand.</span></div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">budget/weekly — allowance not configured</div>
+        <div class="copy-text">Safe to spend: —<br><span class="dim">Set your monthly allowance to activate the governor.</span></div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">FI readout — no income event</div>
+        <div class="copy-text">FI date: —<br><span class="dim">Log your take-home to start the projection.</span></div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">reconcile — no imports this month</div>
+        <div class="copy-text">No reconcile for June yet.<br><span class="dim">Paste your blu + BCA statement from Claude to start.</span></div>
+      </div>
+    </div>
+
+    <div class="copy-card">
+      <h4>Safe-to-Spend Copy</h4>
+      <div class="copy-item">
+        <div class="copy-context">gauge label</div>
+        <div class="copy-text">SAFE TO SPEND TODAY</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">gauge subtext — normal</div>
+        <div class="copy-text dim">Rp 174k left · 3 workdays to reset</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">recalc note — ran hot</div>
+        <div class="copy-text dim">Started at Rp 67k/day — Mon–Tue ran a little hot, recalculated down</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">amber — pool at zero</div>
+        <div class="copy-text amber">This week's pool is used up. Weekend budget is untouched.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">amber — committed bills exceed allowance</div>
+        <div class="copy-text amber">Committed bills exceed your allowance this month — safe to spend is 0.</div>
+      </div>
+    </div>
+
+    <div class="copy-card">
+      <h4>Waterfall Labels</h4>
+      <div class="copy-item">
+        <div class="copy-context">pay-yourself-first items</div>
+        <div class="copy-text dim">Pipe + DPLK &nbsp;<span style="font-size:9px;background:var(--engine-bg);color:var(--engine);border:1px solid rgba(52,211,153,0.2);border-radius:4px;padding:1px 5px;font-weight:700;">✓ Paid first</span></div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">household bills</div>
+        <div class="copy-text dim">KPR, electric, jefry &nbsp;<span style="font-size:9px;background:var(--engine-bg);color:var(--engine);border:1px solid rgba(52,211,153,0.2);border-radius:4px;padding:1px 5px;font-weight:700;">✓ Paid first</span></div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">weekend carve-out row</div>
+        <div class="copy-text dim">− Weekend (pre-allocated)</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">result row</div>
+        <div class="copy-text">÷ 3 workdays = today</div>
+      </div>
+    </div>
+
+    <div class="copy-card">
+      <h4>Toasts + Confirmations</h4>
+      <div class="copy-item">
+        <div class="copy-context">import success</div>
+        <div class="copy-text engine">47 transactions imported</div>
+        <div class="copy-text dim">Net worth snapshot saved · Jun 2026</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">import rollback</div>
+        <div class="copy-text">Import failed — nothing was saved. Try again.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">quick-log success</div>
+        <div class="copy-text engine">Logged Rp 25.000 · Rp 33k left today</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">JSON backup exported</div>
+        <div class="copy-text engine">Backup saved · fi-backup-2026-06-25.json</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">restore confirm modal</div>
+        <div class="copy-text">This will replace all current data. Export first?</div>
+      </div>
+    </div>
+
+    <div class="copy-card">
+      <h4>Onboarding Steps</h4>
+      <div class="copy-item">
+        <div class="copy-context">step 1 — take-home</div>
+        <div class="copy-text">Your take-home</div>
+        <div class="copy-text dim">What lands in your account each month, after tax and deductions.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">step 2 — assets</div>
+        <div class="copy-text">Your starting position</div>
+        <div class="copy-text dim">Add what you own. This is the baseline — every number from here is a delta.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">step 3 — pipes</div>
+        <div class="copy-text">Your pipes</div>
+        <div class="copy-text dim">Money that leaves before you see it. These are your pipes — and they're the engine.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">step 4 — allowance</div>
+        <div class="copy-text">Your personal pool</div>
+        <div class="copy-text dim">What's yours to run the week with, after the pipes have fed.</div>
+      </div>
+    </div>
+
+    <div class="copy-card">
+      <h4>Decision Lens Copy (J4)</h4>
+      <div class="copy-item">
+        <div class="copy-context">one-off purchase</div>
+        <div class="copy-text">Delays FI by ~4 days</div>
+        <div class="copy-text dim">Fits this month's pool. One-off — no future drag.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">new recurring sub</div>
+        <div class="copy-text">−Rp 200k/month · Rp 2.4M/year</div>
+        <div class="copy-text dim">Shrinks every future month's safe-to-spend by Rp 6.7k/day. Delays FI by ~2.1 months.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">new recurring — below the line</div>
+        <div class="copy-text amber">Not funded by freed cash. Would eat into your workweek pool.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">FI disclaimer (visible on every projection)</div>
+        <div class="copy-text dim" style="font-size:10.5px;">Scenario estimate, not a guarantee. Based on your own assumptions.</div>
+      </div>
+    </div>
+
+    <div class="copy-card">
+      <h4>Crash / Do-Nothing Flow (J7)</h4>
+      <div class="copy-item">
+        <div class="copy-context">home screen — market down period (no special treatment needed)</div>
+        <div class="copy-text">Net worth: Rp 78M</div>
+        <div class="copy-text dim">Same screen as always. No drawdown callout. No "down X%" banner. No red.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">milestones screen — crash note (if the user navigates there)</div>
+        <div class="copy-text dim">Markets are down. The plan is to keep funding. Units are cheaper. Nothing to do here.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">design rule</div>
+        <div class="copy-text dim">The crash experience is silence. No notification, no badge, no modal. The app's inaction is the feature.</div>
+      </div>
+    </div>
+
+    <div class="copy-card">
+      <h4>PIN + Security Copy</h4>
+      <div class="copy-item">
+        <div class="copy-context">PIN setup prompt</div>
+        <div class="copy-text">Set a 6-digit PIN</div>
+        <div class="copy-text dim">Your data lives on this device. The PIN is the only key — there's no recovery without a backup.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">forgot PIN</div>
+        <div class="copy-text">Forgot your PIN?</div>
+        <div class="copy-text dim">Restore from a JSON backup to regain access. All current data will be replaced.</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">lockout state</div>
+        <div class="copy-text dim">Too many attempts — try again in 30s</div>
+      </div>
+      <div class="copy-item">
+        <div class="copy-context">storage persist banner (one-time)</div>
+        <div class="copy-text dim">Allow persistent storage to protect against data loss when your phone is low on space. <span style="color:var(--amber-text);">Allow</span> · Dismiss</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<!-- SECTION 5: DESIGN RULES FOR DEVS                     -->
+<!-- ===================================================== -->
+<div style="max-width:1280px;margin:52px auto 0;border-top:1px solid var(--line-2);padding-top:32px;">
+  <div class="section-heading">Design Rules — Developer Reference</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;">
+
+    <div class="comp-card">
+      <h4>Colour Rules</h4>
+      <ul style="font-size:12px;color:var(--ink-2);line-height:1.9;padding-left:14px;">
+        <li>Amber is the <em>only</em> accent. No blue buttons, no green CTAs.</li>
+        <li>Red does not exist in the app. Debt, errors, and warnings use slate or amber.</li>
+        <li>Lane colours categorise only — never status signals.</li>
+        <li>Background elevation: deeper = more background, not more prominent.</li>
+        <li>Text on amber background (--amber) must use #000 (black). Contrast ≥ 4.5:1.</li>
+        <li>Never use raw hex values in components. Always use the token var().</li>
+      </ul>
+    </div>
+
+    <div class="comp-card">
+      <h4>Typography Rules</h4>
+      <ul style="font-size:12px;color:var(--ink-2);line-height:1.9;padding-left:14px;">
+        <li>All currency/number values: <code style="font-size:10.5px;background:var(--bg-3);padding:1px 4px;border-radius:3px;">font-family: var(--font-mono)</code>.</li>
+        <li>Hero numbers (Rp 58k, Rp 80M): 40–52px, weight 700, letter-spacing ≤ −1.5px.</li>
+        <li>Section labels: 9.5px, uppercase, 0.7px letter-spacing, weight 700, ink-3.</li>
+        <li>No italics. No underlines except interactive links.</li>
+        <li>Never justify text. Left-align all copy.</li>
+        <li>Amounts: right-align in tables/rows. Labels: left-align.</li>
+      </ul>
+    </div>
+
+    <div class="comp-card">
+      <h4>Spacing + Touch</h4>
+      <ul style="font-size:12px;color:var(--ink-2);line-height:1.9;padding-left:14px;">
+        <li>Minimum tap target: 44×44px (iOS HIG). PIN keys: 56px height.</li>
+        <li>Screen horizontal padding: 20px left + right.</li>
+        <li>Card padding: 14px vertical, 16px horizontal.</li>
+        <li>Card border-radius: 14px (lg). Sheet: 22px top corners.</li>
+        <li>FAB: 52×52px, border-radius 16px. Bottom: 72px (above tab bar).</li>
+        <li>Tab bar height: 58px. Bottom inset: 10px for home indicator.</li>
+      </ul>
+    </div>
+
+    <div class="comp-card">
+      <h4>Motion + Feedback</h4>
+      <ul style="font-size:12px;color:var(--ink-2);line-height:1.9;padding-left:14px;">
+        <li>Number updates (safe-to-spend): counter animation, 300ms ease-out.</li>
+        <li>Sheet open: slide up 250ms cubic-bezier(0.32,0.72,0,1).</li>
+        <li>PIN wrong attempt: horizontal shake, 4 cycles, 50ms each, ±8px.</li>
+        <li>Toast: fade in 200ms, hold 3s, fade out 200ms. Bottom of screen.</li>
+        <li>No skeleton loaders — data is local (IndexedDB), reads are synchronous.</li>
+        <li>FAB press: scale(0.93), 80ms. Release: scale(1), 120ms ease-out.</li>
+      </ul>
+    </div>
+
+    <div class="comp-card">
+      <h4>Amber State Rules</h4>
+      <ul style="font-size:12px;color:var(--ink-2);line-height:1.9;padding-left:14px;">
+        <li>Amber background card: use --amber-surface + --amber-border only.</li>
+        <li>Text on amber-surface: use --amber-text (#fbbf24), not --amber (#f0a500).</li>
+        <li>Amber state never blocks action. Always informational.</li>
+        <li>Never show a negative number in the safe-to-spend gauge. Clamp to 0 and show amber banner.</li>
+        <li>The amber FAB (primary action) uses --amber background with #000 text.</li>
+      </ul>
+    </div>
+
+    <div class="comp-card">
+      <h4>What to Never Build</h4>
+      <ul style="font-size:12px;color:var(--ink-2);line-height:1.9;padding-left:14px;">
+        <li>No red anywhere in the UI — not for errors, not for debt, not for negative deltas.</li>
+        <li>No sell button, no sell flow, no sell confirmation — anywhere.</li>
+        <li>No real-time market data, no price tickers, no live fund NAVs.</li>
+        <li>No push notifications for market movement or portfolio value.</li>
+        <li>No "you should cut this" suggestions. Decision lens shows cost, not verdict.</li>
+        <li>No negative currency display on safe-to-spend — always clamp to 0 + banner.</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
