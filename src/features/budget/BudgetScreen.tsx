@@ -1,5 +1,6 @@
 import { useAppStore } from '@stores/appStore'
 import { SafeToSpendScreen } from './weekly/SafeToSpendScreen'
+import { MonthlyScreen } from './monthly/MonthlyScreen'
 
 export function BudgetScreen() {
   const { budgetHorizon, setBudgetHorizon } = useAppStore()
@@ -37,11 +38,7 @@ export function BudgetScreen() {
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {budgetHorizon === 'weekly' && <SafeToSpendScreen />}
-        {budgetHorizon === 'monthly' && (
-          <div style={{ padding: 20, color: 'var(--ink-3)', fontSize: 13 }}>
-            Monthly envelope view — coming soon.
-          </div>
-        )}
+        {budgetHorizon === 'monthly' && <MonthlyScreen />}
         {budgetHorizon === 'yearly' && (
           <div style={{ padding: 20, color: 'var(--ink-3)', fontSize: 13 }}>
             Yearly overview — coming soon.
