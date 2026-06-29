@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  /* Background layers */
+  --bg-0: #090b10;
+  --bg-1: #0f1219;
+  --bg-2: #161b25;
+  --bg-3: #1e2433;
+  --bg-4: #252d3f;
+
+  /* Ink (text) */
+  --ink-1: #e8ecf5;
+  --ink-2: #8892a8;
+  --ink-3: #4e5668;
+
+  /* Amber — the only accent (DECISION-2: inform, never alarm) */
+  --amber: #f0a500;
+  --amber-text: #fbbf24;
+  --amber-dim: #a87200;
+  --amber-surface: #110d00;
+  --amber-border: #3d2900;
+
+  /* Lane colors */
+  --engine: #34d399;
+  --engine-bg: #021f15;
+  --store: #fbbf24;
+  --store-bg: #130f00;
+  --debt: #64748b;
+  --debt-bg: #0d1117;
+  --protected: #818cf8;
+  --protected-bg: #0f0e2a;
+
+  /* Borders */
+  --border-1: #1e2433;
+  --border-2: #2a3347;
+
+  /* Typography */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.5;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  height: 100dvh;
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--ink-1);
+  font-family: var(--font-ui);
+  overscroll-behavior: none;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Safe area insets for notched devices */
+.safe-top    { padding-top:    env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Scrollable content area */
+.scroll-area {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Amber banner */
+.amber-banner {
+  background: var(--amber-surface);
+  border: 1px solid var(--amber-border);
+  border-radius: 10px;
+  color: var(--amber-text);
+  font-size: 13px;
+  padding: 10px 14px;
+}
