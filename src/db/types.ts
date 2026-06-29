@@ -170,6 +170,7 @@ export type AppSettingKey =
   | 'last_exported_at'
   | 'setup_complete'
   | 'onboarding_step'
+  | 'onboarding_draft'
   | 'reconcile_in_progress'
   | 'ios_install_banner_dismissed'
   | 'gold_staleness_dismissed_at'
