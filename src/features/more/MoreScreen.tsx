@@ -10,9 +10,10 @@ import { PinSetup } from './PinSetup'
 import { AssumptionsEditor } from './AssumptionsEditor'
 import { RestoreBackup } from './RestoreBackup'
 import { CategoryManager } from './CategoryManager'
+import { ImportPromptSheet } from './ImportPromptSheet'
 import { BottomSheet } from '@components/BottomSheet'
 
-type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | null
+type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | null
 
 export function MoreScreen() {
   const { start: startReconcile } = useReconcileStore()
@@ -65,6 +66,7 @@ export function MoreScreen() {
       <MenuRow label="Categories" sub="Tag transactions by lane for import auto-match" onClick={() => setSheet('categories')} />
 
       <SectionLabel style={{ marginTop: 12 }}>Data</SectionLabel>
+      <MenuRow label="Get Claude Prompt" sub="Copy ready-made prompt to paste into Claude" onClick={() => setSheet('import_prompt')} />
       <MenuRow label="Import Transactions" sub="Paste Claude's JSON output" onClick={handleReconcile} />
       <MenuRow label="Export Backup" sub="Download all data as JSON" onClick={handleExport} />
       <MenuRow label="Restore Backup" sub="Replace all data from a backup file" onClick={() => setSheet('restore')} />
@@ -97,6 +99,10 @@ export function MoreScreen() {
 
       <BottomSheet open={sheet === 'categories'} onClose={() => setSheet(null)} title="Categories" height="90dvh">
         <CategoryManager />
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'import_prompt'} onClose={() => setSheet(null)} title="Claude Import Prompt" height="90dvh">
+        <ImportPromptSheet />
       </BottomSheet>
     </div>
   )
