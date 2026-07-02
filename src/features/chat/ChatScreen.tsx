@@ -12,6 +12,7 @@ const SUGGESTIONS = [
 ]
 
 const TOOL_LABELS: Record<string, string> = {
+  create_account: 'Creating account',
   query_transactions: 'Checked your transactions',
   log_transactions: 'Logging transactions',
   log_income: 'Logging income',

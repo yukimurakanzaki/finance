@@ -10,6 +10,7 @@ const LANE_ENUM = ['income_producing', 'store_of_value', 'debt_liability', 'prot
 
 // Write tools mutate the DB and require user confirmation before executing.
 export const WRITE_TOOLS = new Set([
+  'create_account',
   'log_transactions',
   'log_income',
   'add_recurring_item',
@@ -39,9 +40,24 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     },
   },
   {
+    name: 'create_account',
+    description:
+      'Create a new account (bank, digital wallet, or cash) so transactions can be logged against it. Use when the user has an account not yet tracked in the app. Requires confirmation. Returns the new account id — use that id for subsequent log_transactions calls.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Display name, e.g. "blu by BCA Digital"' },
+        institution: { type: 'string', description: 'Bank/provider name, e.g. "BCA Digital"' },
+        account_type: { type: 'string', enum: ['bank', 'digital_wallet', 'cash'] },
+        lane: { type: 'string', enum: LANE_ENUM, description: 'protected_living for day-to-day spending accounts' },
+      },
+      required: ['name', 'institution', 'account_type', 'lane'],
+    },
+  },
+  {
     name: 'log_transactions',
     description:
-      'Log one or more transactions (spending, income received into an account, top-ups). Use this after extracting rows from a pasted bank statement image, or when the user tells you about spending. The user will review and confirm before anything is saved.',
+      'Log one or more transactions (spending, income received into an account, top-ups). Use this after extracting rows from a pasted bank statement image, or when the user tells you about spending. The user will review and confirm before anything is saved. For internal moves between the user’s own accounts, set is_transfer on BOTH legs and give both the same transfer_pair_key — transfer legs are excluded from spending and balance math.',
     input_schema: {
       type: 'object',
       properties: {
@@ -57,6 +73,8 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
               category_name: { type: 'string', description: 'Category name from the user’s category list, or omit if none matches' },
               lane: { type: 'string', enum: LANE_ENUM, description: 'protected_living for day-to-day spending unless clearly otherwise' },
               note: { type: 'string', description: 'Short description, e.g. merchant name' },
+              is_transfer: { type: 'boolean', description: 'true for internal moves between the user’s own accounts' },
+              transfer_pair_key: { type: 'string', description: 'Same arbitrary key on both legs of one transfer so they are paired, e.g. "tf-2026-05-09-blu-bca"' },
             },
             required: ['date', 'amount', 'direction', 'account_id', 'lane'],
           },
@@ -136,6 +154,7 @@ export async function executeReadTool(name: string, input: ToolInput): Promise<s
 
 export async function executeWriteTool(name: string, input: ToolInput): Promise<string> {
   switch (name) {
+    case 'create_account': return createAccount(input)
     case 'log_transactions': return logTransactions(input)
     case 'log_income': return logIncome(input)
     case 'add_recurring_item': return addRecurringItem(input)
@@ -195,6 +214,24 @@ interface TxnRow {
   category_name?: string
   lane: Lane
   note?: string
+  is_transfer?: boolean
+  transfer_pair_key?: string
+}
+
+async function createAccount(input: ToolInput): Promise<string> {
+  const id = await db.accounts.add({
+    name: String(input['name']),
+    institution: String(input['institution']),
+    account_type: input['account_type'] as 'bank' | 'digital_wallet' | 'cash',
+    lane: input['lane'] as Lane,
+    currency: 'IDR',
+    is_protected: false,
+    is_active: true,
+    manual_balance_override: null,
+    last_balance_updated_at: null,
+    created_at: now(),
+  })
+  return JSON.stringify({ saved: true, account_id: id, name: input['name'] })
 }
 
 async function logTransactions(input: ToolInput): Promise<string> {
@@ -204,6 +241,17 @@ async function logTransactions(input: ToolInput): Promise<string> {
     db.categories.toArray(),
   ])
   const accountIds = new Set(accounts.map((a) => a.id))
+
+  // Legs sharing a transfer_pair_key get the same generated pair id
+  const pairIds = new Map<string, string>()
+  const pairIdFor = (key: string) => {
+    let id = pairIds.get(key)
+    if (!id) {
+      id = crypto.randomUUID()
+      pairIds.set(key, id)
+    }
+    return id
+  }
 
   let saved = 0
   const errors: string[] = []
@@ -215,6 +263,7 @@ async function logTransactions(input: ToolInput): Promise<string> {
     const category = t.category_name
       ? (categories.find((c) => c.name.toLowerCase() === t.category_name!.toLowerCase()) ?? null)
       : null
+    const isTransfer = t.is_transfer === true
     await db.transactions.add({
       date: t.date,
       amount: t.amount,
@@ -228,8 +277,8 @@ async function logTransactions(input: ToolInput): Promise<string> {
       overridden_amount: null,
       override_note: null,
       overridden_at: null,
-      is_transfer: false,
-      transfer_pair_id: null,
+      is_transfer: isTransfer,
+      transfer_pair_id: isTransfer && t.transfer_pair_key ? pairIdFor(t.transfer_pair_key) : null,
       created_at: now(),
     })
     saved++
@@ -299,11 +348,13 @@ async function updateAccountBalance(input: ToolInput): Promise<string> {
 
 export function describeWrite(name: string, input: ToolInput): string[] {
   switch (name) {
+    case 'create_account':
+      return [`New account: ${input['name']} (${input['institution']}, ${input['account_type']})`]
     case 'log_transactions': {
       const txns = (input['transactions'] ?? []) as TxnRow[]
       return txns.map(
         (t) =>
-          `${t.direction === 'out' ? '−' : '+'} ${formatRpFull(t.amount)} · ${t.date}` +
+          `${t.is_transfer ? '⇄' : t.direction === 'out' ? '−' : '+'} ${formatRpFull(t.amount)} · ${t.date}` +
           `${t.note ? ` · ${t.note}` : ''}${t.category_name ? ` (${t.category_name})` : ''}`,
       )
     }
