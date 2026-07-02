@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type Tab = 'home' | 'budget' | 'assets' | 'decide' | 'more'
+type Tab = 'home' | 'budget' | 'assets' | 'chat' | 'decide' | 'more'
 type BudgetHorizon = 'yearly' | 'monthly' | 'weekly'
 
 interface AppState {

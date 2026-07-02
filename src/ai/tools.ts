@@ -1,0 +1,318 @@
+import type Anthropic from '@anthropic-ai/sdk'
+import { db } from '@db/db'
+import type { Lane, Cadence, RecurringKind } from '@db/types'
+import { formatRpFull } from '@lib/currency'
+import { todayISO } from '@lib/dates'
+
+const now = () => new Date().toISOString()
+
+const LANE_ENUM = ['income_producing', 'store_of_value', 'debt_liability', 'protected_living']
+
+// Write tools mutate the DB and require user confirmation before executing.
+export const WRITE_TOOLS = new Set([
+  'log_transactions',
+  'log_income',
+  'add_recurring_item',
+  'update_asset_value',
+  'update_account_balance',
+])
+
+export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
+  {
+    name: 'query_transactions',
+    description:
+      'Search past transactions. Call this when the user asks about spending history, a specific purchase, totals for a period, or before logging transactions that might be duplicates. Dates are YYYY-MM-DD.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        from_date: { type: 'string', description: 'Start date (inclusive), YYYY-MM-DD' },
+        to_date: { type: 'string', description: 'End date (inclusive), YYYY-MM-DD' },
+        direction: { type: 'string', enum: ['in', 'out'], description: 'Filter by money in or out' },
+        account_id: { type: 'number', description: 'Filter by account id' },
+        search_note: { type: 'string', description: 'Case-insensitive substring match on the note field' },
+        limit: { type: 'number', description: 'Max rows to return, default 50' },
+      },
+      required: ['from_date', 'to_date'],
+    },
+  },
+  {
+    name: 'log_transactions',
+    description:
+      'Log one or more transactions (spending, income received into an account, top-ups). Use this after extracting rows from a pasted bank statement image, or when the user tells you about spending. The user will review and confirm before anything is saved.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        transactions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              date: { type: 'string', description: 'YYYY-MM-DD' },
+              amount: { type: 'number', description: 'Positive amount in IDR, no separators' },
+              direction: { type: 'string', enum: ['in', 'out'] },
+              account_id: { type: 'number', description: 'Account id from the context or snapshot' },
+              category_name: { type: 'string', description: 'Category name from the user’s category list, or omit if none matches' },
+              lane: { type: 'string', enum: LANE_ENUM, description: 'protected_living for day-to-day spending unless clearly otherwise' },
+              note: { type: 'string', description: 'Short description, e.g. merchant name' },
+            },
+            required: ['date', 'amount', 'direction', 'account_id', 'lane'],
+          },
+        },
+      },
+      required: ['transactions'],
+    },
+  },
+  {
+    name: 'log_income',
+    description:
+      'Record a salary / take-home income event (not a regular account transaction). Use when the user reports receiving their salary. Requires confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'YYYY-MM-DD' },
+        gross: { type: 'number', description: 'Gross salary in IDR if known, else omit' },
+        take_home_net: { type: 'number', description: 'Take-home net in IDR' },
+        note: { type: 'string' },
+      },
+      required: ['date', 'take_home_net'],
+    },
+  },
+  {
+    name: 'add_recurring_item',
+    description:
+      'Add a recurring monthly/weekly/yearly commitment: a savings pipe (pay_yourself_first), household bill, or personal subscription. Requires confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        amount: { type: 'number', description: 'Amount in IDR per cadence period' },
+        cadence: { type: 'string', enum: ['monthly', 'weekly', 'yearly', 'one_off'] },
+        kind: { type: 'string', enum: ['pay_yourself_first', 'household_bill', 'personal_sub', 'other'] },
+        lane: { type: 'string', enum: LANE_ENUM },
+        note: { type: 'string' },
+      },
+      required: ['name', 'amount', 'cadence', 'kind', 'lane'],
+    },
+  },
+  {
+    name: 'update_asset_value',
+    description:
+      'Update the current value of an asset (investment, gold, DPLK). Asset ids are listed in the context. Requires confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        asset_id: { type: 'number' },
+        new_value: { type: 'number', description: 'New total value in IDR' },
+      },
+      required: ['asset_id', 'new_value'],
+    },
+  },
+  {
+    name: 'update_account_balance',
+    description:
+      'Set the balance of a digital wallet or cash account (bank balances derive from transactions and cannot be set directly). Requires confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        account_id: { type: 'number' },
+        new_balance: { type: 'number', description: 'New balance in IDR' },
+      },
+      required: ['account_id', 'new_balance'],
+    },
+  },
+]
+
+// ---------- Executors ----------
+
+type ToolInput = Record<string, unknown>
+
+export async function executeReadTool(name: string, input: ToolInput): Promise<string> {
+  if (name === 'query_transactions') return queryTransactions(input)
+  return JSON.stringify({ error: `Unknown read tool: ${name}` })
+}
+
+export async function executeWriteTool(name: string, input: ToolInput): Promise<string> {
+  switch (name) {
+    case 'log_transactions': return logTransactions(input)
+    case 'log_income': return logIncome(input)
+    case 'add_recurring_item': return addRecurringItem(input)
+    case 'update_asset_value': return updateAssetValue(input)
+    case 'update_account_balance': return updateAccountBalance(input)
+    default: return JSON.stringify({ error: `Unknown write tool: ${name}` })
+  }
+}
+
+async function queryTransactions(input: ToolInput): Promise<string> {
+  const from = String(input['from_date'])
+  const to = String(input['to_date'])
+  const limit = typeof input['limit'] === 'number' ? input['limit'] : 50
+
+  let rows = await db.transactions.where('date').between(from, to, true, true).toArray()
+
+  if (input['direction']) rows = rows.filter((t) => t.direction === input['direction'])
+  if (typeof input['account_id'] === 'number') rows = rows.filter((t) => t.account_id === input['account_id'])
+  if (typeof input['search_note'] === 'string') {
+    const q = (input['search_note'] as string).toLowerCase()
+    rows = rows.filter((t) => t.note?.toLowerCase().includes(q))
+  }
+
+  const [accounts, categories] = await Promise.all([db.accounts.toArray(), db.categories.toArray()])
+  const accName = new Map(accounts.map((a) => [a.id, a.name]))
+  const catName = new Map(categories.map((c) => [c.id, c.name]))
+
+  const totalIn = rows.filter((t) => t.direction === 'in' && !t.is_transfer).reduce((s, t) => s + t.amount, 0)
+  const totalOut = rows.filter((t) => t.direction === 'out' && !t.is_transfer).reduce((s, t) => s + t.amount, 0)
+
+  rows.sort((a, b) => b.date.localeCompare(a.date))
+  const trimmed = rows.slice(0, limit).map((t) => ({
+    id: t.id,
+    date: t.date,
+    amount: t.amount,
+    direction: t.direction,
+    account: accName.get(t.account_id) ?? `#${t.account_id}`,
+    category: t.category_id ? (catName.get(t.category_id) ?? null) : null,
+    lane: t.lane,
+    note: t.note,
+    is_transfer: t.is_transfer,
+  }))
+
+  return JSON.stringify({
+    match_count: rows.length,
+    total_in_excl_transfers: totalIn,
+    total_out_excl_transfers: totalOut,
+    transactions: trimmed,
+  })
+}
+
+interface TxnRow {
+  date: string
+  amount: number
+  direction: 'in' | 'out'
+  account_id: number
+  category_name?: string
+  lane: Lane
+  note?: string
+}
+
+async function logTransactions(input: ToolInput): Promise<string> {
+  const txns = (input['transactions'] ?? []) as TxnRow[]
+  const [accounts, categories] = await Promise.all([
+    db.accounts.filter((a) => a.is_active).toArray(),
+    db.categories.toArray(),
+  ])
+  const accountIds = new Set(accounts.map((a) => a.id))
+
+  let saved = 0
+  const errors: string[] = []
+  for (const t of txns) {
+    if (!accountIds.has(t.account_id)) {
+      errors.push(`No active account with id ${t.account_id} (note: "${t.note ?? ''}")`)
+      continue
+    }
+    const category = t.category_name
+      ? (categories.find((c) => c.name.toLowerCase() === t.category_name!.toLowerCase()) ?? null)
+      : null
+    await db.transactions.add({
+      date: t.date,
+      amount: t.amount,
+      direction: t.direction,
+      account_id: t.account_id,
+      category_id: category?.id ?? null,
+      lane: t.lane,
+      source: 'claude_import',
+      note: t.note || null,
+      original_amount: null,
+      overridden_amount: null,
+      override_note: null,
+      overridden_at: null,
+      is_transfer: false,
+      transfer_pair_id: null,
+      created_at: now(),
+    })
+    saved++
+  }
+  return JSON.stringify({ saved_count: saved, errors })
+}
+
+async function logIncome(input: ToolInput): Promise<string> {
+  const prev = await db.incomeEvents.orderBy('date').last()
+  const takeHome = Number(input['take_home_net'])
+  const id = await db.incomeEvents.add({
+    date: String(input['date'] ?? todayISO()),
+    gross: typeof input['gross'] === 'number' ? input['gross'] : 0,
+    take_home_net: takeHome,
+    delta_vs_prev: prev ? takeHome - prev.take_home_net : null,
+    routed_to_pipe: 0,
+    routed_to_lifestyle: 0,
+    note: typeof input['note'] === 'string' ? input['note'] : null,
+    source: 'manual',
+    created_at: now(),
+  })
+  return JSON.stringify({ saved: true, income_event_id: id })
+}
+
+async function addRecurringItem(input: ToolInput): Promise<string> {
+  const id = await db.recurringItems.add({
+    name: String(input['name']),
+    amount: Number(input['amount']),
+    cadence: input['cadence'] as Cadence,
+    kind: input['kind'] as RecurringKind,
+    lane: input['lane'] as Lane,
+    is_protected: input['kind'] === 'pay_yourself_first',
+    is_active: true,
+    next_due: todayISO(),
+    end_date: null,
+    note: typeof input['note'] === 'string' ? input['note'] : null,
+    created_at: now(),
+  })
+  return JSON.stringify({ saved: true, recurring_item_id: id })
+}
+
+async function updateAssetValue(input: ToolInput): Promise<string> {
+  const id = Number(input['asset_id'])
+  const asset = await db.assets.get(id)
+  if (!asset) return JSON.stringify({ error: `No asset with id ${id}` })
+  await db.assets.update(id, { value: Number(input['new_value']), last_valued_at: todayISO() })
+  return JSON.stringify({ saved: true, asset: asset.name, new_value: input['new_value'] })
+}
+
+async function updateAccountBalance(input: ToolInput): Promise<string> {
+  const id = Number(input['account_id'])
+  const account = await db.accounts.get(id)
+  if (!account) return JSON.stringify({ error: `No account with id ${id}` })
+  if (account.account_type === 'bank') {
+    return JSON.stringify({
+      error: 'Bank balances derive from transactions. Log a correcting transaction instead.',
+    })
+  }
+  await db.accounts.update(id, {
+    manual_balance_override: Number(input['new_balance']),
+    last_balance_updated_at: now(),
+  })
+  return JSON.stringify({ saved: true, account: account.name, new_balance: input['new_balance'] })
+}
+
+// ---------- Human-readable summaries for the confirmation card ----------
+
+export function describeWrite(name: string, input: ToolInput): string[] {
+  switch (name) {
+    case 'log_transactions': {
+      const txns = (input['transactions'] ?? []) as TxnRow[]
+      return txns.map(
+        (t) =>
+          `${t.direction === 'out' ? '−' : '+'} ${formatRpFull(t.amount)} · ${t.date}` +
+          `${t.note ? ` · ${t.note}` : ''}${t.category_name ? ` (${t.category_name})` : ''}`,
+      )
+    }
+    case 'log_income':
+      return [`Income: ${formatRpFull(Number(input['take_home_net']))} take-home on ${input['date']}`]
+    case 'add_recurring_item':
+      return [`Recurring: ${input['name']} — ${formatRpFull(Number(input['amount']))} / ${input['cadence']}`]
+    case 'update_asset_value':
+      return [`Asset #${input['asset_id']} → ${formatRpFull(Number(input['new_value']))}`]
+    case 'update_account_balance':
+      return [`Account #${input['account_id']} balance → ${formatRpFull(Number(input['new_balance']))}`]
+    default:
+      return [JSON.stringify(input)]
+  }
+}

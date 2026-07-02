@@ -174,3 +174,13 @@ export type AppSettingKey =
   | 'reconcile_in_progress'
   | 'ios_install_banner_dismissed'
   | 'gold_staleness_dismissed_at'
+  | 'anthropic_api_key'
+
+// One row per Anthropic-API-format message. `content` is JSON:
+// either a plain string or an array of content blocks (text/image/tool_use/tool_result/thinking).
+export interface ChatMessage {
+  id?: number
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}

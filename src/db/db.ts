@@ -12,6 +12,7 @@ import type {
   Milestone,
   Assumptions,
   AppSetting,
+  ChatMessage,
 } from './types'
 
 class FIDatabase extends Dexie {
@@ -27,6 +28,7 @@ class FIDatabase extends Dexie {
   milestones!: Table<Milestone, number>
   assumptions!: Table<Assumptions, number>
   appSettings!: Table<AppSetting, string>
+  chatMessages!: Table<ChatMessage, number>
 
   constructor() {
     super('fi-dashboard')
@@ -77,6 +79,11 @@ class FIDatabase extends Dexie {
             }),
         ]),
       )
+
+    // v5: AI finance manager chat history
+    this.version(5).stores({
+      chatMessages: '++id, created_at',
+    })
 
     // v4: milestone gains income_event_id FK
     this.version(4)

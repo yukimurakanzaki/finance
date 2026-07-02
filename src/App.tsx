@@ -9,6 +9,7 @@ import { BudgetScreen } from '@features/budget/BudgetScreen'
 import { AssetsScreen } from '@features/assets/AssetsScreen'
 import { DecideScreen } from '@features/decide/DecideScreen'
 import { MoreScreen } from '@features/more/MoreScreen'
+import { ChatScreen } from '@features/chat/ChatScreen'
 import { useReconcileStore } from '@stores/reconcileStore'
 import { ReconcileEntryScreen } from '@features/reconcile/ReconcileEntryScreen'
 import { ReconcileConfirmScreen } from '@features/reconcile/ReconcileConfirmScreen'
@@ -59,21 +60,24 @@ function AppShell() {
   const SCREENS = {
     home:   { title: 'Home',   subtitle: 'The Scoreboard',      component: <HomeScreen /> },
     budget: { title: 'Budget', subtitle: 'This workweek',       component: <BudgetScreen /> },
+    chat:   { title: 'Manager', subtitle: 'Your AI finance partner', component: <ChatScreen /> },
     assets: { title: 'Assets', subtitle: 'Accounts & assets',   component: <AssetsScreen /> },
     decide: { title: 'Decide', subtitle: 'What does this buy?', component: <DecideScreen /> },
     more:   { title: 'More',   subtitle: '',                    component: <MoreScreen /> },
   }
 
   const screen = SCREENS[activeTab]
+  // Chat manages its own scrolling and input bar; the FAB would cover the send button
+  const isChat = activeTab === 'chat'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <AppBar title={screen.title} subtitle={screen.subtitle} />
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowY: isChat ? 'hidden' : 'auto' }}>
         {screen.component}
       </div>
       <TabBar />
-      <QuickLogFAB />
+      {!isChat && <QuickLogFAB />}
     </div>
   )
 }

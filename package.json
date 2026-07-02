@@ -11,6 +11,7 @@
     "lint": "biome check src"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.109.1",
     "@types/node": "^26.0.1",
     "dexie": "^4.0.8",
     "dexie-react-hooks": "^4.4.0",
