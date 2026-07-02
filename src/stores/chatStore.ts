@@ -49,6 +49,7 @@ function trimForApi(messages: ApiMessage[]): ApiMessage[] {
   let slice = messages.slice(-HISTORY_LIMIT)
   while (slice.length > 0) {
     const first = slice[0]
+    if (!first) break
     const hasOrphanToolResult =
       first.role !== 'user' ||
       (Array.isArray(first.content) && first.content.some((b) => b.type === 'tool_result'))
@@ -154,6 +155,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       while (messages.length > 0) {
         const last = messages[messages.length - 1]
         const dangling =
+          last !== undefined &&
           last.role === 'assistant' &&
           Array.isArray(last.content) &&
           last.content.some((b) => b.type === 'tool_use')

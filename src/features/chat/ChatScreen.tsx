@@ -113,7 +113,7 @@ function Conversation() {
       const buf = await file.arrayBuffer()
       let binary = ''
       const bytes = new Uint8Array(buf)
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+      for (const byte of bytes) binary += String.fromCharCode(byte)
       setImages((prev) => [...prev, { media_type: file.type, data: btoa(binary) }])
     }
     e.target.value = ''
