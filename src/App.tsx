@@ -16,6 +16,7 @@ import { ReconcileConfirmScreen } from '@features/reconcile/ReconcileConfirmScre
 import { OnboardingWizard } from '@features/onboarding/OnboardingWizard'
 import { hasPin } from '@lib/crypto'
 import { settingsRepo } from '@db/repositories/settings.repo'
+import { refreshAssetPrices } from '@lib/marketPrices'
 
 function useSetupComplete() {
   const [ready, setReady] = useState<boolean | null>(null)
@@ -29,6 +30,11 @@ function AppShell() {
   const { activeTab } = useAppStore()
   const { isInProgress, step } = useReconcileStore()
   const { ready, markDone } = useSetupComplete()
+
+  // Silent daily market-price refresh for auto-priced assets (no-op within 12h)
+  useEffect(() => {
+    refreshAssetPrices().catch(() => {})
+  }, [])
 
   if (ready === null) {
     return <div style={{ height: '100dvh', background: 'var(--bg-0)' }} />

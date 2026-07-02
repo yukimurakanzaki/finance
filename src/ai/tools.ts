@@ -17,7 +17,10 @@ export const WRITE_TOOLS = new Set([
   'update_account_balance',
 ])
 
-export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
+export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
+  // Server-side web search: runs on Anthropic's infrastructure, used for
+  // looking up mutual fund NAV and other prices with no free local API.
+  { type: 'web_search_20260209', name: 'web_search', max_uses: 4 },
   {
     name: 'query_transactions',
     description:

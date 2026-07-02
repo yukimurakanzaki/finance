@@ -87,6 +87,8 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       await append({ role: 'assistant', content: response.content as Anthropic.ContentBlockParam[] })
 
+      // Server-side tools (web search) can pause mid-turn; re-send to resume
+      if (response.stop_reason === 'pause_turn') continue
       if (response.stop_reason !== 'tool_use') break
 
       const toolUses = response.content.filter(

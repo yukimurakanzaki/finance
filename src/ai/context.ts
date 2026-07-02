@@ -12,6 +12,7 @@ Core rules:
 - Data changes (log_transactions, log_income, add_recurring_item, update_asset_value, update_account_balance) are shown to the user for approval before saving — so propose them freely when the user's intent is clear, but never call them speculatively.
 - When the user pastes an image of a bank statement or transaction list, extract every row: date, amount, direction (money out = "out", money in = "in"), merchant/description as note. Match to the right account by asking or from context. If any row is unclear, ask about that row instead of skipping silently. Use query_transactions first if there's a chance rows were already logged.
 - For affordability questions ("can I afford X?"), reason from the data: safe-to-spend this week, monthly discretionary pool, upcoming committed spending, and — for big purchases — impact on the savings pipe and FI timeline. Give a clear verdict (yes / yes-with-tradeoff / no) and the one or two numbers that drive it.
+- Asset prices: gold and foreign-currency assets marked AUTO refresh themselves daily from market APIs — don't offer to update those. For mutual funds (RDPU, equity funds) and anything else without a live feed, use web_search to find today's NAV/price (e.g. "NAV <fund name> hari ini site:bibit.id OR site:bareksa.com"), compute the new value from the user's holdings, cite the source and date, and propose it with update_asset_value. If you can't find a trustworthy current figure, say so — never invent a price.
 - Be concise and mobile-friendly: short paragraphs, no long lists unless asked. Warm but direct, like a good financial partner.
 - If the "Notices" section below is non-empty and this is the start of a conversation, briefly surface the most important notice.`
 
@@ -43,9 +44,11 @@ export async function buildSystemPrompt(): Promise<string> {
     return `- id ${a.id}: ${a.name} (${a.institution}, ${a.account_type}) — balance Rp ${bal.toLocaleString('id-ID')}`
   })
 
-  const assetLines = assets.map(
-    (a) => `- id ${a.id}: ${a.name} (${a.asset_type}) — Rp ${a.value.toLocaleString('id-ID')}, last valued ${a.last_valued_at}`,
-  )
+  const assetLines = assets.map((a) => {
+    const qty = a.quantity_grams ? `, ${a.quantity_grams}g` : a.fx_amount ? `, ${a.fx_amount} ${a.fx_code}` : ''
+    const auto = a.auto_price ? ' [AUTO-PRICED]' : ''
+    return `- id ${a.id}: ${a.name} (${a.asset_type}${qty}) — Rp ${a.value.toLocaleString('id-ID')}, last valued ${a.last_valued_at}${auto}`
+  })
 
   const categoryLines = categories.map((c) => `- ${c.name} [${c.lane}]`)
   const recurringLines = recurring.map(
@@ -86,7 +89,7 @@ export async function buildSystemPrompt(): Promise<string> {
   let fiBlock = 'Not configured yet (no FI assumptions).'
   if (assumptions) {
     const currentAssets: Record<AssetType, number> = {
-      investment_rdpu: 0, investment_equity: 0, gold: 0, dplk: 0, storyforge: 0, other: 0,
+      investment_rdpu: 0, investment_equity: 0, gold: 0, dplk: 0, storyforge: 0, currency: 0, other: 0,
     }
     for (const a of assets) currentAssets[a.asset_type] += a.value
     const pipeMonthly = recurring

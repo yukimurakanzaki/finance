@@ -85,6 +85,20 @@ class FIDatabase extends Dexie {
       chatMessages: '++id, created_at',
     })
 
+    // v6: auto market pricing fields on assets
+    this.version(6)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table<Asset>('assets')
+          .toCollection()
+          .modify((a) => {
+            if (a.auto_price === undefined) a.auto_price = null
+            if (a.fx_code === undefined) a.fx_code = null
+            if (a.fx_amount === undefined) a.fx_amount = null
+          }),
+      )
+
     // v4: milestone gains income_event_id FK
     this.version(4)
       .stores({})

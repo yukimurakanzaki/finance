@@ -316,18 +316,21 @@ function MessageBubble({ msg }: { msg: ApiMessage }) {
             </div>
           )
         }
-        if (b.type === 'tool_use') {
+        if (b.type === 'tool_use' || b.type === 'server_tool_use') {
+          const label = b.type === 'server_tool_use'
+            ? 'Searching the web'
+            : (TOOL_LABELS[b.name] ?? b.name)
           return (
             <div key={i} style={{
               alignSelf: 'flex-start', fontSize: 11, color: 'var(--ink-3)',
               padding: '2px 10px', display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <span style={{ fontSize: 10 }}>⚙</span>
-              {TOOL_LABELS[b.name] ?? b.name}
+              <span style={{ fontSize: 10 }}>{b.type === 'server_tool_use' ? '🔍' : '⚙'}</span>
+              {label}
             </div>
           )
         }
-        return null // thinking blocks etc.
+        return null // thinking / web_search_tool_result blocks etc.
       })}
     </>
   )
