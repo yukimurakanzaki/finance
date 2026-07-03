@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
-import { settingsRepo } from '@db/repositories/settings.repo'
+import { supabase } from '@lib/supabaseClient'
 import { buildSystemPrompt } from '../ai/context'
 import { TOOL_DEFINITIONS, WRITE_TOOLS, executeReadTool, executeWriteTool } from '../ai/tools'
 
@@ -60,10 +60,18 @@ function trimForApi(messages: ApiMessage[]): ApiMessage[] {
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
-  async function getClient(): Promise<Anthropic> {
-    const key = await settingsRepo.get('anthropic_api_key')
-    if (!key) throw new Error('NO_API_KEY')
-    return new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true })
+  // Calls the Anthropic API via a Supabase Edge Function that holds the key
+  // server-side. Supabase attaches the signed-in session's JWT automatically;
+  // the function rejects the call (401) if no one is signed in.
+  async function callAnthropic(system: string, messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('NOT_SIGNED_IN')
+
+    const { data, error } = await supabase.functions.invoke('anthropic-proxy', {
+      body: { model: MODEL, max_tokens: MAX_TOKENS, system, tools: TOOL_DEFINITIONS, messages },
+    })
+    if (error) throw new Error(error.message ?? 'Chat request failed')
+    return data as Anthropic.Message
   }
 
   async function append(msg: ApiMessage) {
@@ -73,17 +81,10 @@ export const useChatStore = create<ChatState>((set, get) => {
 
   // Core agent loop: call the API, execute read tools, pause on write tools.
   async function runLoop() {
-    const client = await getClient()
     const system = await buildSystemPrompt()
 
     while (true) {
-      const response = await client.messages.create({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system,
-        tools: TOOL_DEFINITIONS,
-        messages: trimForApi(get().messages) as Anthropic.MessageParam[],
-      })
+      const response = await callAnthropic(system, trimForApi(get().messages) as Anthropic.MessageParam[])
 
       await append({ role: 'assistant', content: response.content as Anthropic.ContentBlockParam[] })
 
@@ -122,14 +123,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       await runLoop()
     } catch (err) {
       let msg = 'Something went wrong.'
-      if (err instanceof Error && err.message === 'NO_API_KEY') {
-        msg = 'No API key configured.'
-      } else if (err instanceof Anthropic.AuthenticationError) {
-        msg = 'Invalid API key. Check it in the setup screen (clear the key in More if needed).'
-      } else if (err instanceof Anthropic.RateLimitError) {
-        msg = 'Rate limited by the API — wait a moment and try again.'
-      } else if (err instanceof Anthropic.APIError) {
-        msg = `API error: ${err.message}`
+      if (err instanceof Error && err.message === 'NOT_SIGNED_IN') {
+        msg = 'You were signed out. Sign in again to keep chatting.'
       } else if (err instanceof Error) {
         msg = err.message
       }
