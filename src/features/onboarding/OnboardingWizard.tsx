@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { db } from '@db/db'
 import { settingsRepo } from '@db/repositories/settings.repo'
 import { allowanceRepo } from '@db/repositories/allowance.repo'
 import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
-import { assetsRepo } from '@db/repositories/assets.repo'
 import { accountsRepo } from '@db/repositories/accounts.repo'
 import { Field, Input, Select, Btn } from '@components/FormField'
 import { todayISO } from '@lib/dates'
@@ -14,33 +13,87 @@ interface OnboardingWizardProps {
   onComplete: () => void
 }
 
+interface DraftState {
+  step: number
+  gross: string
+  takeHome: string
+  pipes: Array<{ name: string; amount: string }>
+  dplk: string
+  monthly: string
+  weekend: string
+  accountName: string
+  accountInstitution: string
+  accountType: AccountType
+}
+
+const DEFAULT_DRAFT: DraftState = {
+  step: 1,
+  gross: '',
+  takeHome: '',
+  pipes: [{ name: 'RDPU Pipe', amount: '' }],
+  dplk: '',
+  monthly: '',
+  weekend: '',
+  accountName: 'BCA Tabungan',
+  accountInstitution: 'BCA',
+  accountType: 'bank',
+}
+
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+  const [loaded, setLoaded] = useState(false)
   const [step, setStep] = useState(1)
 
-  // Step 1: Take-home income
   const [gross, setGross] = useState('')
   const [takeHome, setTakeHome] = useState('')
-
-  // Step 2: Pipe + DPLK (pay-yourself-first recurring items)
   const [pipes, setPipes] = useState([{ name: 'RDPU Pipe', amount: '' }])
   const [dplk, setDplk] = useState('')
-
-  // Step 3: Allowance
   const [monthly, setMonthly] = useState('')
   const [weekend, setWeekend] = useState('')
-
-  // Step 4: First account/asset (optional)
   const [accountName, setAccountName] = useState('BCA Tabungan')
   const [accountInstitution, setAccountInstitution] = useState('BCA')
   const [accountType, setAccountType] = useState<AccountType>('bank')
-
   const [saving, setSaving] = useState(false)
+
+  // Restore draft on mount
+  useEffect(() => {
+    settingsRepo.get('onboarding_draft').then((raw) => {
+      if (raw) {
+        try {
+          const draft = JSON.parse(raw) as DraftState
+          setStep(draft.step ?? 1)
+          setGross(draft.gross ?? '')
+          setTakeHome(draft.takeHome ?? '')
+          setPipes(draft.pipes?.length ? draft.pipes : DEFAULT_DRAFT.pipes)
+          setDplk(draft.dplk ?? '')
+          setMonthly(draft.monthly ?? '')
+          setWeekend(draft.weekend ?? '')
+          setAccountName(draft.accountName ?? DEFAULT_DRAFT.accountName)
+          setAccountInstitution(draft.accountInstitution ?? DEFAULT_DRAFT.accountInstitution)
+          setAccountType(draft.accountType ?? DEFAULT_DRAFT.accountType)
+        } catch {
+          // corrupt draft — ignore, start fresh
+        }
+      }
+      setLoaded(true)
+    })
+  }, [])
+
+  // Persist draft whenever step or key fields change (after initial load)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (!loaded) return
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    const draft: DraftState = {
+      step, gross, takeHome, pipes, dplk, monthly, weekend,
+      accountName, accountInstitution, accountType,
+    }
+    settingsRepo.set('onboarding_draft', JSON.stringify(draft))
+  }, [step, gross, takeHome, pipes, dplk, monthly, weekend, accountName, accountInstitution, accountType, loaded])
 
   async function handleFinish() {
     setSaving(true)
     const today = todayISO()
 
-    // 1. Income event
     if (takeHome) {
       await incomeEventsRepo.create({
         date: today,
@@ -54,7 +107,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       })
     }
 
-    // 2. Pipe recurring items
     for (const pipe of pipes) {
       if (pipe.name && pipe.amount) {
         await recurringRepo.create({
@@ -72,7 +124,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       }
     }
 
-    // DPLK as separate pipe
     if (dplk) {
       await recurringRepo.create({
         name: 'DPLK',
@@ -88,7 +139,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       })
     }
 
-    // 3. Allowance
     if (monthly) {
       await allowanceRepo.set({
         monthly_amount: Number(monthly.replace(/[.,]/g, '')),
@@ -96,7 +146,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       })
     }
 
-    // 4. First account
     if (accountName) {
       await accountsRepo.create({
         name: accountName,
@@ -112,8 +161,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
 
     await settingsRepo.set('setup_complete', 'true')
+    // Clear draft now that setup is done
+    await db.appSettings.delete('onboarding_draft')
     setSaving(false)
     onComplete()
+  }
+
+  // Don't render until we've tried to restore the draft
+  if (!loaded) {
+    return <div style={{ height: '100dvh', background: 'var(--bg-0)' }} />
   }
 
   return (

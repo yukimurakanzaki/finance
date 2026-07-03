@@ -26,6 +26,7 @@ export function useFIProjection(): {
       gold: 0,
       dplk: 0,
       storyforge: 0,
+      currency: 0,
       other: 0,
     }
     for (const a of assets) {

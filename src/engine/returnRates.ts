@@ -7,5 +7,6 @@ export const REAL_RETURN_RATES: Record<AssetType, number> = {
   gold: 0.01,
   dplk: 0.04, // 7% nominal − 3% inflation
   storyforge: 0.0, // speculative; excluded from FI projection
+  currency: 0.0, // cash holding; excluded from FI projection
   other: 0.0,
 }

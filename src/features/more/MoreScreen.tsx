@@ -70,6 +70,16 @@ export function MoreScreen() {
       <MenuRow label="Import Transactions" sub="Paste Claude's JSON output" onClick={handleReconcile} />
       <MenuRow label="Export Backup" sub="Download all data as JSON" onClick={handleExport} />
       <MenuRow label="Restore Backup" sub="Replace all data from a backup file" onClick={() => setSheet('restore')} />
+      <MenuRow
+        label="Reset AI Manager Key"
+        sub="Remove the Claude API key from this device"
+        onClick={async () => {
+          if (window.confirm('Remove the stored Claude API key? The Manager tab will ask for a new one.')) {
+            await db.appSettings.delete('anthropic_api_key')
+            window.alert('API key removed.')
+          }
+        }}
+      />
 
       <div style={{ marginTop: 24, padding: '0 4px' }}>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.6 }}>

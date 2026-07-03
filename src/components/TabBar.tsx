@@ -1,10 +1,11 @@
 import { useAppStore } from '@stores/appStore'
 
-type Tab = 'home' | 'budget' | 'assets' | 'decide' | 'more'
+type Tab = 'home' | 'budget' | 'assets' | 'chat' | 'decide' | 'more'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home',   label: 'Home',   icon: '⌂' },
   { id: 'budget', label: 'Budget', icon: '◎' },
+  { id: 'chat',   label: 'Manager', icon: '✦' },
   { id: 'assets', label: 'Assets', icon: '◈' },
   { id: 'decide', label: 'Decide', icon: '◆' },
   { id: 'more',   label: 'More',   icon: '···' },

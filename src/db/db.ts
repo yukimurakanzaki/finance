@@ -12,6 +12,7 @@ import type {
   Milestone,
   Assumptions,
   AppSetting,
+  ChatMessage,
 } from './types'
 
 class FIDatabase extends Dexie {
@@ -27,6 +28,7 @@ class FIDatabase extends Dexie {
   milestones!: Table<Milestone, number>
   assumptions!: Table<Assumptions, number>
   appSettings!: Table<AppSetting, string>
+  chatMessages!: Table<ChatMessage, number>
 
   constructor() {
     super('fi-dashboard')
@@ -76,6 +78,25 @@ class FIDatabase extends Dexie {
               if (t.transfer_pair_id === undefined) t.transfer_pair_id = null
             }),
         ]),
+      )
+
+    // v5: AI finance manager chat history
+    this.version(5).stores({
+      chatMessages: '++id, created_at',
+    })
+
+    // v6: auto market pricing fields on assets
+    this.version(6)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table<Asset>('assets')
+          .toCollection()
+          .modify((a) => {
+            if (a.auto_price === undefined) a.auto_price = null
+            if (a.fx_code === undefined) a.fx_code = null
+            if (a.fx_amount === undefined) a.fx_amount = null
+          }),
       )
 
     // v4: milestone gains income_event_id FK

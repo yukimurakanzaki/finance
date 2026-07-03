@@ -20,7 +20,12 @@ export type AssetType =
   | 'gold'
   | 'dplk'
   | 'storyforge'
+  | 'currency'
   | 'other'
+
+// Assets that track a live market price instead of a manually entered value.
+// 'gold_spot' — XAU/USD spot × USD/IDR, per gram. 'fx' — foreign currency holding.
+export type AutoPriceSource = 'gold_spot' | 'fx'
 
 export type EnvelopeHorizon = 'yearly' | 'monthly' | 'weekly'
 
@@ -50,6 +55,9 @@ export interface Asset {
   value: number
   quantity_grams: number | null
   price_per_gram: number | null
+  auto_price: AutoPriceSource | null
+  fx_code: string | null
+  fx_amount: number | null
   last_valued_at: string
   note: string | null
   created_at: string
@@ -170,6 +178,18 @@ export type AppSettingKey =
   | 'last_exported_at'
   | 'setup_complete'
   | 'onboarding_step'
+  | 'onboarding_draft'
   | 'reconcile_in_progress'
   | 'ios_install_banner_dismissed'
   | 'gold_staleness_dismissed_at'
+  | 'anthropic_api_key'
+  | 'prices_last_refreshed_at'
+
+// One row per Anthropic-API-format message. `content` is JSON:
+// either a plain string or an array of content blocks (text/image/tool_use/tool_result/thinking).
+export interface ChatMessage {
+  id?: number
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}
