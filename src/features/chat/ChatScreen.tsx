@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { useChatStore, type ApiMessage } from '@stores/chatStore'
-import { supabase } from '@lib/supabaseClient'
+import { supabase, supabaseConfigured } from '@lib/supabaseClient'
 import { describeWrite } from '../../ai/tools'
 import { Btn, Input } from '@components/FormField'
 
@@ -26,11 +26,20 @@ export function ChatScreen() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
 
   useEffect(() => {
+    if (!supabaseConfigured) return
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  if (!supabaseConfigured) {
+    return (
+      <div style={{ padding: '32px 20px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+        The AI Manager isn't configured on this deployment yet (missing Supabase environment
+        variables). The rest of the app works normally.
+      </div>
+    )
+  }
   if (session === undefined) return <div style={{ height: '100%' }} />
   if (!session) return <SignIn />
   return <Conversation />
