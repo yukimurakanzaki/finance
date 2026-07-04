@@ -167,10 +167,24 @@ class FIDatabase extends Dexie {
 
 export const db = new FIDatabase()
 
-// Assign a UUID on insert for any sync table row that doesn't already carry one.
-// Pure key assignment only — no cross-table writes, so it is transaction-safe.
+// While applying rows pulled from the cloud, suppress the hooks below so we don't
+// re-stamp updated_at (which would make pulled rows look dirty and echo back).
+export const syncControl = { applyingRemote: false }
+
+const nowIso = () => new Date().toISOString()
+
+// On every local write to a synced table: assign a UUID if missing and stamp
+// updated_at. updated_at is the watermark the sync engine pushes on, so it must
+// be set for a row to ever sync. Pure field assignment — transaction-safe.
 for (const name of SYNC_TABLES) {
-  db.table(name).hook('creating', (_pk, obj: { id?: string }) => {
+  const table = db.table(name)
+  table.hook('creating', (_pk, obj: { id?: string; updated_at?: string }) => {
+    if (syncControl.applyingRemote) return
     if (!obj.id) obj.id = crypto.randomUUID()
+    if (!obj.updated_at) obj.updated_at = nowIso()
+  })
+  table.hook('updating', () => {
+    if (syncControl.applyingRemote) return
+    return { updated_at: nowIso() }
   })
 }

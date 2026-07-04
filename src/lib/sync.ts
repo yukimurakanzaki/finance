@@ -1,4 +1,4 @@
-import { db, SYNC_TABLES, type SyncTable } from '@db/db'
+import { db, SYNC_TABLES, syncControl, type SyncTable } from '@db/db'
 import { supabase } from '@lib/supabaseClient'
 import {
   CLOUD_TABLE,
@@ -63,13 +63,28 @@ async function pullTable(table: SyncTable, householdId: string): Promise<number>
   if (remote.length === 0) return 0
 
   const localRows = remote.map((r) => fromCloudRow(table, r))
-  await db.table(table).bulkPut(localRows)
+  // Suppress the updated_at/uuid hooks so pulled rows keep their server timestamps.
+  syncControl.applyingRemote = true
+  try {
+    await db.table(table).bulkPut(localRows)
+  } finally {
+    syncControl.applyingRemote = false
+  }
   await setMeta(`pulled:${table}`, maxUpdatedAt(remote as Array<{ updated_at?: string }>, since))
   return remote.length
 }
 
+// Guard against overlapping/duplicate sync cycles (auth events can fire several times).
+let syncing = false
+
 /** One full sync cycle: push then pull every table. Safe to call repeatedly. */
 export async function syncNow(householdId: string, userId: string): Promise<void> {
-  for (const table of SYNC_TABLES) await pushTable(table, householdId, userId)
-  for (const table of SYNC_TABLES) await pullTable(table, householdId)
+  if (syncing) return
+  syncing = true
+  try {
+    for (const table of SYNC_TABLES) await pushTable(table, householdId, userId)
+    for (const table of SYNC_TABLES) await pullTable(table, householdId)
+  } finally {
+    syncing = false
+  }
 }
