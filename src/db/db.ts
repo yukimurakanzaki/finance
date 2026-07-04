@@ -55,7 +55,13 @@ class FIDatabase extends Dexie {
   syncMeta!: Table<SyncMeta, string>
 
   constructor() {
-    super('fi-dashboard')
+    // New DB name for the cloud era. IndexedDB cannot change a store's primary
+    // key on an existing database, and v7 switches from auto-increment numeric
+    // keys to client-assigned UUIDs — so upgrading the old 'fi-dashboard' DB in
+    // place would fail. A fresh name gives existing devices a clean v7 database;
+    // their old local data remains in the 'fi-dashboard' DB and can be recovered
+    // via backup/restore. Cloud sync is the new source of truth.
+    super('fi-dashboard-v2')
 
     // v1: Phase 1 skeleton (legacy numeric auto-increment).
     this.version(1).stores({
