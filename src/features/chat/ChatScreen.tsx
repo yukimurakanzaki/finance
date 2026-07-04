@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { useChatStore, type ApiMessage } from '@stores/chatStore'
-import { settingsRepo } from '@db/repositories/settings.repo'
+import { supabase, supabaseConfigured } from '@lib/supabaseClient'
 import { describeWrite } from '../../ai/tools'
 import { Btn, Input } from '@components/FormField'
 
@@ -22,29 +23,43 @@ const TOOL_LABELS: Record<string, string> = {
 }
 
 export function ChatScreen() {
-  const [apiKey, setApiKey] = useState<string | null | undefined>(undefined)
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
 
   useEffect(() => {
-    settingsRepo.get('anthropic_api_key').then((v) => setApiKey(v))
+    if (!supabaseConfigured) return
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => sub.subscription.unsubscribe()
   }, [])
 
-  if (apiKey === undefined) return <div style={{ height: '100%' }} />
-  if (!apiKey) return <ApiKeySetup onSaved={(k) => setApiKey(k)} />
+  if (!supabaseConfigured) {
+    return (
+      <div style={{ padding: '32px 20px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+        The AI Manager isn't configured on this deployment yet (missing Supabase environment
+        variables). The rest of the app works normally.
+      </div>
+    )
+  }
+  if (session === undefined) return <div style={{ height: '100%' }} />
+  if (!session) return <SignIn />
   return <Conversation />
 }
 
-// ---------- API key setup ----------
+// ---------- Household sign-in ----------
 
-function ApiKeySetup({ onSaved }: { onSaved: (key: string) => void }) {
-  const [key, setKey] = useState('')
-  const [saving, setSaving] = useState(false)
+function SignIn() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  async function handleSave() {
-    if (!key.trim()) return
-    setSaving(true)
-    await settingsRepo.set('anthropic_api_key', key.trim())
-    setSaving(false)
-    onSaved(key.trim())
+  async function handleSignIn() {
+    if (!email.trim() || !password) return
+    setBusy(true)
+    setError(null)
+    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    setBusy(false)
+    if (err) setError(err.message)
   }
 
   return (
@@ -58,24 +73,28 @@ function ApiKeySetup({ onSaved }: { onSaved: (key: string) => void }) {
         afford that trip.
       </div>
       <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-        It runs on the Claude API with your own key — calls go directly from this device to
-        Anthropic, pay-per-use. Get a key at{' '}
-        <span style={{ color: 'var(--amber-text)' }}>console.anthropic.com</span>.
+        Sign in with your household account — the same one you and your partner both use. No API
+        key to manage; the app talks to Claude through a shared backend.
       </div>
       <Input
-        type="password"
-        placeholder="sk-ant-..."
-        value={key}
-        onChange={(e) => setKey(e.target.value)}
-        mono
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
       />
-      <Btn onClick={handleSave} disabled={!key.trim() || saving} fullWidth>
-        Save key & start
+      <Input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleSignIn() }}
+      />
+      {error && (
+        <div style={{ fontSize: 12, color: '#ef4444' }}>{error}</div>
+      )}
+      <Btn onClick={handleSignIn} disabled={!email.trim() || !password || busy} fullWidth>
+        Sign in
       </Btn>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.6 }}>
-        The key is stored only on this device (IndexedDB). Your financial data is sent to the
-        Claude API only while you chat.
-      </div>
     </div>
   )
 }

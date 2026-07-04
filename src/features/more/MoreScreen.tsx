@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { db } from '@db/db'
 import { settingsRepo } from '@db/repositories/settings.repo'
+import { supabase } from '@lib/supabaseClient'
 import { useReconcileStore } from '@stores/reconcileStore'
 import { useAppStore } from '@stores/appStore'
 import { hasPin } from '@lib/crypto'
@@ -71,12 +72,12 @@ export function MoreScreen() {
       <MenuRow label="Export Backup" sub="Download all data as JSON" onClick={handleExport} />
       <MenuRow label="Restore Backup" sub="Replace all data from a backup file" onClick={() => setSheet('restore')} />
       <MenuRow
-        label="Reset AI Manager Key"
-        sub="Remove the Claude API key from this device"
+        label="Sign out of AI Manager"
+        sub="End your household session on this device"
         onClick={async () => {
-          if (window.confirm('Remove the stored Claude API key? The Manager tab will ask for a new one.')) {
-            await db.appSettings.delete('anthropic_api_key')
-            window.alert('API key removed.')
+          if (window.confirm('Sign out of the AI Manager? The Manager tab will ask you to sign in again.')) {
+            await supabase.auth.signOut()
+            window.alert('Signed out.')
           }
         }}
       />

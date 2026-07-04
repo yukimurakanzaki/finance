@@ -182,7 +182,6 @@ export type AppSettingKey =
   | 'reconcile_in_progress'
   | 'ios_install_banner_dismissed'
   | 'gold_staleness_dismissed_at'
-  | 'anthropic_api_key'
   | 'prices_last_refreshed_at'
 
 // One row per Anthropic-API-format message. `content` is JSON:

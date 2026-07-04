@@ -1,6 +1,7 @@
 # FI Dashboard — Requirements Baseline
-**Version:** 1.0 · **Date:** 2026-07-03 · **Status:** Elicited from product owner (Yuki), first formal baseline
+**Version:** 1.1 · **Date:** 2026-07-03 · **Status:** Elicited from product owner (Yuki), first formal baseline
 
+**Progress note (2026-07-03):** SR-1.6 and SR-2.8 are done, ahead of the rest of Phase 1/2, at the product owner's request (his wife didn't want to manage a personal Anthropic key). A dedicated Supabase project (`fi-dashboard`) now hosts an `anthropic-proxy` Edge Function holding the Anthropic key server-side, gated by Supabase Auth (`verify_jwt`). This pulled forward a thin slice of SR-2.3 (one shared household login) for the chat feature only — the rest of Phase 2 (household-scoped Postgres schema for accounts/transactions/etc., replacing Dexie as system of record) has **not** started. Everything else in the app is still local-first IndexedDB, per the original phase ordering.
 ## 0. Why this document exists
 
 Five sprints of code exist (`ea0e7a7`..`3f7e7b0`) and zero requirements documents preceded them. `ARCHITECTURE.md` describes *how* the app is built; nothing describes *what it's for* or *who decided that*. Every prior decision — no server, no auth, no sync — was made implicitly by whoever prompted the sprint, not deliberately by the product owner. This document is the first deliberate pass. It was produced by direct elicitation (not assumption), and it obsoletes the "no server / no sync / no auth" decisions baked into `ARCHITECTURE.md` §1. That file's decision table is now **stale as of this document** and must be revised alongside the Phase 2 work in §5.
