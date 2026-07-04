@@ -17,7 +17,7 @@ export function useNetWorth() {
     const today = todayISO()
 
     // Derive account balances from transactions for bank accounts
-    const txnSums: Record<number, number> = {}
+    const txnSums: Record<string, number> = {}
     const allTxns = await db.transactions.filter((t) => !t.is_transfer).toArray()
     for (const t of allTxns) {
       txnSums[t.account_id] = (txnSums[t.account_id] ?? 0) + (t.direction === 'in' ? t.amount : -t.amount)

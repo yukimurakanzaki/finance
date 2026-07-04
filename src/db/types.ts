@@ -34,7 +34,7 @@ export type MilestoneStatus = 'pending' | 'triggered' | 'done' | 'skipped'
 export type Cadence = 'monthly' | 'weekly' | 'yearly' | 'one_off'
 
 export interface Account {
-  id?: number
+  id?: string
   name: string
   institution: string
   account_type: AccountType
@@ -48,7 +48,7 @@ export interface Account {
 }
 
 export interface Asset {
-  id?: number
+  id?: string
   name: string
   lane: Lane
   asset_type: AssetType
@@ -64,12 +64,12 @@ export interface Asset {
 }
 
 export interface Transaction {
-  id?: number
+  id?: string
   date: string
   amount: number
   direction: 'in' | 'out'
-  account_id: number
-  category_id: number | null
+  account_id: string
+  category_id: string | null
   lane: Lane
   source: TransactionSource
   note: string | null
@@ -83,25 +83,25 @@ export interface Transaction {
 }
 
 export interface Category {
-  id?: number
+  id?: string
   name: string
   lane: Lane
   is_protected: boolean
-  envelope_id: number | null
+  envelope_id: string | null
 }
 
 export interface Envelope {
-  id?: number
+  id?: string
   name: string
   horizon: EnvelopeHorizon
   target_amount: number
   period: string
-  parent_envelope_id: number | null
+  parent_envelope_id: string | null
   created_at: string
 }
 
 export interface RecurringItem {
-  id?: number
+  id?: string
   name: string
   amount: number
   cadence: Cadence
@@ -116,14 +116,14 @@ export interface RecurringItem {
 }
 
 export interface Allowance {
-  id?: number
+  id?: string
   monthly_amount: number
   weekend_allocation: number
   updated_at: string
 }
 
 export interface NetWorthSnapshot {
-  id?: number
+  id?: string
   year_month: string
   total: number
   by_lane: Record<Lane, number>
@@ -131,7 +131,7 @@ export interface NetWorthSnapshot {
 }
 
 export interface IncomeEvent {
-  id?: number
+  id?: string
   date: string
   gross: number
   take_home_net: number
@@ -144,18 +144,18 @@ export interface IncomeEvent {
 }
 
 export interface Milestone {
-  id?: number
+  id?: string
   title: string
   description: string | null
   flag_date: string | null
   status: MilestoneStatus
   source: string | null
-  income_event_id: number | null
+  income_event_id: string | null
   created_at: string
 }
 
 export interface Assumptions {
-  id?: number
+  id?: string
   target_low: number
   target_high: number
   return_rdpu: number

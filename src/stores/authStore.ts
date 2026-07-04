@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@lib/supabase'
+import { syncNow } from '@lib/sync'
+
+// Fire-and-forget cloud sync once a household is resolved.
+function kickSync(householdId: string | null, user: User | null) {
+  if (householdId && user) syncNow(householdId, user.id).catch((e) => console.error('sync', e))
+}
 
 // Auth + household lifecycle:
 //   loading      → resolving session/household on boot
@@ -37,7 +43,7 @@ async function resolveHousehold(): Promise<{ householdId: string | null; status:
     : { householdId: null, status: 'no_household' as AuthStatus }
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   status: 'loading',
   session: null,
   user: null,
@@ -56,7 +62,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
         set({ session, user: session.user })
         resolveHousehold()
-          .then(({ householdId, status }) => set({ householdId, status }))
+          .then(({ householdId, status }) => {
+            set({ householdId, status })
+            if (status === 'ready') kickSync(householdId, session.user)
+          })
           .catch((e) => set({ error: String(e), status: 'no_household' }))
       })
     }
@@ -71,6 +80,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { householdId, status } = await resolveHousehold()
       set({ householdId, status })
+      if (status === 'ready') kickSync(householdId, session.user)
     } catch (e) {
       set({ error: String(e), status: 'no_household' })
     }
@@ -112,6 +122,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ error: error.message })
       return
     }
-    set({ householdId: data as string, status: 'ready' })
+    const householdId = data as string
+    set({ householdId, status: 'ready' })
+    kickSync(householdId, get().user)
   },
 }))

@@ -32,7 +32,7 @@ export function QuickLogFAB() {
   async function handleLog() {
     if (!amount || !accountId) return
     setSaving(true)
-    const acc = accounts.find((a) => a.id === Number(accountId))
+    const acc = accounts.find((a) => a.id === accountId)
     if (!acc?.id) { setSaving(false); return }
     await transactionsRepo.add({
       date: todayISO(),

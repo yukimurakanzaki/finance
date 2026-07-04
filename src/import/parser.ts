@@ -84,7 +84,7 @@ export async function parseImportJSON(raw: string): Promise<ParseResult> {
 
 export function detectTransfersAsync(
   rows: ValidImportRow[],
-  ownAccountIds: number[],
+  ownAccountIds: string[],
 ): Promise<ValidImportRow[]> {
   return new Promise((resolve, reject) => {
     const workerCode = `

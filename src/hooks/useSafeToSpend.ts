@@ -5,7 +5,7 @@ import { isoWeekStart, isoWeekEnd } from '@lib/dates'
 
 export function useSafeToSpend(): { result: SafeToSpendResult | null; isLoading: boolean } {
   const data = useLiveQuery(async () => {
-    const allowance = await db.allowance.get(1)
+    const allowance = await db.allowance.get('local')
     if (!allowance || allowance.monthly_amount === 0) return null
 
     const today = new Date()

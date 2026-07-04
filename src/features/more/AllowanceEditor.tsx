@@ -6,7 +6,7 @@ import { Field, Input, Btn } from '@components/FormField'
 import { formatRpFull } from '@lib/currency'
 
 export function AllowanceEditor() {
-  const allowance = useLiveQuery(() => db.allowance.get(1))
+  const allowance = useLiveQuery(() => db.allowance.get('local'))
   const [monthly, setMonthly] = useState('')
   const [weekend, setWeekend] = useState('')
   const [saved, setSaved] = useState(false)

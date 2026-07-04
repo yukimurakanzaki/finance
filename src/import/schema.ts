@@ -28,7 +28,7 @@ export interface InvalidImportRow {
 export interface DuplicateImportRow {
   _row_index: number
   incoming: ImportRow
-  existing_transaction_id: number
+  existing_transaction_id: string
   import_anyway: boolean
 }
 

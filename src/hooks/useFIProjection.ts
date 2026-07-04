@@ -12,13 +12,13 @@ export function useFIProjection(): {
 } {
   const data = useLiveQuery(async () => {
     const [assumptions, assets, recurringItems, latestIncome] = await Promise.all([
-      db.assumptions.get(1),
+      db.assumptions.get('local'),
       db.assets.toArray(),
       db.recurringItems.filter((r) => r.is_active && r.kind === 'pay_yourself_first').toArray(),
       db.incomeEvents.orderBy('date').last(),
     ])
 
-    const asm = assumptions ?? { id: 1, ...DEFAULT_ASSUMPTIONS }
+    const asm = assumptions ?? { id: 'local', ...DEFAULT_ASSUMPTIONS }
 
     const currentAssets: Record<AssetType, number> = {
       investment_rdpu: 0,

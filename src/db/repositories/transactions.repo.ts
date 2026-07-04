@@ -24,7 +24,7 @@ export const transactionsRepo = {
     date: string,
     amount: number,
     direction: 'in' | 'out',
-    account_id: number,
+    account_id: string,
   ) =>
     db.transactions
       .where('[date+account_id]')
@@ -35,7 +35,7 @@ export const transactionsRepo = {
   add: (data: Omit<Transaction, 'id' | 'created_at'>) =>
     db.transactions.add({ ...data, created_at: now() }),
 
-  override: async (id: number, overrideAmount: number, note: string | null) =>
+  override: async (id: string, overrideAmount: number, note: string | null) =>
     db.transaction('rw', db.transactions, async () => {
       const existing = await db.transactions.get(id)
       if (!existing) throw new Error(`Transaction ${id} not found`)
@@ -48,10 +48,10 @@ export const transactionsRepo = {
       })
     }),
 
-  unflagTransfer: (id: number) =>
+  unflagTransfer: (id: string) =>
     db.transactions.update(id, { is_transfer: false, transfer_pair_id: null }),
 
-  flagTransfer: (idA: number, idB: number) => {
+  flagTransfer: (idA: string, idB: string) => {
     const pairId = crypto.randomUUID()
     return db.transaction('rw', db.transactions, async () => {
       await db.transactions.update(idA, { is_transfer: true, transfer_pair_id: pairId })

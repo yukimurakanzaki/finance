@@ -12,12 +12,12 @@ export const recurringRepo = {
   create: (data: Omit<RecurringItem, 'id' | 'created_at'>) =>
     db.recurringItems.add({ ...data, created_at: now() }),
 
-  update: (id: number, patch: Partial<RecurringItem>) =>
+  update: (id: string, patch: Partial<RecurringItem>) =>
     db.recurringItems.update(id, patch),
 
-  deactivate: (id: number) =>
+  deactivate: (id: string) =>
     db.recurringItems.update(id, { is_active: false }),
 
-  advanceDue: (id: number, nextDue: string) =>
+  advanceDue: (id: string, nextDue: string) =>
     db.recurringItems.update(id, { next_due: nextDue }),
 }

@@ -6,5 +6,5 @@ export const categoriesRepo = {
 
   create: (data: Omit<Category, 'id'>) => db.categories.add(data),
 
-  update: (id: number, patch: Partial<Category>) => db.categories.update(id, patch),
+  update: (id: string, patch: Partial<Category>) => db.categories.update(id, patch),
 }

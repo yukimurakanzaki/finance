@@ -3,7 +3,7 @@ import type { ValidImportRow } from '../import/schema'
 export interface DetectTransfersRequest {
   type: 'DETECT_TRANSFERS'
   rows: ValidImportRow[]
-  own_account_ids: number[]
+  own_account_ids: string[]
 }
 
 export interface DetectTransfersResponse {

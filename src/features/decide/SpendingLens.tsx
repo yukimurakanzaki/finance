@@ -23,7 +23,7 @@ export function SpendingLens() {
   const [raw, setRaw] = useState('')
   const [lane, setLane] = useState<Lane>('protected_living')
 
-  const allowance = useLiveQuery(() => db.allowance.get(1))
+  const allowance = useLiveQuery(() => db.allowance.get('local'))
   const latestIncome = useLiveQuery(() => db.incomeEvents.orderBy('date').last())
 
   const amount = parseRpInput(raw) ?? 0

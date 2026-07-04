@@ -21,7 +21,7 @@ const KIND_COLOR: Record<RecurringKind, string> = {
 
 export function MonthlyScreen() {
   const items = useLiveQuery(() => db.recurringItems.filter((r) => r.is_active).toArray()) ?? []
-  const allowance = useLiveQuery(() => db.allowance.get(1))
+  const allowance = useLiveQuery(() => db.allowance.get('local'))
   const latestIncome = useLiveQuery(() => db.incomeEvents.orderBy('date').last())
 
   const takeHome = latestIncome?.take_home_net ?? 0

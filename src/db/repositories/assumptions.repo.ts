@@ -16,14 +16,18 @@ export const DEFAULT_ASSUMPTIONS: Omit<Assumptions, 'id'> = {
   updated_at: now(),
 }
 
+// Single local row; the sync layer maps it to the per-household cloud row.
+const LOCAL_ID = 'local'
+
 export const assumptionsRepo = {
   get: async (): Promise<Assumptions> => {
-    const existing = await db.assumptions.get(1)
+    const existing = await db.assumptions.get(LOCAL_ID)
     if (existing) return existing
-    const id = await db.assumptions.add({ id: 1, ...DEFAULT_ASSUMPTIONS })
-    return { id, ...DEFAULT_ASSUMPTIONS }
+    const row: Assumptions = { id: LOCAL_ID, ...DEFAULT_ASSUMPTIONS }
+    await db.assumptions.add(row)
+    return row
   },
 
   update: (patch: Partial<Omit<Assumptions, 'id'>>) =>
-    db.assumptions.update(1, { ...patch, updated_at: now() }),
+    db.assumptions.update(LOCAL_ID, { ...patch, updated_at: now() }),
 }

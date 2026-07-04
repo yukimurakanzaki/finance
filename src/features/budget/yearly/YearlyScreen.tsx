@@ -28,7 +28,7 @@ const KIND_ORDER: RecurringKind[] = ['pay_yourself_first', 'household_bill', 'pe
 
 export function YearlyScreen() {
   const items = useLiveQuery(() => db.recurringItems.filter((r) => r.is_active).toArray()) ?? []
-  const allowance = useLiveQuery(() => db.allowance.get(1))
+  const allowance = useLiveQuery(() => db.allowance.get('local'))
   const latestIncome = useLiveQuery(() => db.incomeEvents.orderBy('date').last())
 
   const takeHomeAnnual = (latestIncome?.take_home_net ?? 0) * 12
