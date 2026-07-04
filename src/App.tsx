@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@stores/appStore'
 import { usePinStore } from '@stores/pinStore'
+import { useAuthStore } from '@stores/authStore'
+import { AuthScreen } from '@features/auth/AuthScreen'
 import { TabBar } from '@components/TabBar'
 import { PinLockScreen } from '@components/PinLockScreen'
 import { QuickLogFAB } from '@components/QuickLogFAB'
@@ -104,6 +106,25 @@ function AppBar({ title, subtitle }: { title: string; subtitle: string }) {
 }
 
 export function App() {
+  const { status, init } = useAuthStore()
+
+  useEffect(() => {
+    init()
+  }, [init])
+
+  if (status === 'loading') {
+    return <div style={{ height: '100dvh', background: 'var(--bg-0)' }} />
+  }
+
+  if (status === 'signed_out' || status === 'no_household') {
+    return <AuthScreen />
+  }
+
+  return <AuthedApp />
+}
+
+// Signed in + household resolved: the original PIN gate + app shell.
+function AuthedApp() {
   const { isLocked } = usePinStore()
   const pinConfigured = hasPin()
 

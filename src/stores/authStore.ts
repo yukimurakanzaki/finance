@@ -1,0 +1,117 @@
+import { create } from 'zustand'
+import type { Session, User } from '@supabase/supabase-js'
+import { supabase } from '@lib/supabase'
+
+// Auth + household lifecycle:
+//   loading      → resolving session/household on boot
+//   signed_out   → no session; show sign in / sign up
+//   no_household → signed in but not in any household; show household setup
+//   ready        → session + household resolved; render the app
+export type AuthStatus = 'loading' | 'signed_out' | 'no_household' | 'ready'
+
+interface AuthState {
+  status: AuthStatus
+  session: Session | null
+  user: User | null
+  householdId: string | null
+  error: string | null
+  notice: string | null
+
+  init: () => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, displayName?: string) => Promise<void>
+  signOut: () => Promise<void>
+  createHousehold: (name: string) => Promise<void>
+}
+
+let subscribed = false
+
+async function resolveHousehold(): Promise<{ householdId: string | null; status: AuthStatus }> {
+  // auth_household_ids() returns the caller's household ids (RLS-safe helper)
+  const { data, error } = await supabase.rpc('auth_household_ids')
+  if (error) throw error
+  const ids = (data as string[] | null) ?? []
+  const first = ids[0]
+  return first
+    ? { householdId: first, status: 'ready' as AuthStatus }
+    : { householdId: null, status: 'no_household' as AuthStatus }
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
+  status: 'loading',
+  session: null,
+  user: null,
+  householdId: null,
+  error: null,
+  notice: null,
+
+  init: async () => {
+    if (!subscribed) {
+      subscribed = true
+      supabase.auth.onAuthStateChange((_event, session) => {
+        // Keep session/user fresh; re-resolve household on sign-in/out.
+        if (!session) {
+          set({ status: 'signed_out', session: null, user: null, householdId: null })
+          return
+        }
+        set({ session, user: session.user })
+        resolveHousehold()
+          .then(({ householdId, status }) => set({ householdId, status }))
+          .catch((e) => set({ error: String(e), status: 'no_household' }))
+      })
+    }
+
+    const { data } = await supabase.auth.getSession()
+    const session = data.session
+    if (!session) {
+      set({ status: 'signed_out', session: null, user: null })
+      return
+    }
+    set({ session, user: session.user })
+    try {
+      const { householdId, status } = await resolveHousehold()
+      set({ householdId, status })
+    } catch (e) {
+      set({ error: String(e), status: 'no_household' })
+    }
+  },
+
+  signIn: async (email, password) => {
+    set({ error: null, notice: null })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) set({ error: error.message })
+    // onAuthStateChange resolves household on success.
+  },
+
+  signUp: async (email, password, displayName) => {
+    set({ error: null, notice: null })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      ...(displayName ? { options: { data: { display_name: displayName } } } : {}),
+    })
+    if (error) {
+      set({ error: error.message })
+      return
+    }
+    // If email confirmation is required, there is no session yet.
+    if (!data.session) {
+      set({ notice: 'Check your email to confirm your account, then sign in.' })
+    }
+  },
+
+  signOut: async () => {
+    await supabase.auth.signOut()
+    set({ status: 'signed_out', session: null, user: null, householdId: null })
+  },
+
+  createHousehold: async (name) => {
+    set({ error: null })
+    const { data, error } = await supabase.rpc('create_household', { p_name: name })
+    if (error) {
+      set({ error: error.message })
+      return
+    }
+    set({ householdId: data as string, status: 'ready' })
+  },
+}))
