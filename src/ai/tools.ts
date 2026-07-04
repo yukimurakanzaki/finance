@@ -32,7 +32,7 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
         from_date: { type: 'string', description: 'Start date (inclusive), YYYY-MM-DD' },
         to_date: { type: 'string', description: 'End date (inclusive), YYYY-MM-DD' },
         direction: { type: 'string', enum: ['in', 'out'], description: 'Filter by money in or out' },
-        account_id: { type: 'number', description: 'Filter by account id' },
+        account_id: { type: 'string', description: 'Filter by account id' },
         search_note: { type: 'string', description: 'Case-insensitive substring match on the note field' },
         limit: { type: 'number', description: 'Max rows to return, default 50' },
       },
@@ -69,7 +69,7 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
               date: { type: 'string', description: 'YYYY-MM-DD' },
               amount: { type: 'number', description: 'Positive amount in IDR, no separators' },
               direction: { type: 'string', enum: ['in', 'out'] },
-              account_id: { type: 'number', description: 'Account id from the context or snapshot' },
+              account_id: { type: 'string', description: 'Account id from the context or snapshot' },
               category_name: { type: 'string', description: 'Category name from the user’s category list, or omit if none matches' },
               lane: { type: 'string', enum: LANE_ENUM, description: 'protected_living for day-to-day spending unless clearly otherwise' },
               note: { type: 'string', description: 'Short description, e.g. merchant name' },
@@ -122,7 +122,7 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     input_schema: {
       type: 'object',
       properties: {
-        asset_id: { type: 'number' },
+        asset_id: { type: 'string' },
         new_value: { type: 'number', description: 'New total value in IDR' },
       },
       required: ['asset_id', 'new_value'],
@@ -135,7 +135,7 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     input_schema: {
       type: 'object',
       properties: {
-        account_id: { type: 'number' },
+        account_id: { type: 'string' },
         new_balance: { type: 'number', description: 'New balance in IDR' },
       },
       required: ['account_id', 'new_balance'],
@@ -210,7 +210,7 @@ interface TxnRow {
   date: string
   amount: number
   direction: 'in' | 'out'
-  account_id: number
+  account_id: string
   category_name?: string
   lane: Lane
   note?: string
@@ -321,7 +321,7 @@ async function addRecurringItem(input: ToolInput): Promise<string> {
 }
 
 async function updateAssetValue(input: ToolInput): Promise<string> {
-  const id = Number(input['asset_id'])
+  const id = String(input['asset_id'])
   const asset = await db.assets.get(id)
   if (!asset) return JSON.stringify({ error: `No asset with id ${id}` })
   await db.assets.update(id, { value: Number(input['new_value']), last_valued_at: todayISO() })
@@ -329,7 +329,7 @@ async function updateAssetValue(input: ToolInput): Promise<string> {
 }
 
 async function updateAccountBalance(input: ToolInput): Promise<string> {
-  const id = Number(input['account_id'])
+  const id = String(input['account_id'])
   const account = await db.accounts.get(id)
   if (!account) return JSON.stringify({ error: `No account with id ${id}` })
   if (account.account_type === 'bank') {

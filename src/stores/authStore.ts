@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '@lib/supabase'
+import { supabase } from '@lib/supabaseClient'
 import { syncNow } from '@lib/sync'
 
 // Fire-and-forget cloud sync once a household is resolved.

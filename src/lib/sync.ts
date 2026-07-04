@@ -1,5 +1,5 @@
 import { db, SYNC_TABLES, type SyncTable } from '@db/db'
-import { supabase } from '@lib/supabase'
+import { supabase } from '@lib/supabaseClient'
 import {
   CLOUD_TABLE,
   cloudConflictKey,

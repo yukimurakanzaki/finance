@@ -28,13 +28,13 @@ export async function buildSystemPrompt(): Promise<string> {
       db.assets.toArray(),
       db.categories.toArray(),
       db.recurringItems.filter((r) => r.is_active).toArray(),
-      db.allowance.get(1),
+      db.allowance.get('local'),
       db.assumptions.orderBy('id').last(),
       db.incomeEvents.orderBy('date').last(),
     ])
 
   // Account balances: bank = transaction ledger sum, others = manual override
-  const txnSums: Record<number, number> = {}
+  const txnSums: Record<string, number> = {}
   const allTxns = await db.transactions.filter((t) => !t.is_transfer).toArray()
   for (const t of allTxns) {
     txnSums[t.account_id] = (txnSums[t.account_id] ?? 0) + (t.direction === 'in' ? t.amount : -t.amount)
