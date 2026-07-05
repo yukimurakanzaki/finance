@@ -50,14 +50,13 @@ async function pushTable(table: SyncTable, householdId: string, userId: string):
   return dirty.length
 }
 
-async function pullTable(table: SyncTable, householdId: string): Promise<number> {
+async function pullTable(table: SyncTable, householdId: string, userId: string): Promise<number> {
   const since = await getMeta(`pulled:${table}`)
-  const { data, error } = await sb()
-    .from(CLOUD_TABLE[table])
-    .select('*')
-    .eq('household_id', householdId)
-    .gt('updated_at', since)
-    .order('updated_at', { ascending: true })
+  let query = sb().from(CLOUD_TABLE[table]).select('*').eq('household_id', householdId).gt('updated_at', since)
+  // allowance is per-member: only pull this user's own row (it collapses to one
+  // local singleton), otherwise a member would inherit another member's allowance.
+  if (table === 'allowance') query = query.eq('member_id', userId)
+  const { data, error } = await query.order('updated_at', { ascending: true })
   if (error) throw new Error(`pull ${table}: ${error.message}`)
   const remote = (data ?? []) as Array<Record<string, unknown>>
   if (remote.length === 0) return 0
@@ -83,7 +82,7 @@ export async function syncNow(householdId: string, userId: string): Promise<void
   syncing = true
   try {
     for (const table of SYNC_TABLES) await pushTable(table, householdId, userId)
-    for (const table of SYNC_TABLES) await pullTable(table, householdId)
+    for (const table of SYNC_TABLES) await pullTable(table, householdId, userId)
   } finally {
     syncing = false
   }
