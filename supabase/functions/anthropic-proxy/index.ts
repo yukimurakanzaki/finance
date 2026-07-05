@@ -7,13 +7,22 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")
 const ANTHROPIC_VERSION = "2023-06-01"
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+// Reflect the browser's requested headers back in the preflight response so any
+// header the Supabase JS client adds (e.g. x-supabase-api-version, x-client-info)
+// passes CORS — a fixed allow-list breaks when the client starts sending a new one.
+function corsHeadersFor(req: Request): Record<string, string> {
+  const requested = req.headers.get("Access-Control-Request-Headers")
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      requested ?? "authorization, x-client-info, apikey, content-type, x-supabase-api-version",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  }
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = corsHeadersFor(req)
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders })
   }
