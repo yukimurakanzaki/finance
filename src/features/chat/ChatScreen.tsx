@@ -4,6 +4,10 @@ import { useChatStore, type ApiMessage } from '@stores/chatStore'
 import { supabase, supabaseConfigured } from '@lib/supabaseClient'
 import { describeWrite } from '../../ai/tools'
 import { Btn, Input } from '@components/FormField'
+import { SessionList } from './SessionList'
+import { ModelPicker } from './ModelPicker'
+import { SkillPicker } from './SkillPicker'
+import { ContextWindowIndicator } from './ContextWindowIndicator'
 
 const SUGGESTIONS = [
   'Where am I at this month?',
@@ -20,6 +24,9 @@ const TOOL_LABELS: Record<string, string> = {
   add_recurring_item: 'Adding recurring item',
   update_asset_value: 'Updating asset value',
   update_account_balance: 'Updating balance',
+  save_memory: 'Saving to memory',
+  delete_memory: 'Removing from memory',
+  create_skill: 'Creating skill',
 }
 
 export function ChatScreen() {
@@ -105,11 +112,19 @@ function Conversation() {
   const {
     hydrated, messages, status, error, pendingWrites,
     hydrate, sendMessage, resolvePending, clearChat,
+    sessions, activeSessionId, setSessionModel, setSessionSkills,
   } = useChatStore()
   const [input, setInput] = useState('')
   const [images, setImages] = useState<{ media_type: string; data: string }[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [showSessions, setShowSessions] = useState(false)
+  const [showModel, setShowModel] = useState(false)
+  const [showSkills, setShowSkills] = useState(false)
+
+  const activeSession = sessions.find((s) => s.id === activeSessionId) || null
+  const currentModel = activeSession?.model || 'gemini-2.5-flash'
+  const currentSkills = activeSession?.skills || []
 
   useEffect(() => { hydrate() }, [hydrate])
   // Auto-scroll on new content
@@ -143,6 +158,50 @@ function Conversation() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Session/Model top bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
+        borderBottom: '1px solid var(--border-1)', background: 'var(--bg-1)',
+      }}>
+        <button
+          onClick={() => setShowSessions(true)}
+          style={{
+            background: 'var(--bg-3)', border: 'none', borderRadius: 8,
+            width: 30, height: 30, cursor: 'pointer', color: 'var(--ink-2)', fontSize: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          ☰
+        </button>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {activeSession?.title || 'New chat'}
+          </div>
+        </div>
+        <button
+          onClick={() => setShowModel(true)}
+          style={{
+            background: 'var(--bg-2)', border: '1px solid var(--border-2)',
+            borderRadius: 8, padding: '4px 8px', fontSize: 10, fontWeight: 600,
+            color: 'var(--ink-2)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
+          }}
+        >
+          {currentModel.split('-').slice(0, 2).join('-')}
+        </button>
+        <button
+          onClick={() => setShowSkills(true)}
+          style={{
+            background: currentSkills.length > 0 ? 'var(--amber-bg)' : 'var(--bg-2)',
+            border: `1px solid ${currentSkills.length > 0 ? 'var(--amber)' : 'var(--border-2)'}`,
+            borderRadius: 8, padding: '4px 8px', fontSize: 10, fontWeight: 600,
+            color: currentSkills.length > 0 ? 'var(--amber-text)' : 'var(--ink-3)', cursor: 'pointer',
+          }}
+        >
+          ⚡{currentSkills.length > 0 ? ` ${currentSkills.length}` : ''}
+        </button>
+      </div>
+      <ContextWindowIndicator />
+
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {hydrated && messages.length === 0 && (
@@ -279,6 +338,29 @@ function Conversation() {
           Clear conversation
         </button>
       )}
+
+      {/* Pickers */}
+      <SessionList open={showSessions} onClose={() => setShowSessions(false)} />
+      <ModelPicker
+        open={showModel}
+        onClose={() => setShowModel(false)}
+        currentModel={currentModel}
+        onSelect={async (model) => {
+          if (activeSessionId) await setSessionModel(activeSessionId, model)
+        }}
+      />
+      <SkillPicker
+        open={showSkills}
+        onClose={() => setShowSkills(false)}
+        activeSessionId={activeSessionId}
+        currentSkills={currentSkills}
+        onToggleSkill={async (skillId) => {
+          const next = currentSkills.includes(skillId)
+            ? currentSkills.filter((s) => s !== skillId)
+            : [...currentSkills, skillId]
+          if (activeSessionId) await setSessionSkills(activeSessionId, next)
+        }}
+      />
     </div>
   )
 }
