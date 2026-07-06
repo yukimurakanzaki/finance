@@ -1,4 +1,4 @@
-import { AVAILABLE_MODELS, type ModelConfig } from '@ai/models'
+import { AVAILABLE_MODELS, type ModelConfig } from '../../ai/models'
 import { BottomSheet } from '@components/BottomSheet'
 
 interface Props {

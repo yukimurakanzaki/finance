@@ -111,7 +111,7 @@ function SignIn() {
 function Conversation() {
   const {
     hydrated, messages, status, error, pendingWrites,
-    hydrate, sendMessage, resolvePending, clearChat,
+    hydrate, sendMessage, resolvePending, clearSession,
     sessions, activeSessionId, setSessionModel, setSessionSkills,
   } = useChatStore()
   const [input, setInput] = useState('')
@@ -328,7 +328,7 @@ function Conversation() {
       {/* Footer: clear chat */}
       {messages.length > 0 && (
         <button
-          onClick={() => { if (window.confirm('Clear this conversation?')) clearChat() }}
+          onClick={() => { if (window.confirm('Clear this conversation?')) clearSession() }}
           style={{
             background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 10,
             padding: '4px 0 8px', cursor: 'pointer', fontFamily: 'var(--font-ui)',

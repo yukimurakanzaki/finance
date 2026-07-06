@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { BUILT_IN_SKILLS } from '@ai/skills'
+import { useEffect, useState } from 'react'
+import { BUILT_IN_SKILLS } from '../../ai/skills'
 import type { ChatCustomSkill } from '@db/types'
 import { db } from '@db/db'
 import { BottomSheet } from '@components/BottomSheet'
@@ -13,17 +13,15 @@ interface Props {
   onToggleSkill: (skillId: string) => void
 }
 
-export function SkillPicker({ open, onClose, activeSessionId, currentSkills, onToggleSkill }: Props) {
+export function SkillPicker({ open, onClose, currentSkills, onToggleSkill }: Props) {
   const [customSkills, setCustomSkills] = useState<ChatCustomSkill[]>([])
   const [loading, setLoading] = useState(true)
 
-  if (open) {
-    // Only fetch once when opened
-    if (customSkills.length === 0 && !loading) {
-      setLoading(true)
-      db.chatCustomSkills.toArray().then(setCustomSkills).finally(() => setLoading(false))
-    }
-  }
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    db.chatCustomSkills.toArray().then(setCustomSkills).finally(() => setLoading(false))
+  }, [open])
 
   const active = currentSkills
 
