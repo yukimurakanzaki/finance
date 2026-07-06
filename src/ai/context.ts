@@ -3,6 +3,7 @@ import { computeSafeToSpend } from '@engine/safeToSpend'
 import { computeFIProjection } from '@engine/fiProjection'
 import type { AssetType, Lane } from '@db/types'
 import { isoWeekStart, isoWeekEnd, todayISO } from '@lib/dates'
+import { BUILT_IN_SKILLS } from './skills'
 
 const PERSONA = `You are Adi's personal AI finance manager inside the FI Dashboard app — a trusted partner who manages his money with him. All amounts are Indonesian Rupiah (IDR); write them like "Rp 1.500.000".
 
@@ -15,9 +16,11 @@ Core rules:
 - For affordability questions ("can I afford X?"), reason from the data: safe-to-spend this week, monthly discretionary pool, upcoming committed spending, and — for big purchases — impact on the savings pipe and FI timeline. Give a clear verdict (yes / yes-with-tradeoff / no) and the one or two numbers that drive it.
 - Asset prices: gold and foreign-currency assets marked AUTO refresh themselves daily from market APIs — don't offer to update those. For mutual funds (RDPU, equity funds) and anything else without a live feed, use web_search to find today's NAV/price (e.g. "NAV <fund name> hari ini site:bibit.id OR site:bareksa.com"), compute the new value from the user's holdings, cite the source and date, and propose it with update_asset_value. If you can't find a trustworthy current figure, say so — never invent a price.
 - Be concise and mobile-friendly: short paragraphs, no long lists unless asked. Warm but direct, like a good financial partner.
-- If the "Notices" section below is non-empty and this is the start of a conversation, briefly surface the most important notice.`
+- If the "Notices" section below is non-empty and this is the start of a conversation, briefly surface the most important notice.
+- You have persistent memory across sessions. When the user states a preference, correction, or personal financial detail that will matter in future conversations (e.g. "I get paid on the 25th", "don't count DPLK as liquid", "wife handles grocery budget"), propose saving it with save_memory. Keep entries compact — declarative facts, not instructions. If you notice a memory is stale or contradicted, propose deleting the old one with delete_memory and saving the corrected version.
+- When you complete a useful multi-step workflow (3+ tool calls, user approved all), offer to save it as a reusable skill with create_skill. Extract the workflow pattern, not the specific data.`
 
-export async function buildSystemPrompt(): Promise<string> {
+export async function buildSystemPrompt(activeSkillIds: string[] = []): Promise<string> {
   const today = new Date()
   const iso = todayISO()
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' })
@@ -122,6 +125,31 @@ export async function buildSystemPrompt(): Promise<string> {
     notices.push(`Due within 7 days: ${dueSoon.map((r) => `${r.name} (${r.next_due}, Rp ${r.amount.toLocaleString('id-ID')})`).join(', ')}.`)
   }
 
+  // Persistent memory
+  const memories = await db.chatMemories.toArray()
+  const totalMemoryChars = memories.reduce((s, m) => s + m.content.length, 0)
+  let memoryBlock = memories.length > 0
+    ? memories.map((m) => `- [id: ${m.id}] ${m.content}`).join('\n')
+    : '(none)'
+  if (totalMemoryChars > 2000) {
+    memoryBlock += '\n(Memory is near capacity — consider removing stale entries)'
+  }
+
+  // Active skills (built-in + custom)
+  const skillInjections: string[] = []
+  for (const sid of activeSkillIds) {
+    const builtIn = BUILT_IN_SKILLS.find((s) => s.id === sid)
+    if (builtIn) {
+      skillInjections.push(`=== ACTIVE SKILL: ${builtIn.name} ===\n${builtIn.prompt_injection}`)
+      continue
+    }
+    const custom = await db.chatCustomSkills.get(sid)
+    if (custom) {
+      skillInjections.push(`=== ACTIVE SKILL: ${custom.name} ===\n${custom.prompt_injection}`)
+    }
+  }
+  const skillsBlock = skillInjections.length > 0 ? skillInjections.join('\n\n') : ''
+
   return `${PERSONA}
 
 === TODAY ===
@@ -153,5 +181,10 @@ ${fiBlock}
 ${lastIncome ? `${lastIncome.date}: take-home Rp ${lastIncome.take_home_net.toLocaleString('id-ID')}` : '(none logged)'}
 
 === NOTICES ===
-${notices.join('\n') || '(none)'}`
+${notices.join('\n') || '(none)'}
+
+=== MEMORY ===
+${memoryBlock}
+
+${skillsBlock}`
 }

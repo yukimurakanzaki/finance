@@ -16,6 +16,9 @@ export const WRITE_TOOLS = new Set([
   'add_recurring_item',
   'update_asset_value',
   'update_account_balance',
+  'save_memory',
+  'delete_memory',
+  'create_skill',
 ])
 
 export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
@@ -141,6 +144,45 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
       required: ['account_id', 'new_balance'],
     },
   },
+  {
+    name: 'save_memory',
+    description:
+      'Save a fact to persistent memory that survives across chat sessions. Use when the user states a preference, correction, or stable financial detail. Keep entries compact and declarative. Requires confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'The fact to remember, e.g. "Gets paid on the 25th of each month"' },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'delete_memory',
+    description:
+      'Remove a memory entry that is stale, wrong, or contradicted by new information. Requires confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        memory_id: { type: 'string', description: 'ID of the memory to remove (from the MEMORY section in context)' },
+      },
+      required: ['memory_id'],
+    },
+  },
+  {
+    name: 'create_skill',
+    description:
+      'Save a reusable workflow as a custom skill. Use after a successful multi-step interaction that the user would want to repeat. Extract the pattern (not the specific data) into a prompt injection. Requires confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Short name, e.g. "End of Month BCA Reconcile"' },
+        description: { type: 'string', description: 'One-line description for the skill picker' },
+        icon: { type: 'string', description: 'Single emoji icon' },
+        prompt_injection: { type: 'string', description: 'The instruction text injected into the system prompt when this skill is active. Describe the workflow steps.' },
+      },
+      required: ['name', 'description', 'prompt_injection'],
+    },
+  },
 ]
 
 // ---------- Executors ----------
@@ -160,6 +202,9 @@ export async function executeWriteTool(name: string, input: ToolInput): Promise<
     case 'add_recurring_item': return addRecurringItem(input)
     case 'update_asset_value': return updateAssetValue(input)
     case 'update_account_balance': return updateAccountBalance(input)
+    case 'save_memory': return saveMemory(input)
+    case 'delete_memory': return deleteMemory(input)
+    case 'create_skill': return createCustomSkill(input)
     default: return JSON.stringify({ error: `Unknown write tool: ${name}` })
   }
 }
@@ -344,6 +389,41 @@ async function updateAccountBalance(input: ToolInput): Promise<string> {
   return JSON.stringify({ saved: true, account: account.name, new_balance: input['new_balance'] })
 }
 
+async function saveMemory(input: ToolInput): Promise<string> {
+  const id = crypto.randomUUID()
+  await db.chatMemories.add({
+    id,
+    content: String(input['content']),
+    source_session_id: null,
+    created_at: now(),
+    updated_at: now(),
+  })
+  return JSON.stringify({ saved: true, memory_id: id })
+}
+
+async function deleteMemory(input: ToolInput): Promise<string> {
+  const id = String(input['memory_id'])
+  const existing = await db.chatMemories.get(id)
+  if (!existing) return JSON.stringify({ error: `No memory with id ${id}` })
+  await db.chatMemories.delete(id)
+  return JSON.stringify({ deleted: true, content: existing.content })
+}
+
+async function createCustomSkill(input: ToolInput): Promise<string> {
+  const id = crypto.randomUUID()
+  await db.chatCustomSkills.add({
+    id,
+    name: String(input['name']),
+    description: String(input['description']),
+    icon: typeof input['icon'] === 'string' ? input['icon'] : '⚡',
+    prompt_injection: String(input['prompt_injection']),
+    source_session_id: null,
+    created_at: now(),
+    updated_at: now(),
+  })
+  return JSON.stringify({ saved: true, skill_id: id, name: input['name'] })
+}
+
 // ---------- Human-readable summaries for the confirmation card ----------
 
 export function describeWrite(name: string, input: ToolInput): string[] {
@@ -366,6 +446,12 @@ export function describeWrite(name: string, input: ToolInput): string[] {
       return [`Asset #${input['asset_id']} → ${formatRpFull(Number(input['new_value']))}`]
     case 'update_account_balance':
       return [`Account #${input['account_id']} balance → ${formatRpFull(Number(input['new_balance']))}`]
+    case 'save_memory':
+      return [`💾 Remember: "${input['content']}"`]
+    case 'delete_memory':
+      return [`🗑 Forget memory #${String(input['memory_id']).slice(0, 8)}…`]
+    case 'create_skill':
+      return [`⚡ New skill: "${input['name']}" — ${input['description']}`]
     default:
       return [JSON.stringify(input)]
   }
