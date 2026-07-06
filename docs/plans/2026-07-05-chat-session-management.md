@@ -880,26 +880,467 @@ git commit -m "test: verify v7→v8 migration preserves chat history"
 
 ---
 
-### Phase E: Security & UX Review (Tasks 20–22)
+### Phase E: Persistent Memory & Auto-Skill Creation (Tasks 20–26)
 
-#### Task 20: Security review
+#### Task 20: Add ChatMemory and ChatCustomSkill types
+
+**Objective:** Define the new TypeScript types for persistent memory and user-created skills.
+
+**Files:**
+- Modify: `src/db/types.ts`
+
+**Step 1: Add ChatMemory interface**
+
+```typescript
+export interface ChatMemory {
+  id: string
+  content: string            // compact declarative fact, e.g. "Gets paid on the 25th"
+  source_session_id: string | null  // which session created this memory
+  created_at: string
+  updated_at: string
+}
+```
+
+**Step 2: Add ChatCustomSkill interface**
+
+```typescript
+export interface ChatCustomSkill {
+  id: string
+  name: string               // e.g. "End of Month BCA Reconcile"
+  description: string        // one-liner for the picker
+  icon: string               // emoji
+  prompt_injection: string   // text appended to system prompt when active
+  source_session_id: string | null  // which session created this skill
+  created_at: string
+  updated_at: string
+}
+```
+
+**Step 3: Commit**
+```bash
+git add src/db/types.ts
+git commit -m "feat: add ChatMemory and ChatCustomSkill types"
+```
+
+---
+
+#### Task 21: Add Dexie v9 schema for memory and custom skills
+
+**Objective:** Create IndexedDB tables and add to sync.
+
+**Files:**
+- Modify: `src/db/db.ts`
+
+**Step 1: Add table declarations**
+
+```typescript
+chatMemories!: Table<ChatMemory, string>
+chatCustomSkills!: Table<ChatCustomSkill, string>
+```
+
+**Step 2: Add version 9 migration**
+
+```typescript
+// v9: persistent AI memory + user-created custom skills
+this.version(9).stores({
+  chatMemories: 'id, updated_at, created_at',
+  chatCustomSkills: 'id, updated_at, created_at',
+})
+```
+
+**Step 3: Add to SYNC_TABLES**
+
+```typescript
+export const SYNC_TABLES = [
+  // ... existing ...
+  'chatSessions',
+  'chatMessages',
+  'chatMemories',
+  'chatCustomSkills',
+] as const
+```
+
+**Step 4: Commit**
+```bash
+git add src/db/db.ts
+git commit -m "feat: add chatMemories and chatCustomSkills tables (Dexie v9)"
+```
+
+---
+
+#### Task 22: Supabase migration for chat_memories and chat_custom_skills
+
+**Objective:** Cloud tables with RLS.
+
+**Files:**
+- Create: `supabase/migrations/XXX_chat_memories.sql`
+
+**Step 1: Write migration**
+
+```sql
+CREATE TABLE chat_memories (
+  id UUID PRIMARY KEY,
+  household_id UUID NOT NULL REFERENCES households(id),
+  content TEXT NOT NULL,
+  source_session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE chat_custom_skills (
+  id UUID PRIMARY KEY,
+  household_id UUID NOT NULL REFERENCES households(id),
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  icon TEXT NOT NULL DEFAULT '⚡',
+  prompt_injection TEXT NOT NULL,
+  source_session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE chat_memories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_custom_skills ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Household members can CRUD own memories"
+  ON chat_memories FOR ALL USING (
+    household_id = (SELECT household_id FROM household_members WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "Household members can CRUD own custom skills"
+  ON chat_custom_skills FOR ALL USING (
+    household_id = (SELECT household_id FROM household_members WHERE user_id = auth.uid())
+  );
+```
+
+**Step 2: Add sync mappers** in `src/lib/syncMappers.ts`:
+- `chatMemories` → `chat_memories` (direct mapping)
+- `chatCustomSkills` → `chat_custom_skills` (direct mapping)
+
+**Step 3: Commit**
+```bash
+git add supabase/migrations/ src/lib/syncMappers.ts
+git commit -m "feat: add chat_memories and chat_custom_skills cloud tables with RLS"
+```
+
+---
+
+#### Task 23: Inject memory into system prompt
+
+**Objective:** All memories appear in the system prompt for every session.
+
+**Files:**
+- Modify: `src/ai/context.ts`
+
+**Step 1: Load memories in buildSystemPrompt**
+
+```typescript
+const memories = await db.chatMemories.toArray()
+```
+
+**Step 2: Add MEMORY section after NOTICES**
+
+```typescript
+const memoryBlock = memories.length > 0
+  ? memories.map(m => `- ${m.content}`).join('\n')
+  : '(none)'
+
+// ... append to the system prompt string:
+// === MEMORY ===
+// ${memoryBlock}
+```
+
+**Step 3: Add memory-awareness to PERSONA**
+
+Add to the persona instructions:
+```
+- You have persistent memory across sessions. When the user states a preference, correction, or personal financial detail that will matter in future conversations (e.g. "I get paid on the 25th", "don't count DPLK as liquid", "wife handles grocery budget"), propose saving it with save_memory. Keep entries compact — declarative facts, not instructions. If you notice a memory is stale or contradicted, propose deleting the old one with delete_memory and saving the corrected version.
+- When you complete a useful multi-step workflow (3+ tool calls, user approved all), offer to save it as a reusable skill with create_skill. Extract the workflow pattern, not the specific data.
+```
+
+**Step 4: Enforce soft cap**
+
+Before injecting, compute total chars of all memories. If >2000 chars, add a notice:
+```
+(Memory is near capacity — consider removing stale entries)
+```
+
+**Step 5: Commit**
+```bash
+git add src/ai/context.ts
+git commit -m "feat: inject persistent memory into system prompt"
+```
+
+---
+
+#### Task 24: Add save_memory, delete_memory, create_skill tools
+
+**Objective:** AI can propose memory saves and skill creation for user confirmation.
+
+**Files:**
+- Modify: `src/ai/tools.ts`
+
+**Step 1: Add tool definitions**
+
+```typescript
+// Add to WRITE_TOOLS set:
+'save_memory', 'delete_memory', 'create_skill'
+
+// Add to TOOL_DEFINITIONS array:
+{
+  name: 'save_memory',
+  description: 'Save a fact to persistent memory that survives across chat sessions. Use when the user states a preference, correction, or stable financial detail. Keep entries compact and declarative. Requires confirmation.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      content: { type: 'string', description: 'The fact to remember, e.g. "Gets paid on the 25th of each month"' },
+    },
+    required: ['content'],
+  },
+},
+{
+  name: 'delete_memory',
+  description: 'Remove a memory entry that is stale, wrong, or contradicted by new information. Requires confirmation.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      memory_id: { type: 'string', description: 'ID of the memory to remove (from the MEMORY section in context)' },
+    },
+    required: ['memory_id'],
+  },
+},
+{
+  name: 'create_skill',
+  description: 'Save a reusable workflow as a custom skill. Use after a successful multi-step interaction that the user would want to repeat. Extract the pattern (not the specific data) into a prompt injection. Requires confirmation.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Short name, e.g. "End of Month BCA Reconcile"' },
+      description: { type: 'string', description: 'One-line description for the skill picker' },
+      icon: { type: 'string', description: 'Single emoji icon' },
+      prompt_injection: { type: 'string', description: 'The instruction text that will be injected into the system prompt when this skill is active. Describe the workflow steps.' },
+    },
+    required: ['name', 'description', 'prompt_injection'],
+  },
+},
+```
+
+**Step 2: Add executors**
+
+```typescript
+async function saveMemory(input: ToolInput): Promise<string> {
+  const id = crypto.randomUUID()
+  await db.chatMemories.add({
+    id,
+    content: String(input['content']),
+    source_session_id: null, // set by caller with active session id
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  })
+  return JSON.stringify({ saved: true, memory_id: id })
+}
+
+async function deleteMemory(input: ToolInput): Promise<string> {
+  const id = String(input['memory_id'])
+  const existing = await db.chatMemories.get(id)
+  if (!existing) return JSON.stringify({ error: `No memory with id ${id}` })
+  await db.chatMemories.delete(id)
+  return JSON.stringify({ deleted: true, content: existing.content })
+}
+
+async function createSkill(input: ToolInput): Promise<string> {
+  const id = crypto.randomUUID()
+  await db.chatCustomSkills.add({
+    id,
+    name: String(input['name']),
+    description: String(input['description']),
+    icon: typeof input['icon'] === 'string' ? input['icon'] : '⚡',
+    prompt_injection: String(input['prompt_injection']),
+    source_session_id: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  })
+  return JSON.stringify({ saved: true, skill_id: id, name: input['name'] })
+}
+```
+
+**Step 3: Add to executeWriteTool switch**
+
+```typescript
+case 'save_memory': return saveMemory(input)
+case 'delete_memory': return deleteMemory(input)
+case 'create_skill': return createSkill(input)
+```
+
+**Step 4: Add describeWrite cases**
+
+```typescript
+case 'save_memory':
+  return [`💾 Remember: "${input['content']}"`]
+case 'delete_memory':
+  return [`🗑 Forget memory #${input['memory_id']}`]
+case 'create_skill':
+  return [`⚡ New skill: "${input['name']}" — ${input['description']}`]
+```
+
+**Step 5: Commit**
+```bash
+git add src/ai/tools.ts
+git commit -m "feat: add save_memory, delete_memory, create_skill write tools"
+```
+
+---
+
+#### Task 25: Update memory section to include IDs for delete_memory
+
+**Objective:** The AI needs memory IDs to propose deletions.
+
+**Files:**
+- Modify: `src/ai/context.ts`
+
+**Key change:**
+
+Memory entries in the system prompt include their ID so the AI can reference them:
+```
+=== MEMORY ===
+- [id: abc-123] Gets paid on the 25th of each month
+- [id: def-456] Wife handles grocery budget, don't include in personal spending review
+- [id: ghi-789] Prefers to keep 3 months emergency fund in BCA savings
+```
+
+**Step 1: Commit**
+```bash
+git add src/ai/context.ts
+git commit -m "feat: include memory IDs in system prompt for delete_memory tool"
+```
+
+---
+
+#### Task 26: Build Memory Management screen
+
+**Objective:** User can view, edit, and delete memories from Settings.
+
+**Files:**
+- Create: `src/features/more/MemoryManager.tsx`
+- Modify: `src/features/more/MoreScreen.tsx` (add link)
+
+**UI spec:**
+- Accessible from **More → AI Memory**
+- List of all memories, most recent first
+- Each row: content text, date created, source session title (if available)
+- Swipe left → Delete (with confirmation)
+- Tap → inline edit (textarea)
+- Footer: "X / 2000 chars used" capacity indicator
+- Empty state: "Your AI manager has no memories yet. As you chat, it will offer to remember important facts about your finances."
+
+**Step 1: Commit**
+```bash
+git add src/features/more/MemoryManager.tsx src/features/more/MoreScreen.tsx
+git commit -m "feat: add AI Memory management screen"
+```
+
+---
+
+### Phase F: Updated UI for Custom Skills (Task 27)
+
+#### Task 27: Add custom skills section to SkillPicker
+
+**Objective:** User-created skills appear alongside built-in skills.
+
+**Files:**
+- Modify: `src/features/chat/SkillPicker.tsx`
+
+**Key changes:**
+- Load `db.chatCustomSkills.toArray()` on mount
+- Two sections: **"Built-in"** and **"My Skills"**
+- Custom skills show same card UI: icon, name, description, toggle
+- Long-press custom skill → context menu: **Edit** / **Delete**
+- Edit opens bottom sheet: name, description, icon, prompt text (all editable textarea)
+- Delete → confirmation → `db.chatCustomSkills.delete(id)`
+
+**Step 1: Commit**
+```bash
+git add src/features/chat/SkillPicker.tsx
+git commit -m "feat: add custom skills section to SkillPicker"
+```
+
+---
+
+### Phase G: Testing (Tasks 28–29)
+
+#### Task 28: Write tests for memory CRUD and injection
+
+**Objective:** Verify memory tools and prompt injection.
+
+**Files:**
+- Create: `src/ai/memory.test.ts`
+
+**Tests:**
+1. `save_memory` creates entry in `chatMemories` table
+2. `delete_memory` removes entry, returns deleted content
+3. `delete_memory` with invalid ID returns error, doesn't crash
+4. `buildSystemPrompt()` includes `=== MEMORY ===` section with all memories
+5. Memory entries include IDs in format `[id: xxx]`
+6. Empty memories → section shows `(none)`
+7. Over-capacity (>2000 chars total) → shows capacity warning
+8. Memories survive across sessions (load from DB, not in-memory)
+
+**Step 1: Commit**
+```bash
+git add src/ai/memory.test.ts
+git commit -m "test: add memory CRUD and injection tests"
+```
+
+---
+
+#### Task 29: Write tests for auto-skill creation
+
+**Objective:** Verify create_skill tool and SkillPicker integration.
+
+**Files:**
+- Create: `src/ai/customSkills.test.ts`
+
+**Tests:**
+1. `create_skill` creates entry in `chatCustomSkills` table
+2. Created skill has all required fields (name, description, icon, prompt_injection)
+3. Default icon is '⚡' when omitted
+4. Custom skills loaded alongside built-in skills in `buildSystemPrompt` when activated
+5. Deleting a custom skill removes it from DB
+6. Editing a custom skill updates `prompt_injection` and `updated_at`
+
+**Step 1: Commit**
+```bash
+git add src/ai/customSkills.test.ts
+git commit -m "test: add custom skill creation tests"
+```
+
+---
+
+### Phase H: Security & UX Review (Tasks 30–32)
+
+#### Task 30: Security review
 
 **Checklist:**
 - [ ] No API keys in client code (models list has no keys, only IDs)
 - [ ] Edge Function validates `model` param against allowlist (not arbitrary strings)
-- [ ] RLS on `chat_sessions` and `chat_messages` enforces household isolation
+- [ ] RLS on `chat_sessions`, `chat_messages`, `chat_memories`, `chat_custom_skills` enforces household isolation
 - [ ] Token counts are server-reported, not client-computed (can't be faked to bypass limits)
 - [ ] Session deletion is soft-delete first (archived_at), hard delete requires confirmation
-- [ ] No XSS risk from rendering session titles (user-editable text)
+- [ ] No XSS risk from rendering session titles or memory content (user-editable text)
+- [ ] Memory content is sanitized before injection into system prompt (no prompt injection via memory)
+- [ ] Custom skill `prompt_injection` field cannot break the system prompt structure (no `===` delimiters allowed in user-created content)
+- [ ] `delete_memory` requires confirmation (it's a write tool) — AI can't silently erase memories
 
 **Files to audit:**
 - `supabase/functions/anthropic-proxy/index.ts` — model allowlist
 - `supabase/migrations/XXX_chat_sessions.sql` — RLS policies
+- `supabase/migrations/XXX_chat_memories.sql` — RLS policies
 - `src/features/chat/SessionList.tsx` — title rendering
+- `src/ai/context.ts` — memory injection safety
 
 ---
 
-#### Task 21: UX review
+#### Task 31: UX review
 
 **Checklist:**
 - [ ] Session list works on 375px width (iPhone SE)
@@ -910,16 +1351,23 @@ git commit -m "test: verify v7→v8 migration preserves chat history"
 - [ ] Archive vs delete distinction is obvious
 - [ ] Session switch doesn't lose unsent input text
 - [ ] Long session titles truncate gracefully
+- [ ] Memory manager is reachable from More screen without scrolling on small screens
+- [ ] Memory edit textarea is large enough to read the full content
+- [ ] Confirmation card for save_memory clearly shows what will be remembered
+- [ ] Confirmation card for create_skill shows the skill name and prompt preview (truncated)
+- [ ] Custom skill edit bottom sheet is scrollable for long prompt_injection text
 
 ---
 
-#### Task 22: Performance check
+#### Task 32: Performance check
 
 **Checklist:**
 - [ ] Session list loads in <100ms for 100 sessions
 - [ ] Switching sessions doesn't re-fetch all messages from cloud (local-first)
 - [ ] Token tracking doesn't add perceptible latency to message send
 - [ ] Hydration of chat store doesn't block app startup (lazy-load sessions)
+- [ ] Memory injection adds <50ms to system prompt build (even with 50+ entries)
+- [ ] Custom skills load doesn't delay SkillPicker open
 
 ---
 
@@ -930,12 +1378,15 @@ git commit -m "test: verify v7→v8 migration preserves chat history"
 | A: Data Layer | 1–5 | Types, DB schema, sync mappers, migrations, model/skill configs |
 | B: Store Layer | 6–9 | chatStore rewrite, context builder, edge function routing |
 | C: UI Layer | 10–15 | SessionList, ModelPicker, ContextWindowIndicator, SkillPicker, ChatScreen integration |
-| D: Testing | 16–19 | Store tests, proxy tests, skills tests, migration tests |
-| E: Review | 20–22 | Security audit, UX audit, performance audit |
+| D: Testing (sessions) | 16–19 | Store tests, proxy tests, skills tests, migration tests |
+| E: Memory & Auto-Skills | 20–26 | ChatMemory + ChatCustomSkill types, DB, Supabase, prompt injection, tools, Memory Manager screen |
+| F: Custom Skills UI | 27 | Custom skills in SkillPicker with edit/delete |
+| G: Testing (memory/skills) | 28–29 | Memory CRUD tests, auto-skill creation tests |
+| H: Review | 30–32 | Security audit, UX audit, performance audit |
 
-**Total: 22 tasks across 5 phases.**
+**Total: 32 tasks across 8 phases.**
 
-**Estimated effort:** ~3–4 Codex sessions (Phase A+B in one, Phase C in one, Phase D+E in one, fixes in one).
+**Estimated effort:** ~4–5 Codex sessions (Phase A+B in one, Phase C in one, Phase E+F in one, Phase D+G in one, Phase H + fixes in one).
 
 ---
 
@@ -946,3 +1397,6 @@ git commit -m "test: verify v7→v8 migration preserves chat history"
 - **Session sharing between household members** — sessions are per-member for now. Sharing = a later feature.
 - **Streaming responses** — current proxy returns complete responses. Streaming improves UX but requires SSE plumbing. Separate effort.
 - **Session export** (PDF/markdown) — nice-to-have, not core.
+- **Memory categories/tags** — all memories are flat for now. Categorization adds UX complexity without clear value at small scale.
+- **Skill marketplace / sharing** — custom skills are household-scoped. Sharing across households is a future product feature.
+- **Memory auto-decay** — memories don't expire. Manual deletion is sufficient at household scale.
