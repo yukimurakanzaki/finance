@@ -18,6 +18,10 @@ export const CLOUD_TABLE: Record<SyncTable, string> = {
   netWorthSnapshots: 'net_worth_snapshots',
   allowance: 'allowances',
   assumptions: 'assumptions',
+  chatSessions: 'chat_sessions',
+  chatMessages: 'chat_messages',
+  chatMemories: 'chat_memories',
+  chatCustomSkills: 'chat_custom_skills',
 }
 
 // Singleton local tables map to a natural cloud key instead of an `id` uuid.
