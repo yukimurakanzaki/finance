@@ -28,6 +28,7 @@ interface AuthState {
   signUp: (email: string, password: string, displayName?: string) => Promise<void>
   signOut: () => Promise<void>
   createHousehold: (name: string) => Promise<void>
+  joinHousehold: (code: string) => Promise<void>
 }
 
 let subscribed = false
@@ -54,6 +55,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   init: async () => {
     if (!subscribed) {
       subscribed = true
+      // Re-sync when the app returns to the foreground (second device catching up)
+      // and on a slow heartbeat while open. syncNow() self-guards against overlap.
+      const resync = () => {
+        const { status, householdId, user } = get()
+        if (status === 'ready' && document.visibilityState === 'visible') kickSync(householdId, user)
+      }
+      document.addEventListener('visibilitychange', resync)
+      setInterval(resync, 5 * 60 * 1000)
+
       supabase.auth.onAuthStateChange((_event, session) => {
         // Keep session/user fresh; re-resolve household on sign-in/out.
         if (!session) {
@@ -118,6 +128,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   createHousehold: async (name) => {
     set({ error: null })
     const { data, error } = await supabase.rpc('create_household', { p_name: name })
+    if (error) {
+      set({ error: error.message })
+      return
+    }
+    const householdId = data as string
+    set({ householdId, status: 'ready' })
+    kickSync(householdId, get().user)
+  },
+
+  joinHousehold: async (code) => {
+    set({ error: null })
+    const { data, error } = await supabase.rpc('accept_invite', { p_code: code.trim().toUpperCase() })
     if (error) {
       set({ error: error.message })
       return

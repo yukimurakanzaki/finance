@@ -12,9 +12,10 @@ import { AssumptionsEditor } from './AssumptionsEditor'
 import { RestoreBackup } from './RestoreBackup'
 import { CategoryManager } from './CategoryManager'
 import { ImportPromptSheet } from './ImportPromptSheet'
+import { HouseholdSheet } from './HouseholdSheet'
 import { BottomSheet } from '@components/BottomSheet'
 
-type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | null
+type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | 'household' | null
 
 export function MoreScreen() {
   const { start: startReconcile } = useReconcileStore()
@@ -66,6 +67,9 @@ export function MoreScreen() {
       <MenuRow label="FI Assumptions" sub="Target, return rates, inflation" onClick={() => setSheet('assumptions')} />
       <MenuRow label="Categories" sub="Tag transactions by lane for import auto-match" onClick={() => setSheet('categories')} />
 
+      <SectionLabel style={{ marginTop: 12 }}>Household</SectionLabel>
+      <MenuRow label="Members & Invites" sub="See who's in, invite your partner, transfer admin" onClick={() => setSheet('household')} />
+
       <SectionLabel style={{ marginTop: 12 }}>Data</SectionLabel>
       <MenuRow label="Get Claude Prompt" sub="Copy ready-made prompt to paste into Claude" onClick={() => setSheet('import_prompt')} />
       <MenuRow label="Import Transactions" sub="Paste Claude's JSON output" onClick={handleReconcile} />
@@ -84,7 +88,7 @@ export function MoreScreen() {
 
       <div style={{ marginTop: 24, padding: '0 4px' }}>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.6 }}>
-          FI Dashboard v0.1.0 · Local-first · No server · Your data stays on this device.
+          FI Dashboard v0.1.0 · Offline-first with household cloud sync · Chat history stays on this device.
         </div>
       </div>
 
@@ -114,6 +118,10 @@ export function MoreScreen() {
 
       <BottomSheet open={sheet === 'import_prompt'} onClose={() => setSheet(null)} title="Claude Import Prompt" height="90dvh">
         <ImportPromptSheet />
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'household'} onClose={() => setSheet(null)} title="Household" height="75dvh">
+        <HouseholdSheet />
       </BottomSheet>
     </div>
   )

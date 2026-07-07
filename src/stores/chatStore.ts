@@ -152,6 +152,10 @@ export const useChatStore = create<ChatState>((set, get) => {
 
     hydrate: async () => {
       if (get().hydrated) return
+      // Privacy retention (audit E4): conversations are device-local; prune 90+ day
+      // old messages so sensitive prose doesn't accumulate indefinitely.
+      const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString()
+      await db.chatMessages.filter((m) => m.created_at < cutoff).delete()
       const rows = await db.chatMessages.orderBy('id').toArray()
       const messages: ApiMessage[] = rows.map((r) => ({
         role: r.role,
