@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
 import { supabase } from '@lib/supabaseClient'
-import { buildSystemPrompt } from '../ai/context'
+import { buildSystemPrompt, PROMPT_VERSION } from '../ai/context'
 import { TOOL_DEFINITIONS, WRITE_TOOLS, executeReadTool, executeWriteTool } from '../ai/tools'
 
 const MODEL = 'claude-sonnet-5'
@@ -68,9 +68,17 @@ export const useChatStore = create<ChatState>((set, get) => {
     if (!session) throw new Error('NOT_SIGNED_IN')
 
     const { data, error } = await supabase.functions.invoke('anthropic-proxy', {
-      body: { model: MODEL, max_tokens: MAX_TOKENS, system, tools: TOOL_DEFINITIONS, messages },
+      body: {
+        model: MODEL, max_tokens: MAX_TOKENS, system, tools: TOOL_DEFINITIONS, messages,
+        prompt_version: PROMPT_VERSION,
+      },
     })
-    if (error) throw new Error(error.message ?? 'Chat request failed')
+    if (error) {
+      // The proxy returns 429 with a budget marker when the daily AI cap is hit.
+      const status = (error as { context?: { status?: number } }).context?.status
+      if (status === 429) throw new Error('BUDGET_EXCEEDED')
+      throw new Error(error.message ?? 'Chat request failed')
+    }
     return data as Anthropic.Message
   }
 
@@ -125,6 +133,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       let msg = 'Something went wrong.'
       if (err instanceof Error && err.message === 'NOT_SIGNED_IN') {
         msg = 'You were signed out. Sign in again to keep chatting.'
+      } else if (err instanceof Error && err.message === 'BUDGET_EXCEEDED') {
+        msg = "Today's AI allowance is used up — it resets within 24 hours. Your data and the rest of the app are unaffected."
       } else if (err instanceof Error) {
         msg = err.message
       }

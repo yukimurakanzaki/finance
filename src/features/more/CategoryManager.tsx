@@ -11,6 +11,7 @@ const LANE_OPTIONS: { value: Lane; label: string }[] = [
   { value: 'store_of_value', label: 'Store of Value' },
   { value: 'debt_liability', label: 'Debt / Liability' },
   { value: 'protected_living', label: 'Protected Living' },
+  { value: 'pass_through', label: 'Pass-through (not your money)' },
 ]
 
 const LANE_COLOR: Record<Lane, string> = {
@@ -18,6 +19,7 @@ const LANE_COLOR: Record<Lane, string> = {
   store_of_value: 'var(--store)',
   debt_liability: 'var(--debt)',
   protected_living: 'var(--protected)',
+  pass_through: 'var(--ink-3)',
 }
 
 export function CategoryManager() {

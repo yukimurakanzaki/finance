@@ -3,6 +3,10 @@ export type Lane =
   | 'store_of_value'
   | 'debt_liability'
   | 'protected_living'
+  // Money that flows through the household's accounts but isn't theirs
+  // (group collections, held funds). Excluded from net worth, savings rate,
+  // safe-to-spend, and FI projection — reported separately.
+  | 'pass_through'
 
 export type AccountType = 'bank' | 'digital_wallet' | 'cash'
 

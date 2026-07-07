@@ -36,6 +36,7 @@ export function ReconcileConfirmScreen() {
         store_of_value: 0,
         debt_liability: 0,
         protected_living: 0,
+        pass_through: 0,
       }
 
       await transactionsRepo.importBatch(rows, yearMonth, blankTotals, 0)
