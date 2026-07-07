@@ -24,28 +24,28 @@ export function HouseholdSheet() {
   useEffect(() => {
     if (!householdId) return
     ;(async () => {
-      const { data, error: err } = await supabase
+      // No FK between memberships.user_id and profiles.id (both reference
+      // auth.users), so PostgREST can't embed — fetch the two separately.
+      const { data: ms, error: mErr } = await supabase
         .from('memberships')
-        .select('user_id, role, profiles(display_name)')
+        .select('user_id, role')
         .eq('household_id', householdId)
-      if (err) {
-        setError(err.message)
+      if (mErr) {
+        setError(mErr.message)
         return
       }
+      const ids = (ms ?? []).map((m) => m.user_id as string)
+      const { data: ps } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', ids)
+      const nameById = new Map((ps ?? []).map((p) => [p.id as string, p.display_name as string | null]))
       setMembers(
-        (data ?? []).map((m) => {
-          // PostgREST types to-one embeds as an array; normalize both shapes.
-          const p = m.profiles as unknown as
-            | { display_name: string | null }
-            | { display_name: string | null }[]
-            | null
-          const profile = Array.isArray(p) ? p[0] : p
-          return {
-            user_id: m.user_id as string,
-            role: m.role as Member['role'],
-            display_name: profile?.display_name ?? null,
-          }
-        }),
+        (ms ?? []).map((m) => ({
+          user_id: m.user_id as string,
+          role: m.role as Member['role'],
+          display_name: nameById.get(m.user_id as string) ?? null,
+        })),
       )
     })()
   }, [householdId])
