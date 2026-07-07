@@ -281,7 +281,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Model allowlist
-  const modelId = typeof model === "string" ? model : "gemini-2.5-flash"
+  const modelId = typeof model === "string" ? model : "claude-sonnet-4-20250514"
   const route = MODEL_ROUTES[modelId]
   if (!route) {
     return new Response(JSON.stringify({ error: `Unknown model: ${modelId}. Allowed: ${Object.keys(MODEL_ROUTES).join(", ")}` }), {

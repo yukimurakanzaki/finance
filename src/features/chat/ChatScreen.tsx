@@ -123,7 +123,7 @@ function Conversation() {
   const [showSkills, setShowSkills] = useState(false)
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null
-  const currentModel = activeSession?.model || 'gemini-2.5-flash'
+  const currentModel = activeSession?.model || 'claude-sonnet-4-20250514'
   const currentSkills = activeSession?.skills || []
 
   useEffect(() => { hydrate() }, [hydrate])

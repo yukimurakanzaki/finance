@@ -177,7 +177,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     if (!sessionId) return
 
     const session = await db.chatSessions.get(sessionId)
-    const model = session?.model ?? DEFAULT_MODEL
+    const model = getModelConfig(session?.model ?? '') ? session?.model ?? DEFAULT_MODEL : DEFAULT_MODEL
     const system = await buildSystemPrompt(session?.skills ?? [])
 
     while (true) {

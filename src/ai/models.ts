@@ -13,22 +13,6 @@ export interface ModelConfig {
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini Flash',
-    provider: 'google',
-    contextWindow: 1_048_576,
-    maxOutput: 65_536,
-    costTier: 'free',
-  },
-  {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini Pro',
-    provider: 'google',
-    contextWindow: 1_048_576,
-    maxOutput: 65_536,
-    costTier: 'standard',
-  },
-  {
     id: 'claude-sonnet-4-20250514',
     name: 'Claude Sonnet',
     provider: 'anthropic',
@@ -38,7 +22,7 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
   },
 ]
 
-export const DEFAULT_MODEL = 'gemini-2.5-flash'
+export const DEFAULT_MODEL = 'claude-sonnet-4-20250514'
 
 export function getModelConfig(id: string): ModelConfig | undefined {
   return AVAILABLE_MODELS.find((m) => m.id === id)
