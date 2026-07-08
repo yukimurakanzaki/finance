@@ -11,7 +11,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")
 const ANTHROPIC_VERSION = "2023-06-01"
 
-const ALLOWED_MODEL = "claude-sonnet-5"
+const ALLOWED_MODEL = "claude-3-7-sonnet-latest"
 const MAX_TOKENS_CAP = 8000
 const MAX_BODY_BYTES = 20 * 1024 * 1024 // statement images are base64; 4×5MB + slack
 // Daily per-user cap (input+output). ~40–60 statement-import turns; costs stay

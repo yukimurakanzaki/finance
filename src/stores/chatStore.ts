@@ -5,7 +5,7 @@ import { supabase } from '@lib/supabaseClient'
 import { buildSystemPrompt, PROMPT_VERSION } from '../ai/context'
 import { TOOL_DEFINITIONS, WRITE_TOOLS, executeReadTool, executeWriteTool } from '../ai/tools'
 
-const MODEL = 'claude-sonnet-5'
+const MODEL = 'claude-3-7-sonnet-latest'
 const MAX_TOKENS = 8000
 const HISTORY_LIMIT = 40 // messages sent to the API per turn
 
