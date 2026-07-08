@@ -37,6 +37,8 @@ export default defineConfig({
       '@stores':     resolve(__dirname, 'src/stores'),
       '@features':   resolve(__dirname, 'src/features'),
       '@components': resolve(__dirname, 'src/components'),
+      '@i18n':       resolve(__dirname, 'src/i18n'),
+      '@import':     resolve(__dirname, 'src/import'),
     },
   },
 })

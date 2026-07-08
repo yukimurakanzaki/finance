@@ -17,7 +17,7 @@ export function useSafeToSpend(): { result: SafeToSpendResult | null; isLoading:
       db.transactions
         .where('date')
         .between(weekStart, weekEnd, true, true)
-        .filter((t) => t.direction === 'out' && !t.is_transfer)
+        .filter((t) => t.direction === 'out' && !t.is_transfer && t.lane !== 'pass_through')
         .toArray(),
     ])
 

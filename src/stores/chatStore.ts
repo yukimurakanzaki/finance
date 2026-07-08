@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
 import type { ChatSession, ChatMessage } from '@db/types'
 import { supabase } from '@lib/supabaseClient'
-import { buildSystemPrompt } from '../ai/context'
+import { buildSystemPrompt, PROMPT_VERSION } from '../ai/context'
 import { TOOL_DEFINITIONS, WRITE_TOOLS, executeReadTool, executeWriteTool } from '../ai/tools'
 import { DEFAULT_MODEL, getModelConfig } from '../ai/models'
 
@@ -136,9 +136,17 @@ export const useChatStore = create<ChatState>((set, get) => {
     const maxTokens = modelConfig?.maxOutput ?? MAX_TOKENS
 
     const { data, error } = await supabase.functions.invoke('anthropic-proxy', {
-      body: { model, max_tokens: maxTokens, system, tools: TOOL_DEFINITIONS, messages },
+      body: {
+        model, max_tokens: maxTokens, system, tools: TOOL_DEFINITIONS, messages,
+        prompt_version: PROMPT_VERSION,
+      },
     })
-    if (error) throw new Error(error.message ?? 'Chat request failed')
+    if (error) {
+      // The proxy returns 429 with a budget marker when the daily AI cap is hit.
+      const status = (error as { context?: { status?: number } }).context?.status
+      if (status === 429) throw new Error('BUDGET_EXCEEDED')
+      throw new Error(error.message ?? 'Chat request failed')
+    }
     return data as Anthropic.Message
   }
 
@@ -237,6 +245,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       let msg = 'Something went wrong.'
       if (err instanceof Error && err.message === 'NOT_SIGNED_IN') {
         msg = 'You were signed out. Sign in again to keep chatting.'
+      } else if (err instanceof Error && err.message === 'BUDGET_EXCEEDED') {
+        msg = "Today's AI allowance is used up — it resets within 24 hours. Your data and the rest of the app are unaffected."
       } else if (err instanceof Error) {
         msg = err.message
       }
@@ -258,6 +268,10 @@ export const useChatStore = create<ChatState>((set, get) => {
 
     hydrate: async () => {
       if (get().hydrated) return
+      // Privacy retention (audit E4): conversations are device-local; prune 90+ day
+      // old messages so sensitive prose doesn't accumulate indefinitely.
+      const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString()
+      await db.chatMessages.filter((m) => m.created_at < cutoff).delete()
       const sessions = await db.chatSessions
         .orderBy('updated_at')
         .reverse()

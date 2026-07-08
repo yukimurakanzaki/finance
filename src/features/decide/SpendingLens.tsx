@@ -17,6 +17,7 @@ const LANE_VERDICT: Record<Lane, { color: string; label: string; sub: string }> 
   store_of_value:   { color: 'var(--store)', label: 'This preserves wealth', sub: 'Not compounding, but not burning either.' },
   protected_living: { color: 'var(--protected)', label: 'This maintains life', sub: 'Necessary cost. Keep it lean.' },
   debt_liability:   { color: 'var(--ink-2)', label: 'This reduces debt', sub: 'Good use — debt is negative compounding.' },
+  pass_through:     { color: 'var(--ink-3)', label: 'Not your money', sub: 'Held for others — outside your own spending picture.' },
 }
 
 export function SpendingLens() {

@@ -15,6 +15,7 @@ const LANE_OPTIONS: { value: Lane; label: string }[] = [
   { value: 'store_of_value', label: 'Store of Value' },
   { value: 'debt_liability', label: 'Debt / Liability' },
   { value: 'protected_living', label: 'Protected Living' },
+  { value: 'pass_through', label: 'Pass-through (held for others)' },
 ]
 
 export function AccountForm({ open, onClose, editing }: Props) {

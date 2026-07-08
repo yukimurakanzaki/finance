@@ -6,6 +6,7 @@ const LANE_STYLE: Record<Lane, { bg: string; color: string }> = {
   store_of_value:   { bg: 'var(--store-bg)',   color: 'var(--store)' },
   debt_liability:   { bg: 'var(--debt-bg)',     color: 'var(--debt)' },
   protected_living: { bg: 'var(--protected-bg)', color: 'var(--protected)' },
+  pass_through:     { bg: 'var(--bg-3)', color: 'var(--ink-2)' },
 }
 
 interface Props {

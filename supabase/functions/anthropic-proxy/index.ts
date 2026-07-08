@@ -1,6 +1,11 @@
 // Proxies chat requests to Google Gemini or Anthropic API based on the model param.
+// Hardening (audit D1 + E3):
+//  - model allowlisted server-side; max_tokens clamped; request body size capped.
+//  - per-user daily token budget enforced against the ai_usage ledger.
+//  - every turn logged to ai_usage with prompt_version for regression tracing.
 // Auth is enforced by Supabase (verify_jwt) — only signed-in users can invoke.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY")
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")
@@ -12,6 +17,17 @@ const MODEL_ROUTES: Record<string, { provider: "google" | "anthropic"; apiModel:
   "claude-sonnet-4-20250514": { provider: "anthropic", apiModel: "claude-sonnet-4-20250514" },
 }
 
+const MAX_TOKENS_CAP = 8000
+const MAX_BODY_BYTES = 20 * 1024 * 1024 // statement images are base64; 4×5MB + slack
+// Daily per-user cap (input+output). ~40–60 statement-import turns; costs stay
+// bounded to a few USD/user/day worst case.
+const DAILY_TOKEN_BUDGET = 2_000_000
+
+const admin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+)
+
 function corsHeadersFor(req: Request): Record<string, string> {
   const requested = req.headers.get("Access-Control-Request-Headers")
   return {
@@ -19,6 +35,25 @@ function corsHeadersFor(req: Request): Record<string, string> {
     "Access-Control-Allow-Headers":
       requested ?? "authorization, x-client-info, apikey, content-type, x-supabase-api-version",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
+  }
+}
+
+function json(status: number, body: unknown, cors: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, "Content-Type": "application/json" },
+  })
+}
+
+// verify_jwt has already validated the signature; we only need the subject.
+function userIdFrom(req: Request): string | null {
+  const token = req.headers.get("Authorization")?.replace(/^Bearer /i, "")
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")))
+    return typeof payload.sub === "string" ? payload.sub : null
+  } catch {
+    return null
   }
 }
 
@@ -249,60 +284,79 @@ async function callAnthropic(
 // ===== HANDLER =====
 
 Deno.serve(async (req: Request) => {
-  const corsHeaders = corsHeadersFor(req)
+  const cors = corsHeadersFor(req)
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors })
+  if (req.method !== "POST") return json(405, { error: "Method not allowed" }, cors)
 
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders })
+  const userId = userIdFrom(req)
+  if (!userId) return json(401, { error: "No authenticated user" }, cors)
+
+  const raw = await req.text()
+  if (raw.length > MAX_BODY_BYTES) {
+    return json(413, { error: "Request too large — try fewer or smaller images" }, cors)
   }
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
-  }
-
-  let body: unknown
+  let body: Record<string, unknown>
   try {
-    body = await req.json()
+    body = JSON.parse(raw)
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+    return json(400, { error: "Invalid JSON body" }, cors)
   }
 
-  const { model, max_tokens, system, tools, messages } = body as Record<string, unknown>
-  if (typeof max_tokens !== "number" || !Array.isArray(messages)) {
-    return new Response(JSON.stringify({ error: "Missing max_tokens or messages" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
-  }
+  const { model, system, tools, messages, prompt_version } = body
+  if (!Array.isArray(messages)) return json(400, { error: "Missing messages" }, cors)
+  const maxTokens = Math.min(
+    typeof body.max_tokens === "number" ? body.max_tokens : MAX_TOKENS_CAP,
+    MAX_TOKENS_CAP,
+  )
+  const promptVersion = typeof prompt_version === "number" ? prompt_version : null
 
   // Model allowlist
   const modelId = typeof model === "string" ? model : "claude-sonnet-4-20250514"
   const route = MODEL_ROUTES[modelId]
   if (!route) {
-    return new Response(JSON.stringify({ error: `Unknown model: ${modelId}. Allowed: ${Object.keys(MODEL_ROUTES).join(", ")}` }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+    return json(400, { error: `Unknown model: ${modelId}. Allowed: ${Object.keys(MODEL_ROUTES).join(", ")}` }, cors)
   }
 
+  // Budget check: tokens used in the trailing 24h.
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  const { data: usageRows, error: usageErr } = await admin
+    .from("ai_usage")
+    .select("input_tokens, output_tokens")
+    .eq("user_id", userId)
+    .gte("created_at", since)
+  if (usageErr) return json(500, { error: "Usage check failed" }, cors)
+  const used = (usageRows ?? []).reduce((s, r) => s + r.input_tokens + r.output_tokens, 0)
+  if (used >= DAILY_TOKEN_BUDGET) {
+    await admin.from("ai_usage").insert({
+      user_id: userId, model: modelId,
+      prompt_version: promptVersion,
+      status: "over_budget",
+    })
+    return json(429, { error: { type: "budget", message: "Daily AI budget reached — resets within 24 hours." } }, cors)
+  }
+
+  let result: any
+  let status: "ok" | "api_error" = "ok"
+  let httpStatus = 200
   try {
-    const result = route.provider === "google"
-      ? await callGemini(route.apiModel, max_tokens, system as string | undefined, tools as unknown[] | undefined, messages)
-      : await callAnthropic(route.apiModel, max_tokens, system as string | undefined, tools as unknown[] | undefined, messages)
-
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+    result = route.provider === "google"
+      ? await callGemini(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
+      : await callAnthropic(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
   } catch (err) {
-    return new Response(JSON.stringify({ error: `Proxy error: ${String(err)}` }), {
-      status: 502,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
+    result = { error: `Proxy error: ${String(err)}` }
+    status = "api_error"
+    httpStatus = 502
   }
+
+  // Log the turn (best-effort; never blocks the response).
+  await admin.from("ai_usage").insert({
+    user_id: userId,
+    model: modelId,
+    prompt_version: promptVersion,
+    input_tokens: result?.usage?.input_tokens ?? 0,
+    output_tokens: result?.usage?.output_tokens ?? 0,
+    status,
+  })
+
+  return json(httpStatus, result, cors)
 })

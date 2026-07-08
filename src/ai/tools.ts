@@ -6,7 +6,7 @@ import { todayISO } from '@lib/dates'
 
 const now = () => new Date().toISOString()
 
-const LANE_ENUM = ['income_producing', 'store_of_value', 'debt_liability', 'protected_living']
+const LANE_ENUM = ['income_producing', 'store_of_value', 'debt_liability', 'protected_living', 'pass_through']
 
 // Write tools mutate the DB and require user confirmation before executing.
 export const WRITE_TOOLS = new Set([
@@ -217,7 +217,7 @@ async function queryTransactions(input: ToolInput): Promise<string> {
   let rows = await db.transactions.where('date').between(from, to, true, true).toArray()
 
   if (input['direction']) rows = rows.filter((t) => t.direction === input['direction'])
-  if (typeof input['account_id'] === 'number') rows = rows.filter((t) => t.account_id === input['account_id'])
+  if (typeof input['account_id'] === 'string' && input['account_id']) rows = rows.filter((t) => t.account_id === input['account_id'])
   if (typeof input['search_note'] === 'string') {
     const q = (input['search_note'] as string).toLowerCase()
     rows = rows.filter((t) => t.note?.toLowerCase().includes(q))

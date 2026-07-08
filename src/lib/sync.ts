@@ -1,4 +1,5 @@
 import { db, SYNC_TABLES, syncControl, type SyncTable } from '@db/db'
+import { migrateLegacyIds } from '@lib/legacyIdMigration'
 import { supabase } from '@lib/supabaseClient'
 import {
   CLOUD_TABLE,
@@ -81,6 +82,10 @@ export async function syncNow(householdId: string, userId: string): Promise<void
   if (syncing) return
   syncing = true
   try {
+    // Re-key any pre-cloud rows (numeric ids from a restored backup) to UUIDs
+    // so they become pushable. No-op on devices without legacy rows.
+    const migrated = await migrateLegacyIds()
+    if (migrated > 0) console.info(`sync: re-keyed ${migrated} legacy rows to UUIDs`)
     for (const table of SYNC_TABLES) await pushTable(table, householdId, userId)
     for (const table of SYNC_TABLES) await pullTable(table, householdId, userId)
   } finally {

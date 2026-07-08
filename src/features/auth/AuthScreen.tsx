@@ -108,13 +108,16 @@ function SignInUp() {
 }
 
 function HouseholdSetup() {
-  const { createHousehold, signOut, error, user } = useAuthStore()
+  const { createHousehold, joinHousehold, signOut, error, user } = useAuthStore()
+  const [mode, setMode] = useState<'create' | 'join'>('create')
   const [name, setName] = useState('')
+  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function submit() {
     setBusy(true)
-    await createHousehold(name.trim() || 'My Household')
+    if (mode === 'create') await createHousehold(name.trim() || 'My Household')
+    else await joinHousehold(code)
     setBusy(false)
   }
 
@@ -122,22 +125,50 @@ function HouseholdSetup() {
     <>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.4px' }}>
-          Name your household
+          {mode === 'create' ? 'Name your household' : 'Join a household'}
         </div>
         <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.5 }}>
-          Signed in as {user?.email}. Your household is the shared financial picture you and your
-          partner will use. You can invite members later.
+          {mode === 'create'
+            ? `Signed in as ${user?.email}. Your household is the shared financial picture you and your partner will use. You can invite members later.`
+            : `Signed in as ${user?.email}. Enter the invite code your household admin shared with you.`}
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Field label="Household name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kanzaki Household" />
-        </Field>
-        {error && <div style={{ fontSize: 12, color: '#ef4444' }}>{error}</div>}
-        <Btn fullWidth disabled={busy} onClick={submit}>
-          {busy ? 'Creating…' : 'Create household'}
+        {mode === 'create' ? (
+          <Field label="Household name">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kanzaki Household" />
+          </Field>
+        ) : (
+          <Field label="Invite code">
+            <Input
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="e.g. 3F9A21BC"
+              autoComplete="off"
+              style={{ textTransform: 'uppercase', letterSpacing: '2px' }}
+            />
+          </Field>
+        )}
+        {error && <div style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>}
+        <Btn fullWidth disabled={busy || (mode === 'join' && code.trim().length < 6)} onClick={submit}>
+          {busy ? 'Working…' : mode === 'create' ? 'Create household' : 'Join household'}
         </Btn>
+        <button
+          type="button"
+          onClick={() => setMode((m) => (m === 'create' ? 'join' : 'create'))}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--ink-3)',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-ui)',
+            padding: 8,
+          }}
+        >
+          {mode === 'create' ? 'Have an invite code? Join a household' : 'Start fresh? Create a household'}
+        </button>
         <button
           type="button"
           onClick={() => signOut()}

@@ -142,9 +142,27 @@ function Conversation() {
     await sendMessage(msg, imgs.length > 0 ? imgs : undefined)
   }
 
+  const MAX_IMAGES = 4
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+  const API_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+  const [fileNote, setFileNote] = useState<string | null>(null)
+
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
+    setFileNote(null)
     for (const file of files) {
+      if (images.length >= MAX_IMAGES) {
+        setFileNote(`Up to ${MAX_IMAGES} images per message — extra files were skipped.`)
+        break
+      }
+      if (!API_IMAGE_TYPES.has(file.type)) {
+        setFileNote(`"${file.name}" isn't a supported format (JPEG/PNG/WebP/GIF). iPhone HEIC photos: screenshot the statement instead, or change camera format to "Most Compatible".`)
+        continue
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        setFileNote(`"${file.name}" is over 5MB — try a screenshot or a smaller image.`)
+        continue
+      }
       const buf = await file.arrayBuffer()
       let binary = ''
       const bytes = new Uint8Array(buf)
@@ -253,6 +271,13 @@ function Conversation() {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* File validation notice */}
+      {fileNote && (
+        <div style={{ padding: '6px 14px', fontSize: 11.5, color: 'var(--amber-text)', lineHeight: 1.5 }}>
+          {fileNote}
+        </div>
+      )}
 
       {/* Attached image previews */}
       {images.length > 0 && (

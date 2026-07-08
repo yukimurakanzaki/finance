@@ -35,6 +35,7 @@ const LANE_DOT: Record<string, string> = {
   store_of_value: 'var(--store)',
   debt_liability: 'var(--debt)',
   protected_living: 'var(--protected)',
+  pass_through: 'var(--ink-3)',
 }
 
 export function TransactionHistory() {

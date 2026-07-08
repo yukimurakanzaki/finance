@@ -28,6 +28,7 @@ export function useNetWorth() {
       store_of_value: 0,
       debt_liability: 0,
       protected_living: 0,
+      pass_through: 0,
     }
 
     for (const acc of accounts) {
@@ -42,6 +43,7 @@ export function useNetWorth() {
       byLane[asset.lane] += asset.value
     }
 
+    // pass_through is deliberately excluded: it's not the household's money.
     const total =
       byLane.income_producing +
       byLane.store_of_value -

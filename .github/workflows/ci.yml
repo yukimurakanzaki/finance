@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npx tsc -b
+      # Pre-existing repo-wide violations (248 as of Phase A) — advisory until the
+      # backlog is cleared, then flip to blocking. New code should keep it clean.
+      - name: Lint (advisory)
+        run: npx biome check src
+        continue-on-error: true
+      - name: Engine golden suite + unit tests
+        run: npx vitest run
+
+  # RLS isolation is a launch-blocking gate (PROPOSAL §3 standing rule 2).
+  # Runs when the DATABASE_URL secret is configured (staging DB); skips otherwise
+  # so forks/PRs without secrets still get the check job above.
+  rls-isolation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: RLS isolation test
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::STAGING_DATABASE_URL secret not set — RLS isolation gate skipped"
+            exit 0
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls_isolation_test.sql | grep -q 'RLS ISOLATION: PASS'

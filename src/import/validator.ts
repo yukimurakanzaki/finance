@@ -5,6 +5,7 @@ const LANE_VALUES = [
   'store_of_value',
   'debt_liability',
   'protected_living',
+  'pass_through',
 ]
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '@stores/appStore'
 import { usePinStore } from '@stores/pinStore'
 import { useAuthStore } from '@stores/authStore'
+import { useI18n } from '@i18n/index'
 import { AuthScreen } from '@features/auth/AuthScreen'
 import { TabBar } from '@components/TabBar'
 import { PinLockScreen } from '@components/PinLockScreen'
@@ -19,6 +20,7 @@ import { OnboardingWizard } from '@features/onboarding/OnboardingWizard'
 import { hasPin } from '@lib/crypto'
 import { settingsRepo } from '@db/repositories/settings.repo'
 import { refreshAssetPrices } from '@lib/marketPrices'
+import { seedTransactionsIfNeeded } from '@import/seedTransactions'
 
 function useSetupComplete() {
   const [ready, setReady] = useState<boolean | null>(null)
@@ -32,9 +34,14 @@ function AppShell() {
   const { activeTab } = useAppStore()
   const { isInProgress, step } = useReconcileStore()
   const { ready, markDone } = useSetupComplete()
+  const { init: initI18n } = useI18n()
 
-  // Silent daily market-price refresh for auto-priced assets (no-op within 12h)
+  // Initialize i18n, seed demo transactions once, and silent daily market-price refresh
   useEffect(() => {
+    initI18n()
+    seedTransactionsIfNeeded().catch((err) => {
+      console.error('Failed to seed transactions:', err)
+    })
     refreshAssetPrices().catch(() => {})
   }, [])
 

@@ -11,6 +11,7 @@ const LANE_COLORS = {
   store_of_value:   'var(--store)',
   debt_liability:   'var(--debt)',
   protected_living: 'var(--protected)',
+  pass_through:     'var(--ink-3)',
 } as const
 
 export function HomeScreen() {
@@ -48,7 +49,7 @@ export function HomeScreen() {
         {/* Lane breakdown */}
         {byLane && (
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ALL_LANES.map((lane) => {
+            {ALL_LANES.filter((lane) => lane !== 'pass_through' || (byLane[lane] ?? 0) !== 0).map((lane) => {
               const val = byLane[lane] ?? 0
               return (
                 <div key={lane} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

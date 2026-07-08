@@ -66,5 +66,64 @@ begin
   if missing is not null then raise exception 'FAIL: tables without RLS: %', missing; end if;
 end $$;
 
+-- ===== Phase A additions =====
+
+-- Assertion 5: audit trail exists for Alice's writes, and Bob can't see it
+select set_config('request.jwt.claims','{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+set local role authenticated;
+do $$ begin
+  if (select count(*) from audit.audit_log where table_name = 'transactions') <> 0 then
+    raise exception 'ISOLATION FAIL: Bob sees household A audit entries';
+  end if;
+end $$;
+select set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+do $$ begin
+  if (select count(*) from audit.audit_log where table_name = 'transactions') < 1 then
+    raise exception 'FAIL: Alice''s transaction insert was not audit-logged';
+  end if;
+end $$;
+
+-- Assertion 6: audit log is immutable for API roles
+do $$ begin
+  begin
+    update audit.audit_log set action = 'TAMPERED';
+    raise exception 'FAIL: audit log UPDATE was allowed';
+  exception when insufficient_privilege then null;  -- expected
+  end;
+  begin
+    delete from audit.audit_log;
+    raise exception 'FAIL: audit log DELETE was allowed';
+  exception when insufficient_privilege then null;  -- expected
+  end;
+end $$;
+
+-- Assertion 7: export works for a member, refuses a non-member
+do $$ begin
+  if (select export_household((select v::uuid from t where k='hh_a'))->>'format') <> 'fi-dashboard-household-export' then
+    raise exception 'FAIL: Alice could not export her own household';
+  end if;
+end $$;
+select set_config('request.jwt.claims','{"sub":"bbbbbbbb-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+do $$ begin
+  begin
+    perform export_household((select v::uuid from t where k='hh_a'));
+    raise exception 'ISOLATION FAIL: Bob exported household A';
+  exception when others then
+    if sqlerrm like '%ISOLATION FAIL%' then raise; end if;  -- expected membership error
+  end;
+  begin
+    perform delete_household((select v::uuid from t where k='hh_a'));
+    raise exception 'ISOLATION FAIL: Bob deleted household A';
+  exception when others then
+    if sqlerrm like '%ISOLATION FAIL%' then raise; end if;  -- expected admin error
+  end;
+end $$;
+
+-- Assertion 8: pass_through lane is a valid lane value
+select set_config('request.jwt.claims','{"sub":"aaaaaaaa-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+insert into transactions (household_id,date,amount,direction,account_id,lane,source)
+select (select v::uuid from t where k='hh_a'), current_date, 25000,'out',
+       (select v::uuid from t where k='acct_a'),'pass_through','manual';
+
 select 'RLS ISOLATION: PASS' as result;
 rollback;
