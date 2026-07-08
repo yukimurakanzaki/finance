@@ -90,6 +90,13 @@ balance = (manual_balance_override ?? 0 at last_balance_updated_at ?? beginning)
 - Toggle in More ("Appearance: Dark / Light"), persisted in `db.appSettings` (`theme`), applied to `<html data-theme>` on boot before first paint (inline in `index.html` reading localStorage mirror to avoid flash).
 - Default remains dark. All components already use CSS variables, so no per-component work beyond spot-checking hardcoded colors (`#000` on amber buttons, chart strokes).
 
+## Gap review additions (2026-07-09)
+
+- **Duplicate guard on AI bulk import**: the `save_transactions` executor checks each row against existing transactions on (date, amount, account_id) and returns matches as `possible_duplicates` so the AI can ask before the confirm gate. Manual form entry is exempt.
+- **Within-day ordering**: Today list orders by `created_at` within the selected date. No time-of-day field (known ceiling; add later if backfilled ordering matters).
+- **Balance hook includes transfers**: unlike `useNetWorth` (which correctly excludes transfer pairs for the aggregate), per-account balances must count both transfer legs. Reuse the derivation pattern in `useNetWorth.ts` but without the transfer filter; `useNetWorth` itself is unchanged.
+- Confirmed: `useSafeToSpend` reads `db.transactions`, so manual/AI entries feed the weekly gauge automatically — no integration work.
+
 ## Error handling
 
 - Form: inline validation (missing wallet/amount, transfer same-wallet); save failures surface as a sheet-level error, never silent.
