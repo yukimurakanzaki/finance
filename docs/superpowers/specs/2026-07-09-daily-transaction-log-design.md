@@ -48,7 +48,7 @@ One bottom-sheet form, three modes. Also used for editing.
 - Wallet — required; opens a bottom-sheet grid of active accounts (reference-app pattern)
 - Amount — required, > 0, rupiah numeric input
 - Title — free text; below it, chips of the ~8 most recent distinct titles for one-tap reuse
-- Category — chips of existing categories + a `+ new` chip that creates a category inline (name only, sensible lane default) — resolves P5 discoverability
+- Category — free-text input ("Type here for new category", reference-app pattern) with chips of existing categories below; tapping a chip selects it, typing a name that matches no existing category creates it on save (name only, default lane `protected_living`) — resolves P5 discoverability
 - Description — optional, maps to `note`
 
 **Transfer mode fields**: date, from-wallet, to-wallet (must differ), amount, optional description. Saved as the existing paired pattern: two transactions (`out` from source, `in` to destination), `is_transfer: true`, shared `transfer_pair_id`, `category_id: null`.
