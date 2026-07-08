@@ -187,6 +187,9 @@ export type AppSettingKey =
   | 'ios_install_banner_dismissed'
   | 'gold_staleness_dismissed_at'
   | 'prices_last_refreshed_at'
+  | 'prices_cached'
+  | 'language'
+  | `seeded:${string}`
 
 // One row per Anthropic-API-format message. `content` is JSON:
 // either a plain string or an array of content blocks (text/image/tool_use/tool_result/thinking).
