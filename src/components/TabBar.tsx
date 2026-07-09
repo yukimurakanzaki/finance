@@ -1,13 +1,13 @@
 import { useAppStore } from '@stores/appStore'
 
-type Tab = 'home' | 'budget' | 'assets' | 'chat' | 'decide' | 'more'
+type Tab = 'today' | 'budget' | 'chat' | 'assets' | 'report' | 'more'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home',   label: 'Home',   icon: '⌂' },
+  { id: 'today',  label: 'Today',  icon: '☰' },
   { id: 'budget', label: 'Budget', icon: '◎' },
   { id: 'chat',   label: 'Manager', icon: '✦' },
   { id: 'assets', label: 'Assets', icon: '◈' },
-  { id: 'decide', label: 'Decide', icon: '◆' },
+  { id: 'report', label: 'Report', icon: '⌂' },
   { id: 'more',   label: 'More',   icon: '···' },
 ]
 

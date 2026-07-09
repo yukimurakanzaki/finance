@@ -14,8 +14,9 @@ import { CategoryManager } from './CategoryManager'
 import { ImportPromptSheet } from './ImportPromptSheet'
 import { HouseholdSheet } from './HouseholdSheet'
 import { BottomSheet } from '@components/BottomSheet'
+import { DecideScreen } from '@features/decide/DecideScreen'
 
-type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | 'household' | null
+type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | 'household' | 'decide' | null
 
 export function MoreScreen() {
   const { start: startReconcile } = useReconcileStore()
@@ -66,6 +67,9 @@ export function MoreScreen() {
       <MenuRow label={pinLabel} sub={pinSub} onClick={() => setSheet('pin')} />
       <MenuRow label="FI Assumptions" sub="Target, return rates, inflation" onClick={() => setSheet('assumptions')} />
       <MenuRow label="Categories" sub="Tag transactions by lane for import auto-match" onClick={() => setSheet('categories')} />
+
+      <SectionLabel style={{ marginTop: 12 }}>Plan</SectionLabel>
+      <MenuRow label="Decide" sub="What does this buy? Milestones, income, spending lens" onClick={() => setSheet('decide')} />
 
       <SectionLabel style={{ marginTop: 12 }}>Household</SectionLabel>
       <MenuRow label="Members & Invites" sub="See who's in, invite your partner, transfer admin" onClick={() => setSheet('household')} />
@@ -122,6 +126,10 @@ export function MoreScreen() {
 
       <BottomSheet open={sheet === 'household'} onClose={() => setSheet(null)} title="Household" height="75dvh">
         <HouseholdSheet />
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'decide'} onClose={() => setSheet(null)} title="Decide" height="92dvh">
+        <DecideScreen />
       </BottomSheet>
     </div>
   )
