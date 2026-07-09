@@ -6,7 +6,6 @@ import { useI18n } from '@i18n/index'
 import { AuthScreen } from '@features/auth/AuthScreen'
 import { TabBar } from '@components/TabBar'
 import { PinLockScreen } from '@components/PinLockScreen'
-import { QuickLogFAB } from '@components/QuickLogFAB'
 import { HomeScreen } from '@features/home/HomeScreen'
 import { BudgetScreen } from '@features/budget/BudgetScreen'
 import { AssetsScreen } from '@features/assets/AssetsScreen'
@@ -92,7 +91,6 @@ function AppShell() {
         {screen.component}
       </div>
       <TabBar />
-      {!isChat && <QuickLogFAB />}
     </div>
   )
 }
