@@ -71,6 +71,7 @@ export interface Transaction {
   id?: string
   date: string
   amount: number
+  title: string | null
   direction: 'in' | 'out'
   account_id: string
   category_id: string | null
@@ -189,13 +190,52 @@ export type AppSettingKey =
   | 'prices_last_refreshed_at'
   | 'prices_cached'
   | 'language'
+  | 'theme'
   | `seeded:${string}`
 
-// One row per Anthropic-API-format message. `content` is JSON:
+// --- Chat session management ---
+
+export interface ChatSession {
+  id: string
+  title: string
+  model: string
+  skills: string[]
+  archived_at: string | null
+  created_at: string
+  updated_at: string
+  message_count: number
+  total_input_tokens: number
+  total_output_tokens: number
+}
+
+// One row per API-format message. `content` is JSON:
 // either a plain string or an array of content blocks (text/image/tool_use/tool_result/thinking).
 export interface ChatMessage {
-  id?: number
+  id: string
+  session_id: string
   role: 'user' | 'assistant'
   content: string
+  input_tokens: number | null
+  output_tokens: number | null
   created_at: string
+  updated_at: string
+}
+
+export interface ChatMemory {
+  id: string
+  content: string
+  source_session_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ChatCustomSkill {
+  id: string
+  name: string
+  description: string
+  icon: string
+  prompt_injection: string
+  source_session_id: string | null
+  created_at: string
+  updated_at: string
 }

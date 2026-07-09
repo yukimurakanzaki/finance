@@ -13,6 +13,9 @@ import type {
   Assumptions,
   AppSetting,
   ChatMessage,
+  ChatSession,
+  ChatMemory,
+  ChatCustomSkill,
 } from './types'
 
 // Local sync bookkeeping (never pushed to the cloud).
@@ -35,6 +38,10 @@ export const SYNC_TABLES = [
   'netWorthSnapshots',
   'allowance',
   'assumptions',
+  'chatSessions',
+  'chatMessages',
+  'chatMemories',
+  'chatCustomSkills',
 ] as const
 export type SyncTable = (typeof SYNC_TABLES)[number]
 
@@ -51,7 +58,10 @@ class FIDatabase extends Dexie {
   milestones!: Table<Milestone, string>
   assumptions!: Table<Assumptions, string>
   appSettings!: Table<AppSetting, string>
-  chatMessages!: Table<ChatMessage, number>
+  chatSessions!: Table<ChatSession, string>
+  chatMessages!: Table<ChatMessage, string>
+  chatMemories!: Table<ChatMemory, string>
+  chatCustomSkills!: Table<ChatCustomSkill, string>
   syncMeta!: Table<SyncMeta, string>
 
   constructor() {
@@ -162,6 +172,31 @@ class FIDatabase extends Dexie {
       assumptions: 'id, updated_at',
       syncMeta: '&key',
     })
+
+    // v8: multi-session chat with UUID keys, synced to cloud.
+    // chatMessages moves from numeric autoincrement to string UUID primary key.
+    this.version(8).stores({
+      chatSessions: 'id, archived_at, updated_at, created_at',
+      chatMessages: 'id, session_id, created_at, updated_at',
+    })
+
+    // v9: persistent AI memory + user-created custom skills
+    this.version(9).stores({
+      chatMemories: 'id, updated_at, created_at',
+      chatCustomSkills: 'id, updated_at, created_at',
+    })
+
+    // v10: user-facing title on transactions (note becomes the optional description)
+    this.version(10)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table<Transaction>('transactions')
+          .toCollection()
+          .modify((t) => {
+            if (t.title === undefined) t.title = null
+          }),
+      )
   }
 }
 

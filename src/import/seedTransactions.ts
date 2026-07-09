@@ -51,6 +51,7 @@ export async function seedTransactionsIfNeeded(): Promise<{
       category_id: null,
       lane: row.suggested_lane,
       source: 'csv_import',
+      title: null,
       note: row.note || null,
       original_amount: null,
       overridden_amount: null,

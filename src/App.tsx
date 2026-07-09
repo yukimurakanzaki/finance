@@ -6,11 +6,10 @@ import { useI18n } from '@i18n/index'
 import { AuthScreen } from '@features/auth/AuthScreen'
 import { TabBar } from '@components/TabBar'
 import { PinLockScreen } from '@components/PinLockScreen'
-import { QuickLogFAB } from '@components/QuickLogFAB'
-import { HomeScreen } from '@features/home/HomeScreen'
+import { TodayScreen } from '@features/today/TodayScreen'
+import { ReportScreen } from '@features/report/ReportScreen'
 import { BudgetScreen } from '@features/budget/BudgetScreen'
 import { AssetsScreen } from '@features/assets/AssetsScreen'
-import { DecideScreen } from '@features/decide/DecideScreen'
 import { MoreScreen } from '@features/more/MoreScreen'
 import { ChatScreen } from '@features/chat/ChatScreen'
 import { useReconcileStore } from '@stores/reconcileStore'
@@ -73,12 +72,12 @@ function AppShell() {
   }
 
   const SCREENS = {
-    home:   { title: 'Home',   subtitle: 'The Scoreboard',      component: <HomeScreen /> },
-    budget: { title: 'Budget', subtitle: 'This workweek',       component: <BudgetScreen /> },
+    today:  { title: 'Today',  subtitle: 'Daily transaction log',    component: <TodayScreen /> },
+    budget: { title: 'Budget', subtitle: 'This workweek',            component: <BudgetScreen /> },
     chat:   { title: 'Manager', subtitle: 'Your AI finance partner', component: <ChatScreen /> },
-    assets: { title: 'Assets', subtitle: 'Accounts & assets',   component: <AssetsScreen /> },
-    decide: { title: 'Decide', subtitle: 'What does this buy?', component: <DecideScreen /> },
-    more:   { title: 'More',   subtitle: '',                    component: <MoreScreen /> },
+    assets: { title: 'Assets', subtitle: 'Accounts & assets',        component: <AssetsScreen /> },
+    report: { title: 'Report', subtitle: 'The Scoreboard',           component: <ReportScreen /> },
+    more:   { title: 'More',   subtitle: '',                         component: <MoreScreen /> },
   }
 
   const screen = SCREENS[activeTab]
@@ -92,7 +91,6 @@ function AppShell() {
         {screen.component}
       </div>
       <TabBar />
-      {!isChat && <QuickLogFAB />}
     </div>
   )
 }

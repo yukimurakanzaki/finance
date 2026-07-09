@@ -30,7 +30,7 @@ export function DecideScreen() {
               flex: 1, padding: '7px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
               fontSize: 11, fontWeight: tab === id ? 600 : 400, fontFamily: 'var(--font-ui)',
               background: tab === id ? 'var(--amber)' : 'var(--bg-2)',
-              color: tab === id ? '#000' : 'var(--ink-2)',
+              color: tab === id ? 'var(--on-accent)' : 'var(--ink-2)',
               transition: 'background .15s, color .15s',
             }}
           >

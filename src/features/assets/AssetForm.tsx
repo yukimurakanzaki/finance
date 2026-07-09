@@ -200,7 +200,7 @@ function ToggleRow({
         border: '1px solid var(--border-2)', position: 'relative', transition: 'background .15s',
       }}>
         <div style={{
-          width: 16, height: 16, borderRadius: 8, background: checked ? '#000' : 'var(--ink-3)',
+          width: 16, height: 16, borderRadius: 8, background: checked ? 'var(--on-accent)' : 'var(--ink-3)',
           position: 'absolute', top: 2, left: checked ? 18 : 2, transition: 'left .15s',
         }} />
       </div>

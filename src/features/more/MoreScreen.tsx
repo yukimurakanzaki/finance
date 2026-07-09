@@ -14,14 +14,25 @@ import { CategoryManager } from './CategoryManager'
 import { ImportPromptSheet } from './ImportPromptSheet'
 import { HouseholdSheet } from './HouseholdSheet'
 import { BottomSheet } from '@components/BottomSheet'
+import { DecideScreen } from '@features/decide/DecideScreen'
 
-type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | 'household' | null
+type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | 'household' | 'decide' | null
 
 export function MoreScreen() {
   const { start: startReconcile } = useReconcileStore()
   const { setTab } = useAppStore()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [pinConfigured, setPinConfigured] = useState(hasPin())
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
+
+  function toggleTheme() {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    if (next === 'light') document.documentElement.dataset.theme = 'light'
+    else delete document.documentElement.dataset.theme
+    try { localStorage.setItem('fi-theme', next) } catch { /* private mode */ }
+    db.appSettings.put({ key: 'theme', value: next, updated_at: new Date().toISOString() })
+  }
 
   async function handleExport() {
     const [accounts, assets, transactions, categories, envelopes, recurringItems,
@@ -60,12 +71,22 @@ export function MoreScreen() {
 
   return (
     <div style={{ padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <SectionLabel>Setup</SectionLabel>
+      <SectionLabel>Appearance</SectionLabel>
+      <MenuRow
+        label={`Theme: ${theme === 'light' ? 'Light (blue)' : 'Dark'}`}
+        sub="Tap to switch between dark and light"
+        onClick={toggleTheme}
+      />
+
+      <SectionLabel style={{ marginTop: 12 }}>Setup</SectionLabel>
       <MenuRow label="Allowance" sub="Monthly pool & weekend allocation" onClick={() => setSheet('allowance')} />
       <MenuRow label="Recurring Register" sub="Pipe, bills, subs — what's committed monthly" onClick={() => setSheet('recurring')} />
       <MenuRow label={pinLabel} sub={pinSub} onClick={() => setSheet('pin')} />
       <MenuRow label="FI Assumptions" sub="Target, return rates, inflation" onClick={() => setSheet('assumptions')} />
       <MenuRow label="Categories" sub="Tag transactions by lane for import auto-match" onClick={() => setSheet('categories')} />
+
+      <SectionLabel style={{ marginTop: 12 }}>Plan</SectionLabel>
+      <MenuRow label="Decide" sub="What does this buy? Milestones, income, spending lens" onClick={() => setSheet('decide')} />
 
       <SectionLabel style={{ marginTop: 12 }}>Household</SectionLabel>
       <MenuRow label="Members & Invites" sub="See who's in, invite your partner, transfer admin" onClick={() => setSheet('household')} />
@@ -122,6 +143,10 @@ export function MoreScreen() {
 
       <BottomSheet open={sheet === 'household'} onClose={() => setSheet(null)} title="Household" height="75dvh">
         <HouseholdSheet />
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'decide'} onClose={() => setSheet(null)} title="Decide" height="92dvh">
+        <DecideScreen />
       </BottomSheet>
     </div>
   )

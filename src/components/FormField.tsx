@@ -63,7 +63,7 @@ interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Btn({ variant = 'primary', fullWidth, style, children, ...props }: BtnProps) {
   const styles: Record<string, React.CSSProperties> = {
-    primary: { background: 'var(--amber)', color: '#000', border: 'none' },
+    primary: { background: 'var(--amber)', color: 'var(--on-accent)', border: 'none' },
     secondary: { background: 'var(--bg-3)', color: 'var(--ink-2)', border: '1px solid var(--border-2)' },
     danger: { background: 'var(--bg-3)', color: '#ef4444', border: '1px solid #7f1d1d' },
   }

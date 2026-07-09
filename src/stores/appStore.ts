@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type Tab = 'home' | 'budget' | 'assets' | 'chat' | 'decide' | 'more'
+type Tab = 'today' | 'budget' | 'chat' | 'assets' | 'report' | 'more'
 type BudgetHorizon = 'yearly' | 'monthly' | 'weekly'
 
 interface AppState {
@@ -16,7 +16,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  activeTab: 'home',
+  activeTab: 'today',
   budgetHorizon: 'weekly',
   showIOSBanner: false,
   showGoldNudge: false,

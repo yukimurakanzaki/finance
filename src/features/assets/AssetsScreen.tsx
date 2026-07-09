@@ -5,6 +5,7 @@ import { formatRp } from '@lib/currency'
 import { LanePill } from '@components/LanePill'
 import { todayISO } from '@lib/dates'
 import { refreshAssetPrices } from '@lib/marketPrices'
+import { useAccountBalances } from '../../hooks/useAccountBalances'
 import { AccountForm } from './AccountForm'
 import { AssetForm } from './AssetForm'
 import type { Account, Asset } from '@db/types'
@@ -13,6 +14,7 @@ export function AssetsScreen() {
   const accounts = useLiveQuery(() => db.accounts.filter((a) => a.is_active).toArray())
   const assets = useLiveQuery(() => db.assets.toArray())
   const lastRefreshed = useLiveQuery(() => db.appSettings.get('prices_last_refreshed_at'))
+  const accountBalances = useAccountBalances()
   const today = todayISO()
 
   const [accountFormOpen, setAccountFormOpen] = useState(false)
@@ -44,6 +46,18 @@ export function AssetsScreen() {
     <div style={{ padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Accounts */}
       <section>
+        <div style={{
+          background: 'var(--bg-2)', border: '1px solid var(--border-1)', borderRadius: 10,
+          padding: '12px 14px', display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', marginBottom: 10,
+        }}>
+          <span style={{ fontSize: 10, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+            Total balance
+          </span>
+          <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink-1)' }}>
+            {accountBalances ? formatRp(accountBalances.total) : '—'}
+          </span>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 10, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
             Accounts ({accounts?.length ?? 0})
@@ -74,18 +88,16 @@ export function AssetsScreen() {
                   <LanePill lane={acc.lane} size="xs" />
                 </div>
               </div>
-              {acc.account_type !== 'bank' && acc.manual_balance_override !== null && (
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink-1)' }}>
-                    {formatRp(acc.manual_balance_override)}
-                  </div>
-                  {acc.last_balance_updated_at && (
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>
-                      {acc.last_balance_updated_at}
-                    </div>
-                  )}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink-1)' }}>
+                  {accountBalances ? formatRp(accountBalances.balances.get(acc.id as string) ?? 0) : '—'}
                 </div>
-              )}
+                {acc.manual_balance_override !== null && acc.last_balance_updated_at && (
+                  <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>
+                    {acc.last_balance_updated_at}
+                  </div>
+                )}
+              </div>
             </button>
           ))}
         </div>
@@ -192,5 +204,5 @@ export function AssetsScreen() {
 const addBtnStyle: React.CSSProperties = {
   background: 'var(--amber)', border: 'none', borderRadius: 8,
   padding: '5px 13px', fontSize: 12, fontWeight: 700,
-  color: '#000', cursor: 'pointer', fontFamily: 'var(--font-ui)',
+  color: 'var(--on-accent)', cursor: 'pointer', fontFamily: 'var(--font-ui)',
 }

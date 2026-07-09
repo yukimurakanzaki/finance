@@ -19,6 +19,7 @@
   --amber-dim: #a87200;
   --amber-surface: #110d00;
   --amber-border: #3d2900;
+  --on-accent: #000;
 
   /* Lane colors */
   --engine: #34d399;
@@ -42,6 +43,36 @@
   font-size: 16px;
   line-height: 1.5;
   color-scheme: dark;
+}
+
+/* Light "blue" theme — the accent slot keeps the name --amber but carries blue here.
+   ponytail: renaming --amber across ~30 files is churn with zero user value. */
+:root[data-theme='light'] {
+  --bg-0: #e9eef6;
+  --bg-1: #ffffff;
+  --bg-2: #f2f6fb;
+  --bg-3: #e7edf5;
+  --bg-4: #dbe4ef;
+  --ink-1: #1c2534;
+  --ink-2: #5a6579;
+  --ink-3: #8b95a8;
+  --amber: #2b8ae0;
+  --amber-text: #1d6fc0;
+  --amber-dim: #7fb4e8;
+  --amber-surface: #e9f2fc;
+  --amber-border: #bcd8f3;
+  --on-accent: #ffffff;
+  --engine: #149e6d;
+  --engine-bg: #e3f5ee;
+  --store: #b17a00;
+  --store-bg: #faf2dd;
+  --debt: #64748b;
+  --debt-bg: #eef1f5;
+  --protected: #5b64d8;
+  --protected-bg: #eceefc;
+  --border-1: #dde5ef;
+  --border-2: #c9d4e3;
+  color-scheme: light;
 }
 
 * {

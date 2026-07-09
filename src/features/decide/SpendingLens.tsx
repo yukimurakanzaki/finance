@@ -68,7 +68,7 @@ export function SpendingLens() {
               flex: 1, padding: '8px 4px', borderRadius: 8, border: 'none', cursor: 'pointer',
               fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: lane === o.value ? 600 : 400,
               background: lane === o.value ? LANE_VERDICT[o.value].color : 'var(--bg-2)',
-              color: lane === o.value ? '#000' : 'var(--ink-3)',
+              color: lane === o.value ? 'var(--on-accent)' : 'var(--ink-3)',
               transition: 'background .15s',
             }}
           >
