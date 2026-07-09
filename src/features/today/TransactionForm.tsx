@@ -39,19 +39,36 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
   const accounts = useLiveQuery(() => db.accounts.filter((a) => a.is_active).toArray()) ?? []
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
   const recentTitles = useLiveQuery(async () => {
-    const rows = await db.transactions.orderBy('date').reverse().limit(50).toArray()
+    const rows = await db.transactions.orderBy('date').reverse().toArray()
     const seen = new Set<string>()
-    for (const r of rows) if (r.title && r.source === 'manual') seen.add(r.title)
-    return [...seen].slice(0, 8)
+    for (const r of rows) {
+      if (r.title && r.source === 'manual') seen.add(r.title)
+      if (seen.size >= 8) break
+    }
+    return [...seen]
   }) ?? []
+  const pairLegs = useLiveQuery(
+    async () => editing?.transfer_pair_id
+      ? db.transactions.where('transfer_pair_id').equals(editing.transfer_pair_id).toArray()
+      : [],
+    [editing?.transfer_pair_id],
+  ) ?? []
 
   // Prefill wallet + category when editing (once accounts/categories load)
   if (editing && !fromAccount && accounts.length > 0) {
-    const acc = accounts.find((a) => a.id === editing.account_id)
-    if (acc) setFromAccount(acc)
-    if (editing.category_id && !categoryName) {
-      const cat = categories.find((c) => c.id === editing.category_id)
-      if (cat) setCategoryName(cat.name)
+    if (editing.is_transfer && editing.transfer_pair_id) {
+      const outLeg = pairLegs.find((t) => t.direction === 'out')
+      const inLeg = pairLegs.find((t) => t.direction === 'in')
+      const fromAcc = accounts.find((a) => a.id === outLeg?.account_id)
+      const toAcc = accounts.find((a) => a.id === inLeg?.account_id)
+      if (fromAcc && toAcc) { setFromAccount(fromAcc); setToAccount(toAcc) }
+    } else {
+      const acc = accounts.find((a) => a.id === editing.account_id)
+      if (acc) setFromAccount(acc)
+      if (editing.category_id && !categoryName) {
+        const cat = categories.find((c) => c.id === editing.category_id)
+        if (cat) setCategoryName(cat.name)
+      }
     }
   }
 
@@ -76,12 +93,15 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
     setSaving(true)
     try {
       if (mode === 'transfer') {
-        if (editing?.transfer_pair_id) await transactionsRepo.deleteWithPair(editing.id as string)
-        await transactionsRepo.addTransfer({
-          date, amount: amt,
-          from_account_id: fromAccount.id as string, from_lane: fromAccount.lane,
-          to_account_id: toAccount!.id as string, to_lane: toAccount!.lane,
-          note: note || null,
+        // Atomic: delete old pair + add new pair in one rw txn (repo calls nest/join)
+        await db.transaction('rw', db.transactions, async () => {
+          if (editing?.transfer_pair_id) await transactionsRepo.deleteWithPair(editing.id as string)
+          await transactionsRepo.addTransfer({
+            date, amount: amt,
+            from_account_id: fromAccount.id as string, from_lane: fromAccount.lane,
+            to_account_id: toAccount!.id as string, to_lane: toAccount!.lane,
+            note: note || null,
+          })
         })
       } else {
         const category_id = await resolveCategoryId()
