@@ -80,7 +80,7 @@ export function SkillPicker({ open, onClose, currentSkills, onToggleSkill }: Pro
                     background: isActive ? 'var(--amber)' : 'transparent',
                     flexShrink: 0,
                   }}>
-                    {isActive && <div style={{ width: 8, height: 4, background: '#000', borderRadius: 1 }} />}
+                    {isActive && <div style={{ width: 8, height: 4, background: 'var(--on-accent)', borderRadius: 1 }} />}
                   </div>
                 </button>
               )
