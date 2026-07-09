@@ -175,9 +175,12 @@ class FIDatabase extends Dexie {
 
     // v8: multi-session chat with UUID keys, synced to cloud.
     // chatMessages moves from numeric autoincrement to string UUID primary key.
+    // IndexedDB can't change a store's primary key in place (see v7's DB-rename
+    // note above), so drop it here and recreate it at v11 — Dexie's documented
+    // pattern for a primary-key change.
     this.version(8).stores({
       chatSessions: 'id, archived_at, updated_at, created_at',
-      chatMessages: 'id, session_id, created_at, updated_at',
+      chatMessages: null,
     })
 
     // v9: persistent AI memory + user-created custom skills
@@ -197,6 +200,12 @@ class FIDatabase extends Dexie {
             if (t.title === undefined) t.title = null
           }),
       )
+
+    // v11: recreate chatMessages with its v8 schema (string UUID key) now that
+    // the old auto-increment store has been dropped.
+    this.version(11).stores({
+      chatMessages: 'id, session_id, created_at, updated_at',
+    })
   }
 }
 
