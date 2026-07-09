@@ -12,17 +12,19 @@ Direct user feedback after real use. Each is cross-referenced to a journey stage
 
 | # | Pain point | Stage | Status |
 |---|-----------|-------|--------|
-| P1 | Hard to know the sum of **today's expenses** | Daily glance | ❌ No "today" view anywhere. `TransactionHistory` periods are this month / last month / this year / all. |
-| P2 | Can't see **balance of wallet / bank accounts** | Daily glance, Maintenance | 🟡 `AssetsScreen` shows a balance only for non-bank accounts with a `manual_balance_override`; bank accounts render name/institution/lane but **no balance**. No balance is derived from transactions. |
-| P3 | Can't see **how much my assets are** | Daily glance | 🟡 Home shows total Net Worth by lane, but there is no per-account/per-asset total with balances (depends on P2). |
-| P4 | Can't see **spend per category** | Weekly loop, Monthly review | ❌ Categories exist (`CategoryManager`, import prompt) but **no screen reports by category** — no breakdown, no filter in history. |
-| P5 | **Adding a category** is hard | Maintenance | 🟡 Exists (More → Categories → Add) but buried; not reachable from where categorizing happens (history, import). |
-| P6 | **Adding a transaction** is hard | Weekly loop | ❌ No manual transaction form. The AI's write tools don't include a save-transaction tool either (`WRITE_TOOLS`: recurring item, asset value, account balance, memory, skill). Transactions only enter via seed/bulk-import. |
-| P7 | **Updating salary** is hard | Event-driven | 🟡 Exists (Decide → Income log → Add), but "Decide" doesn't read as the place where salary lives. |
-| P8 | Can't see **total expense / income / balance per month** | Monthly review | 🟡 `TransactionHistory` has In/Out/Net chips per period, but it's buried inside Budget; `MonthlyScreen` shows the *planned* waterfall (recurring commitments), not actuals. |
-| P9 | Can't see **list of wallets and balance on each** | Daily glance | 🟡 List exists on Assets; balances missing for bank accounts (same root cause as P2). |
+| P1 | Hard to know the sum of **today's expenses** | Daily glance | ✅ **Shipped 2026-07-09** (daily transaction log). Today tab is now the default screen with a date navigator and per-day Income/Expenses/Balance chips. |
+| P2 | Can't see **balance of wallet / bank accounts** | Daily glance, Maintenance | ✅ **Shipped 2026-07-09.** `useAccountBalances` derives every account's balance from a manual-override anchor + the transaction ledger (transfer-aware); shown on every Assets row including banks. |
+| P3 | Can't see **how much my assets are** | Daily glance | ✅ **Shipped 2026-07-09.** Assets screen now shows a Total balance header over the per-account balances. (Net-worth-by-lane still on the Report tab.) |
+| P4 | Can't see **spend per category** | Weekly loop, Monthly review | ❌ Still open — deferred to a later round. Categories now capture on every entry, so the data exists for a future breakdown report. |
+| P5 | **Adding a category** is hard | Maintenance | ✅ **Shipped 2026-07-09.** The Add-expense/income form has a category field with create-on-save (typing a new name creates the category inline). |
+| P6 | **Adding a transaction** is hard | Weekly loop | ✅ **Shipped 2026-07-09.** Speed-dial FAB → Expense / Income / Transfer opens a bottom-sheet form (wallet, amount, title, category, note). Plus AI logging via the Ask AI action. |
+| P7 | **Updating salary** is hard | Event-driven | 🟡 Decide (with the income log) is now reachable from More → Plan → Decide. Salary entry still lives there; a Home/settings shortcut is a future polish. |
+| P8 | Can't see **total expense / income / balance per month** | Monthly review | ✅ **Shipped 2026-07-09.** The new Report tab shows a "This month — actuals" card (Income / Expenses / Net) above the net-worth scoreboard. |
+| P9 | Can't see **list of wallets and balance on each** | Daily glance | ✅ **Shipped 2026-07-09.** Assets screen lists every wallet with its derived balance; the wallet picker in the add form shows balances too (same root fix as P2). |
 
-**The theme:** the app is strong on *planning and trajectory* (net worth, waterfall, safe-to-spend model) and weak on *bookkeeping basics* (balances, today's spend, category totals, manual entry). The daily-glance and weekly-loop stages don't answer the questions actually being asked of them.
+**The theme:** the app was strong on *planning and trajectory* (net worth, waterfall, safe-to-spend model) and weak on *bookkeeping basics* (balances, today's spend, category totals, manual entry). The 2026-07-09 daily-transaction-log work closed most of that gap: Today is now the app's front door, wallets carry derived balances, and manual + AI-assisted logging both work. Remaining: category spend breakdown (P4) and a more discoverable salary-entry point (P7).
+
+> **Update 2026-07-09:** Implemented per [docs/superpowers/plans/2026-07-09-daily-transaction-log.md](docs/superpowers/plans/2026-07-09-daily-transaction-log.md). 7 of 9 pain points resolved. tsc + 48 unit tests green; live click-through pending (app is behind a Supabase sign-in).
 
 ---
 
