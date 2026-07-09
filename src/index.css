@@ -11,7 +11,7 @@
   /* Ink (text) */
   --ink-1: #e8ecf5;
   --ink-2: #8892a8;
-  --ink-3: #4e5668;
+  --ink-3: #7a8498;
 
   /* Amber — the only accent (DECISION-2: inform, never alarm) */
   --amber: #f0a500;
@@ -80,6 +80,14 @@
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
 }
 
 html, body, #root {
