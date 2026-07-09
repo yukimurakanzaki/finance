@@ -35,6 +35,48 @@ export const transactionsRepo = {
   add: (data: Omit<Transaction, 'id' | 'created_at'>) =>
     db.transactions.add({ ...data, created_at: now() }),
 
+  addTransfer: (data: {
+    date: string
+    amount: number
+    from_account_id: string
+    from_lane: Lane
+    to_account_id: string
+    to_lane: Lane
+    note: string | null
+  }) => {
+    const pairId = crypto.randomUUID()
+    const base = {
+      date: data.date,
+      amount: data.amount,
+      category_id: null,
+      source: 'manual' as const,
+      title: null,
+      note: data.note,
+      original_amount: null,
+      overridden_amount: null,
+      override_note: null,
+      overridden_at: null,
+      is_transfer: true,
+      transfer_pair_id: pairId,
+      created_at: now(),
+    }
+    return db.transaction('rw', db.transactions, async () => {
+      await db.transactions.add({ ...base, direction: 'out', account_id: data.from_account_id, lane: data.from_lane })
+      await db.transactions.add({ ...base, direction: 'in', account_id: data.to_account_id, lane: data.to_lane })
+    })
+  },
+
+  deleteWithPair: (id: string) =>
+    db.transaction('rw', db.transactions, async () => {
+      const t = await db.transactions.get(id)
+      if (!t) return
+      if (t.transfer_pair_id) {
+        await db.transactions.where('transfer_pair_id').equals(t.transfer_pair_id).delete()
+      } else {
+        await db.transactions.delete(id)
+      }
+    }),
+
   override: async (id: string, overrideAmount: number, note: string | null) =>
     db.transaction('rw', db.transactions, async () => {
       const existing = await db.transactions.get(id)
