@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
+import { transactionsRepo } from '@db/repositories/transactions.repo'
 import type { Lane, Cadence, RecurringKind } from '@db/types'
 import { formatRpFull } from '@lib/currency'
 import { todayISO } from '@lib/dates'
@@ -72,6 +73,7 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
               date: { type: 'string', description: 'YYYY-MM-DD' },
               amount: { type: 'number', description: 'Positive amount in IDR, no separators' },
               direction: { type: 'string', enum: ['in', 'out'] },
+              title: { type: 'string', description: 'Short user-facing title, e.g. "Kopi pagi". Merchant detail goes in note.' },
               account_id: { type: 'string', description: 'Account id from the context or snapshot' },
               category_name: { type: 'string', description: 'Category name from the user’s category list, or omit if none matches' },
               lane: { type: 'string', enum: LANE_ENUM, description: 'protected_living for day-to-day spending unless clearly otherwise' },
@@ -82,6 +84,7 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
             required: ['date', 'amount', 'direction', 'account_id', 'lane'],
           },
         },
+        allow_duplicates: { type: 'boolean', description: 'Set true ONLY after the user confirmed flagged rows are genuinely new, to save them anyway.' },
       },
       required: ['transactions'],
     },
@@ -301,10 +304,18 @@ async function logTransactions(input: ToolInput): Promise<string> {
 
   let saved = 0
   const errors: string[] = []
+  const duplicates: Record<string, unknown>[] = []
   for (const t of txns) {
     if (!accountIds.has(t.account_id)) {
       errors.push(`No active account with id ${t.account_id} (note: "${t.note ?? ''}")`)
       continue
+    }
+    if (input['allow_duplicates'] !== true) {
+      const dup = await transactionsRepo.getDuplicateCandidate(t.date, t.amount, t.direction, t.account_id)
+      if (dup) {
+        duplicates.push({ date: t.date, amount: t.amount, note: t.note ?? null, existing_id: dup.id })
+        continue
+      }
     }
     const category = t.category_name
       ? (categories.find((c) => c.name.toLowerCase() === t.category_name!.toLowerCase()) ?? null)
@@ -330,7 +341,7 @@ async function logTransactions(input: ToolInput): Promise<string> {
     })
     saved++
   }
-  return JSON.stringify({ saved_count: saved, errors })
+  return JSON.stringify({ saved_count: saved, errors, possible_duplicates: duplicates })
 }
 
 async function logIncome(input: ToolInput): Promise<string> {
