@@ -106,7 +106,7 @@ export function RecurringRegister() {
           style={{
             background: 'var(--amber)', border: 'none', borderRadius: 8,
             padding: '6px 14px', fontSize: 12, fontWeight: 700,
-            color: '#000', cursor: 'pointer', fontFamily: 'var(--font-ui)',
+            color: 'var(--on-accent)', cursor: 'pointer', fontFamily: 'var(--font-ui)',
           }}
         >
           + Add

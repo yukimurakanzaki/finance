@@ -82,7 +82,7 @@ export function TransactionHistory() {
               flex: 1, padding: '7px 4px', border: 'none', borderRadius: 8, cursor: 'pointer',
               fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: period === p ? 600 : 400,
               background: period === p ? 'var(--amber)' : 'var(--bg-2)',
-              color: period === p ? '#000' : 'var(--ink-2)',
+              color: period === p ? 'var(--on-accent)' : 'var(--ink-2)',
             }}
           >
             {PERIOD_LABELS[p]}

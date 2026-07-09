@@ -342,7 +342,7 @@ function Conversation() {
           disabled={busy || (!input.trim() && images.length === 0)}
           style={{
             width: 38, height: 38, borderRadius: 10, background: 'var(--amber)', border: 'none',
-            color: '#000', fontSize: 15, fontWeight: 700, cursor: busy ? 'default' : 'pointer',
+            color: 'var(--on-accent)', fontSize: 15, fontWeight: 700, cursor: busy ? 'default' : 'pointer',
             flexShrink: 0, opacity: busy || (!input.trim() && images.length === 0) ? .5 : 1,
           }}
         >
@@ -416,7 +416,7 @@ function MessageBubble({ msg }: { msg: ApiMessage }) {
         ))}
         {texts.filter(Boolean).map((t, i) => (
           <div key={i} style={{
-            background: 'var(--amber)', color: '#000', borderRadius: '14px 14px 4px 14px',
+            background: 'var(--amber)', color: 'var(--on-accent)', borderRadius: '14px 14px 4px 14px',
             padding: '9px 13px', fontSize: 13.5, lineHeight: 1.5, whiteSpace: 'pre-wrap',
           }}>
             {t}

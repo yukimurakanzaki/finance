@@ -204,5 +204,5 @@ export function AssetsScreen() {
 const addBtnStyle: React.CSSProperties = {
   background: 'var(--amber)', border: 'none', borderRadius: 8,
   padding: '5px 13px', fontSize: 12, fontWeight: 700,
-  color: '#000', cursor: 'pointer', fontFamily: 'var(--font-ui)',
+  color: 'var(--on-accent)', cursor: 'pointer', fontFamily: 'var(--font-ui)',
 }

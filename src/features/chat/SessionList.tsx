@@ -164,7 +164,7 @@ export function SessionList({ open, onClose }: Props) {
           onClick={handleNew}
           style={{
             margin: '0 14px 12px', padding: '10px', borderRadius: 10,
-            background: 'var(--amber)', border: 'none', color: '#000',
+            background: 'var(--amber)', border: 'none', color: 'var(--on-accent)',
             fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}
         >

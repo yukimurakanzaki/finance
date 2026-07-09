@@ -190,6 +190,7 @@ export type AppSettingKey =
   | 'prices_last_refreshed_at'
   | 'prices_cached'
   | 'language'
+  | 'theme'
   | `seeded:${string}`
 
 // --- Chat session management ---

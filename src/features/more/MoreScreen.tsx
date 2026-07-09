@@ -23,6 +23,16 @@ export function MoreScreen() {
   const { setTab } = useAppStore()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [pinConfigured, setPinConfigured] = useState(hasPin())
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
+
+  function toggleTheme() {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    if (next === 'light') document.documentElement.dataset.theme = 'light'
+    else delete document.documentElement.dataset.theme
+    try { localStorage.setItem('fi-theme', next) } catch { /* private mode */ }
+    db.appSettings.put({ key: 'theme', value: next, updated_at: new Date().toISOString() })
+  }
 
   async function handleExport() {
     const [accounts, assets, transactions, categories, envelopes, recurringItems,
@@ -61,7 +71,14 @@ export function MoreScreen() {
 
   return (
     <div style={{ padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <SectionLabel>Setup</SectionLabel>
+      <SectionLabel>Appearance</SectionLabel>
+      <MenuRow
+        label={`Theme: ${theme === 'light' ? 'Light (blue)' : 'Dark'}`}
+        sub="Tap to switch between dark and light"
+        onClick={toggleTheme}
+      />
+
+      <SectionLabel style={{ marginTop: 12 }}>Setup</SectionLabel>
       <MenuRow label="Allowance" sub="Monthly pool & weekend allocation" onClick={() => setSheet('allowance')} />
       <MenuRow label="Recurring Register" sub="Pipe, bills, subs — what's committed monthly" onClick={() => setSheet('recurring')} />
       <MenuRow label={pinLabel} sub={pinSub} onClick={() => setSheet('pin')} />

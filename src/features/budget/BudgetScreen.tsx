@@ -32,7 +32,7 @@ export function BudgetScreen() {
               fontSize: 12, fontWeight: budgetHorizon === h.id ? 600 : 400,
               fontFamily: 'var(--font-ui)',
               background: budgetHorizon === h.id ? 'var(--amber)' : 'var(--bg-2)',
-              color: budgetHorizon === h.id ? '#000' : 'var(--ink-2)',
+              color: budgetHorizon === h.id ? 'var(--on-accent)' : 'var(--ink-2)',
               transition: 'background .15s, color .15s',
             }}
           >

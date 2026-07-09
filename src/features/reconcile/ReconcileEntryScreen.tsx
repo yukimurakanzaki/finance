@@ -57,7 +57,7 @@ export function ReconcileEntryScreen() {
         disabled={busy || !rawInput.trim()}
         style={{
           background: busy || !rawInput.trim() ? 'var(--bg-3)' : 'var(--amber)',
-          color: busy || !rawInput.trim() ? 'var(--ink-3)' : '#000',
+          color: busy || !rawInput.trim() ? 'var(--ink-3)' : 'var(--on-accent)',
           border: 'none', borderRadius: 10, padding: '14px 0',
           fontSize: 14, fontWeight: 700, cursor: busy || !rawInput.trim() ? 'default' : 'pointer',
           fontFamily: 'var(--font-ui)', transition: 'background .15s',

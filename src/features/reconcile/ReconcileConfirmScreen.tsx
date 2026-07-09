@@ -139,7 +139,7 @@ export function ReconcileConfirmScreen() {
             flex: 2, padding: '13px 0',
             background: busy ? 'var(--bg-3)' : 'var(--amber)',
             border: 'none', borderRadius: 10,
-            color: busy ? 'var(--ink-3)' : '#000',
+            color: busy ? 'var(--ink-3)' : 'var(--on-accent)',
             fontSize: 14, fontWeight: 700, cursor: busy ? 'default' : 'pointer',
             fontFamily: 'var(--font-ui)', transition: 'background .15s',
           }}
