@@ -258,6 +258,7 @@ interface TxnRow {
   account_id: string
   category_name?: string
   lane: Lane
+  title?: string
   note?: string
   is_transfer?: boolean
   transfer_pair_key?: string
@@ -317,6 +318,7 @@ async function logTransactions(input: ToolInput): Promise<string> {
       category_id: category?.id ?? null,
       lane: t.lane,
       source: 'claude_import',
+      title: t.title || null,
       note: t.note || null,
       original_amount: null,
       overridden_amount: null,

@@ -185,6 +185,18 @@ class FIDatabase extends Dexie {
       chatMemories: 'id, updated_at, created_at',
       chatCustomSkills: 'id, updated_at, created_at',
     })
+
+    // v10: user-facing title on transactions (note becomes the optional description)
+    this.version(10)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table<Transaction>('transactions')
+          .toCollection()
+          .modify((t) => {
+            if (t.title === undefined) t.title = null
+          }),
+      )
   }
 }
 

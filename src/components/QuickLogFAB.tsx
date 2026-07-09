@@ -43,6 +43,7 @@ export function QuickLogFAB() {
       category_id: null,
       lane,
       source: 'manual',
+      title: null,
       note: note || null,
       original_amount: null,
       overridden_amount: null,

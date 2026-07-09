@@ -80,6 +80,7 @@ export const transactionsRepo = {
           category_id: row._resolved_category?.id ?? null,
           lane: row.suggested_lane,
           source: 'claude_import' as const,
+          title: null,
           note: row.note || null,
           original_amount: null,
           overridden_amount: null,
