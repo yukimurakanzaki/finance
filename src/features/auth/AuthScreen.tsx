@@ -46,9 +46,9 @@ function SignInUp() {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.4px' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.4px', margin: 0 }}>
           FI Dashboard
-        </div>
+        </h1>
         <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 6 }}>
           {mode === 'in' ? 'Sign in to your household.' : 'Create an account to get started.'}
         </div>
@@ -80,7 +80,7 @@ function SignInUp() {
           />
         </Field>
 
-        {error && <div style={{ fontSize: 12, color: '#ef4444' }}>{error}</div>}
+        {error && <div role="alert" style={{ fontSize: 12, color: '#ef4444' }}>{error}</div>}
         {notice && <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>{notice}</div>}
 
         <Btn fullWidth disabled={!canSubmit} onClick={submit}>
@@ -124,9 +124,9 @@ function HouseholdSetup() {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.4px' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.4px', margin: 0 }}>
           {mode === 'create' ? 'Name your household' : 'Join a household'}
-        </div>
+        </h1>
         <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.5 }}>
           {mode === 'create'
             ? `Signed in as ${user?.email}. Your household is the shared financial picture you and your partner will use. You can invite members later.`
@@ -150,7 +150,7 @@ function HouseholdSetup() {
             />
           </Field>
         )}
-        {error && <div style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>}
+        {error && <div role="alert" style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>}
         <Btn fullWidth disabled={busy || (mode === 'join' && code.trim().length < 6)} onClick={submit}>
           {busy ? 'Working…' : mode === 'create' ? 'Create household' : 'Join household'}
         </Btn>

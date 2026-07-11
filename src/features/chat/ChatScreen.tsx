@@ -183,6 +183,7 @@ function Conversation() {
       }}>
         <button
           onClick={() => setShowSessions(true)}
+          aria-label="Open chat sessions"
           style={{
             background: 'var(--bg-3)', border: 'none', borderRadius: 8,
             width: 30, height: 30, cursor: 'pointer', color: 'var(--ink-2)', fontSize: 14,
@@ -198,6 +199,7 @@ function Conversation() {
         </div>
         <button
           onClick={() => setShowModel(true)}
+          aria-label="Choose AI model"
           style={{
             background: 'var(--bg-2)', border: '1px solid var(--border-2)',
             borderRadius: 8, padding: '4px 8px', fontSize: 10, fontWeight: 600,
@@ -208,6 +210,7 @@ function Conversation() {
         </button>
         <button
           onClick={() => setShowSkills(true)}
+          aria-label="Choose active skills"
           style={{
             background: currentSkills.length > 0 ? 'var(--amber-bg)' : 'var(--bg-2)',
             border: `1px solid ${currentSkills.length > 0 ? 'var(--amber)' : 'var(--border-2)'}`,
@@ -248,7 +251,7 @@ function Conversation() {
         {messages.map((m, i) => <MessageBubble key={i} msg={m} />)}
 
         {status === 'thinking' && (
-          <div style={{ alignSelf: 'flex-start', color: 'var(--ink-3)', fontSize: 12, padding: '8px 12px' }}>
+          <div aria-live="polite" style={{ alignSelf: 'flex-start', color: 'var(--ink-3)', fontSize: 12, padding: '8px 12px' }}>
             Thinking…
           </div>
         )}
@@ -262,7 +265,7 @@ function Conversation() {
         )}
 
         {error && (
-          <div style={{
+          <div role="alert" style={{
             alignSelf: 'stretch', background: 'rgba(239,68,68,.08)', border: '1px solid #7f1d1d',
             borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#ef4444',
           }}>
@@ -291,6 +294,7 @@ function Conversation() {
               />
               <button
                 onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                aria-label="Remove attachment"
                 style={{
                   position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9,
                   background: 'var(--bg-3)', border: '1px solid var(--border-2)', color: 'var(--ink-2)',
@@ -314,6 +318,7 @@ function Conversation() {
           onClick={() => fileRef.current?.click()}
           disabled={busy}
           title="Attach statement screenshot"
+          aria-label="Attach statement screenshot"
           style={{
             width: 38, height: 38, borderRadius: 10, background: 'var(--bg-2)',
             border: '1px solid var(--border-2)', color: 'var(--ink-2)', fontSize: 16,
@@ -340,6 +345,7 @@ function Conversation() {
         <button
           onClick={() => handleSend()}
           disabled={busy || (!input.trim() && images.length === 0)}
+          aria-label="Send message"
           style={{
             width: 38, height: 38, borderRadius: 10, background: 'var(--amber)', border: 'none',
             color: 'var(--on-accent)', fontSize: 15, fontWeight: 700, cursor: busy ? 'default' : 'pointer',

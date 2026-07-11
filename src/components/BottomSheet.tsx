@@ -33,6 +33,9 @@ export function BottomSheet({ open, onClose, title, children, height = '70dvh' }
       {/* Sheet */}
       <div
         ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 101,
           background: 'var(--bg-1)', borderRadius: '18px 18px 0 0',
@@ -54,6 +57,7 @@ export function BottomSheet({ open, onClose, title, children, height = '70dvh' }
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-1)' }}>{title}</span>
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: 'var(--bg-3)', border: 'none', borderRadius: '50%',
               width: 28, height: 28, cursor: 'pointer', color: 'var(--ink-2)',

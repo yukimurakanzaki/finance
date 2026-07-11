@@ -57,7 +57,7 @@ function AppShell() {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <AppBar title="Reconcile" subtitle="Review & approve" />
-          <div style={{ flex: 1, overflowY: 'auto' }}><ReconcileConfirmScreen /></div>
+          <main style={{ flex: 1, overflowY: 'auto' }}><ReconcileConfirmScreen /></main>
           <TabBar />
         </div>
       )
@@ -65,7 +65,7 @@ function AppShell() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <AppBar title="Reconcile" subtitle="Import transactions" />
-        <div style={{ flex: 1, overflowY: 'auto' }}><ReconcileEntryScreen /></div>
+        <main style={{ flex: 1, overflowY: 'auto' }}><ReconcileEntryScreen /></main>
         <TabBar />
       </div>
     )
@@ -87,9 +87,9 @@ function AppShell() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <AppBar title={screen.title} subtitle={screen.subtitle} />
-      <div style={{ flex: 1, overflowY: isChat ? 'hidden' : 'auto' }}>
+      <main style={{ flex: 1, overflowY: isChat ? 'hidden' : 'auto' }}>
         {screen.component}
-      </div>
+      </main>
       <TabBar />
     </div>
   )
@@ -104,7 +104,7 @@ function AppBar({ title, subtitle }: { title: string; subtitle: string }) {
       background: 'var(--bg-1)',
       flexShrink: 0,
     }}>
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.2px' }}>{title}</div>
+      <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.2px', margin: 0 }}>{title}</h1>
       {subtitle && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{subtitle}</div>}
     </div>
   )

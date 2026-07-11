@@ -132,7 +132,7 @@ export function AssetsScreen() {
           </div>
         )}
         {refreshError && (
-          <div style={{ fontSize: 11, color: '#ef4444', marginBottom: 8 }}>{refreshError}</div>
+          <div role="alert" style={{ fontSize: 11, color: '#ef4444', marginBottom: 8 }}>{refreshError}</div>
         )}
         {assets?.length === 0 && (
           <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>No assets yet. Add your investments, gold, DPLK.</div>

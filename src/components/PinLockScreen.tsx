@@ -80,7 +80,7 @@ export function PinLockScreen() {
         ))}
       </div>
 
-      {error && <div style={{ color: 'var(--amber-text)', fontSize: 13 }}>{error}</div>}
+      {error && <div role="alert" style={{ color: 'var(--amber-text)', fontSize: 13 }}>{error}</div>}
 
       {/* Numpad */}
       {!isLockedOut && (

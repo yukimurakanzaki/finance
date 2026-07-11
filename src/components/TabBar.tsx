@@ -16,6 +16,7 @@ export function TabBar() {
 
   return (
     <nav
+      aria-label="Primary"
       style={{
         display: 'flex',
         height: 56,
@@ -30,6 +31,7 @@ export function TabBar() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
+            aria-current={active ? 'page' : undefined}
             style={{
               flex: 1,
               display: 'flex',
