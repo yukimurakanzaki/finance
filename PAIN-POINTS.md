@@ -4,6 +4,37 @@ Requirements elicitation across the whole app: functional pain points, UI/design
 experience audit, and a proposed design direction. Continues the 2026-07-09 round
 tracked in [USER-JOURNEY.md](USER-JOURNEY.md) (P1–P9, 7 of 9 resolved).
 
+---
+
+## Executive summary
+
+**Top 5 issues** (impact × frequency, with effort S/M/L):
+
+| Rank | Issue | User impact | Effort | Order |
+|------|-------|-------------|--------|-------|
+| 1 | **T1–T3 trust bugs** — transfer-inflated Report actuals, bills double-counted against the safe-to-spend pool, "M" misread as *miliar* | The three numbers users check most are wrong; every decision made on them is misinformed | **S** (each is a few lines) | 1st — ship before anything else |
+| 2 | **F1 — no single "where do I stand" surface** | The daily question (can I buy lunch, from which account) takes 2–3 tab visits; the app's core loop never closes in one glance | **M** (standing strip on Today; data already exists) | 3rd |
+| 3 | **F2/F3 — fragmented transaction surface** | Users can't find a transaction by the title they typed, and where they *can* find it they can't edit it | **M** (one list: search title/category/note, tappable rows, period scope) | 3rd (with F1) |
+| 4 | **O1 — no starting balance at onboarding** | First-run impression is "the app says I have no money"; balances stay wrong until a buried override is found | **S** (one wizard field) | 2nd |
+| 5 | **S1 — one-tap delete, no confirm/undo** | Mis-tap while editing silently destroys a record (both legs for transfers) | **S** | 2nd |
+
+The design-direction work (D1–D9 → "Calm Ledger") is the largest item (**L**) and
+runs as its own phased track — see the [implementation roadmap](#implementation-roadmap).
+
+## How to read this document
+
+Findings fall into three classes — don't weigh them the same way:
+
+- **Defects** — objectively wrong or self-contradicting behavior, verifiable at the
+  cited line: **T1–T5, F3, B2, O1, S1–S3, M1–M2**. These are bug-fix requirements,
+  not opinions.
+- **Experience gaps** — nothing produces a wrong value, but a frequent job costs
+  more taps/hops than it should: **F1–F2, F4, B1, B3–B4, O2–O3, M3–M4**. These are
+  UX requirements; solutions may vary.
+- **Design direction** — opinionated craft assessment and proposal: **D1–D9** and
+  the "Calm Ledger" section. This is a recommendation to adopt, adapt, or reject —
+  not a defect list.
+
 **Method:** code walk of every screen (Today, Budget ×3 horizons, Report, Assets,
 Manager/Chat, More + all sheets, Decide, Onboarding, Auth, Reconcile), checked
 against the journey-map scenarios (lunch decision, payday, overspend week) and the
@@ -180,3 +211,56 @@ time because nothing enforced it.
    weekend number (O3), delete-confirm (S1).
 6. **Discoverability moves** (B1–B3) — entry points, not features; cheap,
    do alongside adjacent work.
+
+---
+
+## Implementation roadmap
+
+Each phase is independently shippable and leaves the app better than it found it;
+no phase depends on a later one.
+
+**Phase 1 — Trust & safety (S effort, 1 PR).**
+Fix T1 (exclude transfers from Report actuals), T2 (exclude committed-lane
+expenses from the pool draw), T3 (jt/M-miliar notation in `formatRp`), T5
+(decimal-safe parsing), O1 (starting-balance field in onboarding), S1
+(delete confirmation). Pure logic diffs; unit-testable; no visual change.
+
+**Phase 2 — Design primitives (M effort, 1 PR, no screen redesigns).**
+Build the enforcement layer from the Calm Ledger proposal: token update
+(`--accent` rename, type scale, spacing scale), primitive components
+(`Screen`, `Card`, `Row`, `StatTile`, `Amount`, `SectionHeader`, `Icon` with the
+SVG set), pressed/loading/empty-state patterns, and the lint/review rule banning
+raw `fontSize` in feature code. Screens still look v1; the system is ready.
+
+**Phase 3 — Today screen on the new system (M effort, 1 PR).**
+Rebuild Today per `design-direction-v2.html`: standing strip (F1, T4), Today
+anchor pill, row list, one-action FAB, slim AppBar — plus the unified transaction
+surface (F2/F3: title/category search, tappable rows, period scope), since Today
+is its natural home. This PR is the reference implementation for Phase 4.
+
+**Phase 4 — Remaining screens migrate (L effort, one PR per screen).**
+Assets → Budget → Report → More/Decide → Chat, in daily-use order. Fold the
+discoverability fixes in as each screen is touched: B1 (income entry point) with
+More/Report, B2 (empty-state pointer) with Budget, B3 (lens-in-context) with
+Budget, O2/O3 with Onboarding. Delete dead v1 styles as the last screen lands.
+
+## Success metrics
+
+Measurable outcomes this document's follow-up PRs should move; baseline = current
+build, measured the same way after each phase.
+
+| Metric | Baseline (current) | Target | Phase |
+|--------|-------------------|--------|-------|
+| Taps to log a repeat expense (open app → saved) | 8+ (FAB → Expense → wallet picker ×2 → amount → save) | ≤ 5 (last-used wallet default, one-action FAB) | 3 |
+| Tab visits to answer "can I buy this, from which account" | 2–3 (Budget + Assets + Today) | 1 (Today standing strip) | 3 |
+| Find-and-edit a transaction logged last week by its title | Impossible (F3) | ≤ 3 taps from Today | 3 |
+| Month "actuals" accuracy with intra-account transfers present | Wrong (inflated both directions) | Exact | 1 |
+| Safe-to-spend accuracy after logging a committed bill | Wrong (pool drops) | Unchanged pool | 1 |
+| Wallet balance correct immediately after onboarding | No (always Rp 0) | Yes | 1 |
+| Accidental-delete recovery | None | Confirm dialog (undo/trash later) | 1 |
+| Distinct font sizes in feature code | ~18 | 4 (type-scale roles) | 2–4 |
+| Interactive targets under 44px | Many (34px nav, 30px chat) | 0 | 2–4 |
+| Steps to update salary | 4 (More → Plan → Decide → Income tab) | ≤ 2 | 4 |
+
+Qualitative checks alongside: onboarding completion without help for a partner-
+profile user (O2), and no support questions caused by misread amounts (T3).
