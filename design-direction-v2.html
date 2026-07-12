@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FI Dashboard — Design Direction v2 "Calm Ledger"</title>
+<style>
+/* ============================================================
+   CALM LEDGER v2 — tokens
+   Same palette philosophy as v1 (one accent, amber informs,
+   never alarms). What changes: type-led hierarchy, rows not
+   boxes, tabular numerals, a real scale.
+   ============================================================ */
+:root {
+  --bg-0: #090b10;
+  --bg-1: #0f1219;
+  --bg-2: #161b25;
+  --bg-3: #1e2433;   /* pressed */
+  --ink-1: #e8ecf5;
+  --ink-2: #8892a8;
+  --ink-3: #5d6678;
+  --line:  #1b2130;  /* the ONLY separator */
+  --accent:        #f0a500; /* honest name; blue in light theme */
+  --accent-text:   #fbbf24;
+  --accent-surface:#151000;
+  --accent-border: #3d2900;
+  --on-accent: #000;
+  --engine: #34d399;
+
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* type scale — the only sizes allowed */
+  --t-display: 34px; --t-display-lh: 40px;
+  --t-title:   17px; --t-title-lh:   24px;
+  --t-body:    15px; --t-body-lh:    22px;
+  --t-caption: 12px; --t-caption-lh: 16px;
+
+  /* spacing scale: 4 8 12 16 24 32 */
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #060810; color: var(--ink-1);
+  font-family: var(--font-ui); line-height: 1.45;
+  padding: 36px 24px 100px;
+  -webkit-font-smoothing: antialiased;
+}
+.header { max-width: 1080px; margin: 0 auto 8px; }
+.header h1 { font-size: 17px; font-weight: 700; }
+.header p { font-size: 12px; color: var(--ink-3); margin-top: 4px; max-width: 62ch; line-height: 1.6; }
+.stage { max-width: 1080px; margin: 32px auto 0; display: flex; gap: 48px; flex-wrap: wrap; align-items: flex-start; }
+
+/* ---------- phone frame ---------- */
+.phone {
+  width: 390px; flex-shrink: 0; background: var(--bg-0);
+  border: 1px solid #222a3c; border-radius: 40px; overflow: hidden;
+  box-shadow: 0 40px 100px rgba(0,0,0,.85);
+  display: flex; flex-direction: column; height: 800px;
+}
+
+/* slim app bar: 44px, title only */
+.appbar {
+  height: 58px; padding: 14px 16px 0; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.appbar h2 { font-size: var(--t-title); line-height: var(--t-title-lh); font-weight: 700; letter-spacing: -.2px; }
+
+.screen { flex: 1; overflow-y: auto; }
+
+/* ---------- standing strip: the one card on the screen ---------- */
+.standing {
+  margin: 8px 16px 0; padding: 16px;
+  background: var(--bg-1); border-radius: 16px;
+}
+.standing .label { font-size: var(--t-caption); line-height: var(--t-caption-lh); color: var(--ink-2); }
+.standing .hero {
+  font-size: var(--t-display); line-height: var(--t-display-lh);
+  font-weight: 700; letter-spacing: -.8px; margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.standing .hero small { font-size: var(--t-body); color: var(--ink-3); font-weight: 500; letter-spacing: 0; }
+.standing .split {
+  display: flex; margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--line); gap: 24px;
+}
+.standing .split > div { flex: 1; }
+.standing .split .k { font-size: var(--t-caption); color: var(--ink-3); }
+.standing .split .v {
+  font-size: var(--t-body); font-weight: 600; margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- date navigator ---------- */
+.datenav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 16px 4px;
+}
+.datenav button.step {
+  width: 44px; height: 44px; border: none; background: none; border-radius: 12px;
+  color: var(--ink-2); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.datenav button.step:active { background: var(--bg-3); }
+.datenav .day { text-align: center; }
+.datenav .day .d1 { font-size: var(--t-body); font-weight: 600; }
+.datenav .day .d2 {
+  display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 600;
+  color: var(--accent-text); background: var(--accent-surface);
+  border: 1px solid var(--accent-border); border-radius: 999px; padding: 2px 10px;
+}
+
+/* ---------- section header: sentence case, real text ---------- */
+.section {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 20px 16px 4px;
+}
+.section h3 { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.section .sum { font-size: var(--t-caption); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* ---------- rows, not boxes ---------- */
+.rows { }
+.row {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 56px; padding: 8px 16px; width: 100%;
+  background: none; border: none; border-bottom: 1px solid var(--line);
+  cursor: pointer; text-align: left; color: inherit; font-family: inherit;
+}
+.row:active { background: var(--bg-2); }
+.row .ic {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  background: var(--bg-2); color: var(--ink-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.row .mid { flex: 1; min-width: 0; }
+.row .t { font-size: var(--t-body); line-height: var(--t-body-lh); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .c { font-size: var(--t-caption); line-height: var(--t-caption-lh); color: var(--ink-3); margin-top: 1px; }
+.row .amt {
+  font-size: var(--t-body); font-weight: 600; flex-shrink: 0;
+  font-variant-numeric: tabular-nums; text-align: right; min-width: 96px;
+}
+.row .amt.in { color: var(--engine); }
+.row.transfer .t, .row.transfer .amt { color: var(--ink-3); font-weight: 500; }
+
+/* ---------- empty state = sentence + action ---------- */
+.empty { text-align: center; padding: 48px 32px; }
+.empty p { font-size: var(--t-body); color: var(--ink-2); }
+.empty button {
+  margin-top: 16px; background: var(--bg-2); color: var(--ink-1);
+  border: none; border-radius: 12px; padding: 12px 20px;
+  font-size: var(--t-body); font-weight: 600; cursor: pointer; font-family: inherit;
+}
+
+/* ---------- FAB: one action ---------- */
+.fabwrap { position: relative; }
+.fab {
+  position: absolute; right: 16px; bottom: 16px;
+  width: 56px; height: 56px; border-radius: 18px; border: none;
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(240,165,0,.35);
+}
+
+/* ---------- tab bar: real icons, 11px labels ---------- */
+.tabbar {
+  display: flex; height: 64px; border-top: 1px solid var(--line);
+  background: var(--bg-1); flex-shrink: 0; padding-bottom: 6px;
+}
+.tab {
+  flex: 1; border: none; background: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  color: var(--ink-3); font-size: 11px; font-weight: 500; font-family: inherit;
+}
+.tab.on { color: var(--accent-text); }
+
+/* ---------- annotation column ---------- */
+.notes { flex: 1; min-width: 300px; max-width: 460px; }
+.notes h3 { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 0 12px; }
+.note { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.note .n {
+  width: 22px; height: 22px; border-radius: 999px; flex-shrink: 0;
+  background: var(--accent-surface); color: var(--accent-text);
+  border: 1px solid var(--accent-border);
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.note p { font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+.note p b { color: var(--ink-1); font-weight: 600; }
+
+.scale { margin-top: 32px; background: var(--bg-1); border-radius: 16px; padding: 20px; }
+.scale h3 { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 16px; }
+.scale .s { display: flex; align-items: baseline; gap: 16px; padding: 6px 0; }
+.scale .s .tag { font-size: 11px; color: var(--ink-3); width: 130px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.badge {
+  display: inline-block; margin-left: 8px; vertical-align: 2px;
+  font-size: 10px; font-weight: 700; color: var(--ink-3);
+  border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px;
+}
+svg { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Design direction v2 — “Calm Ledger” <span class="badge">PROPOSAL · 2026-07-12</span></h1>
+  <p>Same palette philosophy as v1 (one accent; amber informs, never alarms). What changes:
+     hierarchy comes from type and space instead of nested bordered boxes; numbers are staged
+     with tabular figures; icons are a real SVG set; every size comes off a four-role type
+     scale. Shown on the Today screen — the busiest surface. See PAIN-POINTS.md §Design for
+     the rationale (D1–D9).</p>
+</div>
+
+<div class="stage">
+
+  <!-- ================= PHONE ================= -->
+  <div class="phone">
+    <div class="appbar">
+      <h2>Today</h2>
+      <!-- search affordance: one transaction surface, F2/F3 -->
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8892a8" stroke-width="1.7" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>
+      </svg>
+    </div>
+
+    <div class="screen fabwrap">
+
+      <!-- ① standing strip -->
+      <div class="standing">
+        <div class="label">Safe to spend today</div>
+        <div class="hero">Rp 145.000<small> /day</small></div>
+        <div class="split">
+          <div>
+            <div class="k">Spent today</div>
+            <div class="v">Rp 61.500</div>
+          </div>
+          <div>
+            <div class="k">BCA Tabungan</div>
+            <div class="v">Rp 4.212.000</div>
+          </div>
+          <div>
+            <div class="k">Week left</div>
+            <div class="v">Rp 725.000</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ② date navigator with Today anchor -->
+      <div class="datenav">
+        <button class="step" aria-label="Previous day">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <div class="day">
+          <div class="d1">Sat, 12 Jul 2026</div>
+          <div class="d2">Today</div>
+        </div>
+        <button class="step" aria-label="Next day">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      <!-- ③ section header: sentence case, with the day sum where it belongs -->
+      <div class="section">
+        <h3>Transactions</h3>
+        <div class="sum">3 · −Rp 61.500</div>
+      </div>
+
+      <!-- ④ rows, not boxes; ⑤ tabular amounts gutter -->
+      <div class="rows">
+        <button class="row">
+          <span class="ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>
+          </span>
+          <span class="mid">
+            <span class="t">Kopi pagi</span>
+            <span class="c">Food &amp; drink · GoPay</span>
+          </span>
+          <span class="amt">−28.000</span>
+        </button>
+        <button class="row">
+          <span class="ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3V6a1 1 0 0 1 1-1h9v12m-4 0h4m4 0h2v-6h-6V8h4l2 3"/></svg>
+          </span>
+          <span class="mid">
+            <span class="t">Ojek ke kantor</span>
+            <span class="c">Transport · GoPay</span>
+          </span>
+          <span class="amt">−33.500</span>
+        </button>
+        <button class="row transfer">
+          <span class="ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+          </span>
+          <span class="mid">
+            <span class="t">BCA → GoPay</span>
+            <span class="c">Transfer</span>
+          </span>
+          <span class="amt">300.000</span>
+        </button>
+      </div>
+
+      <!-- ⑥ FAB: one action -->
+      <button class="fab" aria-label="Add transaction">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+
+    <!-- ⑦ tab bar with a real icon set -->
+    <div class="tabbar">
+      <button class="tab on">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 9h18"/></svg>
+        Today
+      </button>
+      <button class="tab">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Budget
+      </button>
+      <button class="tab">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M12 8a4 4 0 1 0 4 4"/><path d="M17 3v4h4"/></svg>
+        Manager
+      </button>
+      <button class="tab">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h4"/></svg>
+        Assets
+      </button>
+      <button class="tab">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20v-8M11 20V6M16 20v-11M21 20v-5"/></svg>
+        Report
+      </button>
+      <button class="tab">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></svg>
+        More
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= NOTES ================= -->
+  <div class="notes">
+    <h3>What changed, and which pain it answers</h3>
+    <div class="note"><div class="n">1</div><p><b>Standing strip replaces the three chips.</b> Safe-to-spend is the hero; spent-today, wallet balance, and week-remaining sit under it. Answers “can I buy lunch, from which account” on one screen (F1, T4). The misleading day-“Balance” chip is gone.</p></div>
+    <div class="note"><div class="n">2</div><p><b>“Today” anchor pill.</b> Off-today the pill becomes a tappable “Back to today”, so you always know which day you're on (Today-page pains #8).</p></div>
+    <div class="note"><div class="n">3</div><p><b>Sentence-case section headers.</b> 13px semibold ink-2 text. The 10px-uppercase treatment is retired from headers and kept only for data labels inside the strip (D3).</p></div>
+    <div class="note"><div class="n">4</div><p><b>Rows, not boxes.</b> Flush 56px rows with one hairline separator; pressed state uses bg-2. The only card on the screen is the standing strip (D2, D6, D7).</p></div>
+    <div class="note"><div class="n">5</div><p><b>Numbers gutter.</b> <code>tabular-nums</code>, right-aligned fixed column, sign carries direction — no red/green noise on every row (D5). Abbreviations use jt/M-miliar per Indonesian convention (T3).</p></div>
+    <div class="note"><div class="n">6</div><p><b>One-action FAB.</b> Expense is the 90% case and becomes one tap; income/transfer live inside the sheet as a segment. The stray blue/red accent circles are gone (D8).</p></div>
+    <div class="note"><div class="n">7</div><p><b>Real icons.</b> Inline SVG, 1.7px stroke, 20px grid — no emoji/glyph rendering lottery (D4). Labels 11px minimum; all targets ≥44px (D6).</p></div>
+
+    <div class="scale">
+      <h3>The whole type scale (nothing else ships)</h3>
+      <div class="s"><span class="tag">display · 34/40 · 700</span><span style="font-size:34px;line-height:40px;font-weight:700;letter-spacing:-.8px;font-variant-numeric:tabular-nums">Rp 145.000</span></div>
+      <div class="s"><span class="tag">title · 17/24 · 700</span><span style="font-size:17px;line-height:24px;font-weight:700">Screen title</span></div>
+      <div class="s"><span class="tag">body · 15/22 · 500–600</span><span style="font-size:15px;line-height:22px;font-weight:500">Row primary text · Rp 61.500</span></div>
+      <div class="s"><span class="tag">caption · 12/16 · 400</span><span style="font-size:12px;line-height:16px;color:var(--ink-3)">Supporting caption · Food &amp; drink · GoPay</span></div>
+      <div class="s" style="margin-top:8px"><span class="tag">spacing</span><span style="font-size:12px;color:var(--ink-2)">4 · 8 · 12 · 16 · 24 · 32 — gutter 16, row 12×16, section gap 24</span></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
