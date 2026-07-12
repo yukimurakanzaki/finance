@@ -6,6 +6,7 @@ import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import { accountsRepo } from '@db/repositories/accounts.repo'
 import { Field, Input, Select, Btn } from '@components/FormField'
+import { parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import type { Lane, AssetType, AccountType, RecurringKind } from '@db/types'
 
@@ -24,6 +25,7 @@ interface DraftState {
   accountName: string
   accountInstitution: string
   accountType: AccountType
+  startingBalance: string
 }
 
 const DEFAULT_DRAFT: DraftState = {
@@ -37,6 +39,7 @@ const DEFAULT_DRAFT: DraftState = {
   accountName: 'BCA Tabungan',
   accountInstitution: 'BCA',
   accountType: 'bank',
+  startingBalance: '',
 }
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
@@ -52,6 +55,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [accountName, setAccountName] = useState('BCA Tabungan')
   const [accountInstitution, setAccountInstitution] = useState('BCA')
   const [accountType, setAccountType] = useState<AccountType>('bank')
+  const [startingBalance, setStartingBalance] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Restore draft on mount
@@ -70,6 +74,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           setAccountName(draft.accountName ?? DEFAULT_DRAFT.accountName)
           setAccountInstitution(draft.accountInstitution ?? DEFAULT_DRAFT.accountInstitution)
           setAccountType(draft.accountType ?? DEFAULT_DRAFT.accountType)
+          setStartingBalance(draft.startingBalance ?? '')
         } catch {
           // corrupt draft — ignore, start fresh
         }
@@ -85,10 +90,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     const draft: DraftState = {
       step, gross, takeHome, pipes, dplk, monthly, weekend,
-      accountName, accountInstitution, accountType,
+      accountName, accountInstitution, accountType, startingBalance,
     }
     settingsRepo.set('onboarding_draft', JSON.stringify(draft))
-  }, [step, gross, takeHome, pipes, dplk, monthly, weekend, accountName, accountInstitution, accountType, loaded])
+  }, [step, gross, takeHome, pipes, dplk, monthly, weekend, accountName, accountInstitution, accountType, startingBalance, loaded])
 
   async function handleFinish() {
     setSaving(true)
@@ -97,11 +102,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (takeHome) {
       await incomeEventsRepo.create({
         date: today,
-        gross: Number(gross.replace(/[.,]/g, '')) || 0,
-        take_home_net: Number(takeHome.replace(/[.,]/g, '')),
+        gross: parseRpInput(gross) ?? 0,
+        take_home_net: parseRpInput(takeHome) ?? 0,
         delta_vs_prev: null,
-        routed_to_pipe: pipes.reduce((s, p) => s + (Number(p.amount.replace(/[.,]/g, '')) || 0), 0),
-        routed_to_lifestyle: Number(monthly.replace(/[.,]/g, '')) || 0,
+        routed_to_pipe: pipes.reduce((s, p) => s + (parseRpInput(p.amount) ?? 0), 0),
+        routed_to_lifestyle: parseRpInput(monthly) ?? 0,
         note: 'Onboarding',
         source: 'seed',
       })
@@ -111,7 +116,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       if (pipe.name && pipe.amount) {
         await recurringRepo.create({
           name: pipe.name,
-          amount: Number(pipe.amount.replace(/[.,]/g, '')),
+          amount: parseRpInput(pipe.amount) ?? 0,
           cadence: 'monthly',
           kind: 'pay_yourself_first' as RecurringKind,
           lane: 'income_producing' as Lane,
@@ -127,7 +132,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (dplk) {
       await recurringRepo.create({
         name: 'DPLK',
-        amount: Number(dplk.replace(/[.,]/g, '')),
+        amount: parseRpInput(dplk) ?? 0,
         cadence: 'monthly',
         kind: 'pay_yourself_first' as RecurringKind,
         lane: 'income_producing' as Lane,
@@ -141,12 +146,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
     if (monthly) {
       await allowanceRepo.set({
-        monthly_amount: Number(monthly.replace(/[.,]/g, '')),
-        weekend_allocation: Number(weekend.replace(/[.,]/g, '')) || 0,
+        monthly_amount: parseRpInput(monthly) ?? 0,
+        weekend_allocation: parseRpInput(weekend) ?? 0,
       })
     }
 
     if (accountName) {
+      // Optional starting balance seeds the manual override, anchored to today,
+      // so balances read correctly from first run (see deriveBalance). Left null
+      // when blank/invalid, preserving the prior Rp 0 behaviour.
+      const openingBalance = parseRpInput(startingBalance)
       await accountsRepo.create({
         name: accountName,
         institution: accountInstitution,
@@ -155,8 +164,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         currency: 'IDR',
         is_protected: false,
         is_active: true,
-        manual_balance_override: null,
-        last_balance_updated_at: null,
+        manual_balance_override: openingBalance,
+        last_balance_updated_at: openingBalance !== null ? today : null,
       })
     }
 
@@ -318,6 +327,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   <option value="cash">Cash</option>
                 </Select>
               </Field>
+              <Field label="Current balance (Rp)">
+                <Input
+                  type="text" inputMode="numeric" mono
+                  placeholder="e.g. 3.500.000"
+                  value={startingBalance} onChange={(e) => setStartingBalance(e.target.value)}
+                />
+              </Field>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+                Optional. What's in this account right now, so balances start correct. You can adjust it later.
+              </div>
             </div>
           </>
         )}
