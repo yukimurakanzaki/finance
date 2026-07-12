@@ -206,6 +206,21 @@ class FIDatabase extends Dexie {
     this.version(11).stores({
       chatMessages: 'id, session_id, created_at, updated_at',
     })
+
+    // v12: transactions gain recurring_item_id (tags a committed recurring
+    // payment so it no longer draws the personal pool). Not indexed — the draw
+    // filter reads it in memory — so this is a type-only field plus a default
+    // backfill on existing rows, mirroring the v10 title migration.
+    this.version(12)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table<Transaction>('transactions')
+          .toCollection()
+          .modify((t) => {
+            if (t.recurring_item_id === undefined) t.recurring_item_id = null
+          }),
+      )
   }
 }
 

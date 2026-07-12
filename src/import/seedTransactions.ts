@@ -59,6 +59,7 @@ export async function seedTransactionsIfNeeded(): Promise<{
       overridden_at: null,
       is_transfer: false,
       transfer_pair_id: null,
+      recurring_item_id: null,
       created_at: now,
     })
   }

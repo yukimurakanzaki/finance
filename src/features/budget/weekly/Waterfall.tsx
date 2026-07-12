@@ -22,22 +22,30 @@ export function Waterfall({ result }: Props) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {/* Paid first rows */}
+        {/* Committed items funded outside the personal pool. Shown for context —
+            the allowance is already net of these, so they are NOT subtracted here. */}
         <WRow
-          label={<>Pipe + DPLK <Badge>✓ Paid first</Badge></>}
+          label={<>Pipe + DPLK <Badge>Committed</Badge></>}
           value={formatRpFull(payYourselfFirstTotal)}
           dim
         />
         <WRow
-          label={<>Household bills <Badge>✓ Paid first</Badge></>}
+          label={<>Household bills <Badge>Committed</Badge></>}
           value={formatRpFull(householdBillTotal)}
           dim
         />
+        <WRow
+          label={<>Personal subs <Badge>Committed</Badge></>}
+          value={formatRpFull(personalSubTotal)}
+          dim
+        />
+        <div style={{ fontSize: 10, color: 'var(--ink-3)', padding: '2px 0 4px', lineHeight: 1.5 }}>
+          Your allowance is already net of these — they don't come out of the pool again.
+        </div>
 
         <Divider />
 
         <WRow label="Personal pool (allowance)" value={formatRpFull(personalPool)} />
-        <WRow label="− Personal subs" value={`−${formatRpFull(personalSubTotal)}`} />
         <WRow
           label="− Weekend, pre-allocated"
           value={`−${formatRpFull(weekendAllocation)}`}

@@ -49,7 +49,12 @@ export function computeSafeToSpend(
   const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
   const weeks = weeksInMonth(yearMonth)
 
-  const monthlyDiscretionary = personalPool - personalSubTotal - weekendAllocation
+  // personalPool (allowance.monthly_amount) is ALREADY net of every recurring
+  // item — bills, subs, pay-yourself-first — so only the weekend carve-out comes
+  // out here. Subtracting personalSubTotal again would double-count subs (they
+  // are also excluded from the draw side via recurring_item_id). personalSubTotal
+  // and householdBillTotal are still returned, for display only.
+  const monthlyDiscretionary = personalPool - weekendAllocation
   const isNegativePool = monthlyDiscretionary <= 0
   const weekPool = isNegativePool ? 0 : Math.floor(monthlyDiscretionary / weeks)
 

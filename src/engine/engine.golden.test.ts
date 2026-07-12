@@ -47,13 +47,28 @@ describe('safeToSpend', () => {
       spendThisWeek: 200_000,
       today: TUE,
     })!
-    // discretionary = 3,000,000 − 150,000 subs − 400,000 weekend = 2,450,000 over 4 weeks
-    expect(r.weekPool).toBe(612_500)
-    expect(r.remainingPool).toBe(412_500)
+    // allowance is already net of subs, so only the weekend carve comes out here:
+    // discretionary = 3,000,000 − 400,000 weekend = 2,600,000 over 4 weeks
+    expect(r.weekPool).toBe(650_000)
+    expect(r.remainingPool).toBe(450_000)
     expect(r.remainingWorkdays).toBe(4)
-    expect(r.todayCeiling).toBe(103_125)
+    expect(r.todayCeiling).toBe(112_500)
     expect(r.isNegativePool).toBe(false)
+    // subs are still surfaced for display, just not subtracted from the pool
+    expect(r.personalSubTotal).toBe(150_000)
     for (const v of [r.weekPool, r.remainingPool, r.todayCeiling]) expect(Number.isInteger(v)).toBe(true)
+  })
+
+  it('T2: personal subs no longer subtract from the pool (allowance is already net of them)', () => {
+    const base = { allowance: allowance(3_000_000, 400_000), spendThisWeek: 0, today: TUE }
+    const withoutSubs = computeSafeToSpend({ ...base, activeRecurringItems: [] })
+    const withSubs = computeSafeToSpend({
+      ...base,
+      activeRecurringItems: [recurring('personal_sub', 500_000)],
+    })
+    expect(withSubs?.weekPool).toBe(withoutSubs?.weekPool)
+    expect(withSubs?.remainingPool).toBe(withoutSubs?.remainingPool)
+    expect(withSubs?.personalSubTotal).toBe(500_000)
   })
 
   it('savings-first waterfall: the pipe sits above the pool — growing it never shrinks safe-to-spend', () => {
@@ -68,9 +83,10 @@ describe('safeToSpend', () => {
   })
 
   it('negative pool clamps to zero and flags amber-inform', () => {
+    // Pool goes negative when the weekend carve-out exceeds the allowance itself.
     const r = computeSafeToSpend({
-      allowance: allowance(500_000, 400_000),
-      activeRecurringItems: [recurring('personal_sub', 300_000)],
+      allowance: allowance(500_000, 800_000),
+      activeRecurringItems: [],
       spendThisWeek: 0, today: TUE,
     })!
     expect(r.isNegativePool).toBe(true)
