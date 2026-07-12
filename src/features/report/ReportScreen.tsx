@@ -7,8 +7,8 @@ import { todayISO } from '@lib/dates'
 export function ReportScreen() {
   const ym = todayISO().slice(0, 7)
   const monthTxns = useLiveQuery(() => transactionsRepo.getByMonth(ym), [ym]) ?? []
-  const income = monthTxns.filter((t) => t.direction === 'in').reduce((s, t) => s + t.amount, 0)
-  const expenses = monthTxns.filter((t) => t.direction === 'out').reduce((s, t) => s + t.amount, 0)
+  const income = monthTxns.filter((t) => t.direction === 'in' && !t.is_transfer).reduce((s, t) => s + t.amount, 0)
+  const expenses = monthTxns.filter((t) => t.direction === 'out' && !t.is_transfer).reduce((s, t) => s + t.amount, 0)
 
   return (
     <div>
