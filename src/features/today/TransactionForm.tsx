@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
 import { BottomSheet } from '@components/BottomSheet'
-import { Field, Input, Btn } from '@components/FormField'
+import { Field, Input, Select, Btn } from '@components/FormField'
 import { parseRpInput } from '@lib/currency'
 import { WalletPicker } from './WalletPicker'
 import type { Account, Transaction } from '@db/types'
@@ -30,14 +30,24 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
   const [title, setTitle] = useState(editing?.title ?? '')
   const [categoryName, setCategoryName] = useState('')
   const [note, setNote] = useState(editing?.note ?? '')
+  const [recurringItemId, setRecurringItemId] = useState(editing?.recurring_item_id ?? '')
   const [fromAccount, setFromAccount] = useState<Account | null>(null)
   const [toAccount, setToAccount] = useState<Account | null>(null)
   const [pickerFor, setPickerFor] = useState<'from' | 'to' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const accounts = useLiveQuery(() => db.accounts.filter((a) => a.is_active).toArray()) ?? []
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
+  const recurringItems = useLiveQuery(() => db.recurringItems.filter((r) => r.is_active).toArray()) ?? []
+
+  // Disarm the delete confirm when the sheet closes; clear any pending timer.
+  useEffect(() => {
+    if (!open) setConfirmDelete(false)
+    return () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }
+  }, [open])
   const recentTitles = useLiveQuery(async () => {
     const rows = await db.transactions.orderBy('date').reverse().toArray()
     const seen = new Set<string>()
@@ -111,6 +121,7 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
           title: title.trim() || null, note: note || null,
           original_amount: null, overridden_amount: null, override_note: null,
           overridden_at: null, is_transfer: false, transfer_pair_id: null,
+          recurring_item_id: mode === 'out' ? recurringItemId || null : null,
         }
         if (editing) await db.transactions.update(editing.id as string, record)
         else await transactionsRepo.add(record)
@@ -124,6 +135,15 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
 
   async function handleDelete() {
     if (!editing) return
+    // Two-step inline confirm: first tap arms, second tap (within a few
+    // seconds) deletes. Transfers still remove both legs via deleteWithPair.
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      if (confirmTimer.current) clearTimeout(confirmTimer.current)
+      confirmTimer.current = setTimeout(() => setConfirmDelete(false), 3500)
+      return
+    }
+    if (confirmTimer.current) clearTimeout(confirmTimer.current)
     await transactionsRepo.deleteWithPair(editing.id as string)
     onClose()
   }
@@ -182,6 +202,27 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
                 </button>
               ))}
             </div>
+
+            {mode === 'out' && recurringItems.length > 0 && (
+              <Field label="Pays a recurring item">
+                <Select
+                  value={recurringItemId}
+                  onChange={(e) => {
+                    const id = e.target.value
+                    setRecurringItemId(id)
+                    if (id && !amount.trim()) {
+                      const item = recurringItems.find((r) => r.id === id)
+                      if (item) setAmount(String(item.amount))
+                    }
+                  }}
+                >
+                  <option value="">None</option>
+                  {recurringItems.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
           </>
         )}
 
@@ -195,7 +236,15 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
           {saving ? 'Saving…' : 'Save'}
         </Btn>
         {editing && (
-          <Btn variant="danger" onClick={handleDelete} fullWidth>Delete</Btn>
+          <Btn
+            variant="danger"
+            onClick={handleDelete}
+            fullWidth
+            aria-label={confirmDelete ? 'Confirm delete' : 'Delete'}
+            style={confirmDelete ? { background: '#ef4444', color: '#fff', borderColor: '#ef4444' } : undefined}
+          >
+            {confirmDelete ? 'Tap again to delete' : 'Delete'}
+          </Btn>
         )}
       </div>
 
