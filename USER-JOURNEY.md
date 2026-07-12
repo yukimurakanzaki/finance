@@ -6,6 +6,8 @@
 
 ---
 
+> **Elicitation round 2 (2026-07-12):** app-wide pain-point analysis (trust, fragmentation, discoverability, onboarding, safety, AI Manager) plus a UI/design experience audit and the "Calm Ledger" design-direction proposal now live in [PAIN-POINTS.md](PAIN-POINTS.md) with mock [design-direction-v2.html](design-direction-v2.html). The P1–P9 table below is the 2026-07-09 round and stays as the historical record.
+
 ## Reported pain points (2026-07-09)
 
 Direct user feedback after real use. Each is cross-referenced to a journey stage and resolved in the ranked gap list at the bottom.
