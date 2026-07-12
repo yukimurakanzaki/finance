@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
+import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { BottomSheet } from '@components/BottomSheet'
 import { Field, Input, Select, Btn } from '@components/FormField'
 import { parseRpInput } from '@lib/currency'
 import { WalletPicker } from './WalletPicker'
-import type { Account, Transaction } from '@db/types'
+import type { Account, RecurringItem, Transaction } from '@db/types'
 
 interface Props {
   open: boolean
@@ -41,7 +42,12 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
 
   const accounts = useLiveQuery(() => db.accounts.filter((a) => a.is_active).toArray()) ?? []
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
-  const recurringItems = useLiveQuery(() => db.recurringItems.filter((r) => r.is_active).toArray()) ?? []
+  // Only the expense form offers recurring tagging — skip the query (and its
+  // live subscription) entirely for income/transfer.
+  const recurringItems = useLiveQuery(
+    () => (mode === 'out' ? recurringRepo.getActive() : Promise.resolve([] as RecurringItem[])),
+    [mode],
+  ) ?? []
 
   // Disarm the delete confirm when the sheet closes; clear any pending timer.
   useEffect(() => {

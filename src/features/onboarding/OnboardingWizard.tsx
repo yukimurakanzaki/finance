@@ -57,6 +57,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [accountType, setAccountType] = useState<AccountType>('bank')
   const [startingBalance, setStartingBalance] = useState('')
   const [saving, setSaving] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
 
   // Restore draft on mount
   useEffect(() => {
@@ -96,27 +97,53 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }, [step, gross, takeHome, pipes, dplk, monthly, weekend, accountName, accountInstitution, accountType, startingBalance, loaded])
 
   async function handleFinish() {
+    // Validate every non-empty money field BEFORE writing anything — a silent
+    // `?? 0` here corrupts the income/allowance figures that drive savings
+    // rate, FI projection, and the safe-to-spend gauge (PAIN-POINTS T5).
+    const invalid: string[] = []
+    const money = (label: string, raw: string): number | null => {
+      if (!raw.trim()) return null
+      const n = parseRpInput(raw)
+      if (n === null) invalid.push(label)
+      return n
+    }
+    const grossN = money('Gross salary', gross)
+    const takeHomeN = money('Take-home net', takeHome)
+    const pipeNs = pipes.map((p, i) =>
+      p.name && p.amount ? money(`Pipe ${i + 1}`, p.amount) : null,
+    )
+    const dplkN = money('DPLK', dplk)
+    const monthlyN = money('Monthly pool', monthly)
+    const weekendN = money('Weekend allocation', weekend)
+    const openingBalance = money('Current balance', startingBalance)
+    if (invalid.length > 0) {
+      setFinishError(
+        `Check these amounts — digits with optional thousand separators (e.g. 12.500.000): ${invalid.join(', ')}`,
+      )
+      return
+    }
+    setFinishError(null)
     setSaving(true)
     const today = todayISO()
 
-    if (takeHome) {
+    if (takeHomeN !== null) {
       await incomeEventsRepo.create({
         date: today,
-        gross: parseRpInput(gross) ?? 0,
-        take_home_net: parseRpInput(takeHome) ?? 0,
+        gross: grossN ?? 0,
+        take_home_net: takeHomeN,
         delta_vs_prev: null,
-        routed_to_pipe: pipes.reduce((s, p) => s + (parseRpInput(p.amount) ?? 0), 0),
-        routed_to_lifestyle: parseRpInput(monthly) ?? 0,
+        routed_to_pipe: pipeNs.reduce<number>((s, n) => s + (n ?? 0), 0),
+        routed_to_lifestyle: monthlyN ?? 0,
         note: 'Onboarding',
         source: 'seed',
       })
     }
 
-    for (const pipe of pipes) {
+    for (const [i, pipe] of pipes.entries()) {
       if (pipe.name && pipe.amount) {
         await recurringRepo.create({
           name: pipe.name,
-          amount: parseRpInput(pipe.amount) ?? 0,
+          amount: pipeNs[i] ?? 0,
           cadence: 'monthly',
           kind: 'pay_yourself_first' as RecurringKind,
           lane: 'income_producing' as Lane,
@@ -129,10 +156,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       }
     }
 
-    if (dplk) {
+    if (dplkN !== null) {
       await recurringRepo.create({
         name: 'DPLK',
-        amount: parseRpInput(dplk) ?? 0,
+        amount: dplkN,
         cadence: 'monthly',
         kind: 'pay_yourself_first' as RecurringKind,
         lane: 'income_producing' as Lane,
@@ -144,18 +171,22 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       })
     }
 
-    if (monthly) {
+    if (monthlyN !== null) {
       await allowanceRepo.set({
-        monthly_amount: parseRpInput(monthly) ?? 0,
-        weekend_allocation: parseRpInput(weekend) ?? 0,
+        monthly_amount: monthlyN,
+        weekend_allocation: weekendN ?? 0,
       })
     }
 
     if (accountName) {
-      // Optional starting balance seeds the manual override, anchored to today,
-      // so balances read correctly from first run (see deriveBalance). Left null
-      // when blank/invalid, preserving the prior Rp 0 behaviour.
-      const openingBalance = parseRpInput(startingBalance)
+      // Optional starting balance seeds the manual override. Anchor it to
+      // YESTERDAY: deriveBalance ignores transactions dated on-or-before the
+      // anchor day, and a brand-new account has no earlier transactions — so a
+      // day-zero anchor of today would silently exclude the very first expense
+      // the user logs after finishing setup. Left null when blank.
+      const anchor = new Date(`${today}T12:00:00`)
+      anchor.setDate(anchor.getDate() - 1)
+      const anchorDay = anchor.toISOString().slice(0, 10)
       await accountsRepo.create({
         name: accountName,
         institution: accountInstitution,
@@ -165,7 +196,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         is_protected: false,
         is_active: true,
         manual_balance_override: openingBalance,
-        last_balance_updated_at: openingBalance !== null ? today : null,
+        last_balance_updated_at: openingBalance !== null ? anchorDay : null,
       })
     }
 
@@ -341,7 +372,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           </>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 'auto' }}>
+        {finishError && (
+          <div role="alert" style={{ fontSize: 12, color: 'var(--amber-text)', lineHeight: 1.5, marginTop: 'auto' }}>
+            {finishError}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, marginTop: finishError ? 0 : 'auto' }}>
           {step > 1 && (
             <Btn variant="secondary" style={{ flex: 1 }} onClick={() => setStep((s) => s - 1)}>
               Back

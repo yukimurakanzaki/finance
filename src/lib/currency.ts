@@ -29,16 +29,17 @@ export function formatRpFull(value: number): string {
 
 // Parses a user-typed rupiah amount to an integer, strictly.
 // Accepts plain digit strings ("25000") and digit strings whose "." or ","
-// appear ONLY as 3-digit group separators ("25.000", "1,250,000"). The
-// separator must be consistent, and every group after the first must be
-// exactly three digits. Anything ambiguous — a decimal-looking "12.5",
-// "1.2.3", or a trailing 1–2 digit group — returns null so forms surface
-// their "Enter a valid amount" error instead of silently mis-parsing.
+// appear ONLY as 3-digit group separators. The separator must be consistent
+// and every group AFTER a separator exactly three digits; the leading group
+// may be any width ("45000.000" is an unambiguous 45,000,000). Anything
+// ambiguous — a decimal-looking "12.5", "1.2.3", or a trailing 1–2 digit
+// group — returns null so forms surface their "Enter a valid amount" error
+// instead of silently mis-parsing.
 export function parseRpInput(raw: string): number | null {
   const s = raw.trim()
   if (!s) return null
   // Plain digits, or grouped thousands with a single consistent separator.
-  if (!/^\d+$/.test(s) && !/^\d{1,3}([.,])\d{3}(?:\1\d{3})*$/.test(s))
+  if (!/^\d+$/.test(s) && !/^\d+([.,])\d{3}(?:\1\d{3})*$/.test(s))
     return null
   const n = Number(s.replace(/[.,]/g, ''))
   if (!Number.isFinite(n) || n <= 0) return null

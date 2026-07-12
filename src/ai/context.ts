@@ -1,5 +1,6 @@
 import { db } from '@db/db'
-import { computeSafeToSpend } from '@engine/safeToSpend'
+import { computeSafeToSpend, isWeekDraw } from '@engine/safeToSpend'
+import { deriveBalance } from '@lib/balances'
 import { computeFIProjection } from '@engine/fiProjection'
 import type { AssetType, Lane } from '@db/types'
 import { isoWeekStart, isoWeekEnd, todayISO } from '@lib/dates'
@@ -46,15 +47,12 @@ export async function buildSystemPrompt(activeSkillIds: string[] = []): Promise<
       db.incomeEvents.orderBy('date').last(),
     ])
 
-  // Account balances: bank = transaction ledger sum, others = manual override
-  const txnSums: Record<string, number> = {}
-  const allTxns = await db.transactions.filter((t) => !t.is_transfer).toArray()
-  for (const t of allTxns) {
-    txnSums[t.account_id] = (txnSums[t.account_id] ?? 0) + (t.direction === 'in' ? t.amount : -t.amount)
-  }
+  // Account balances: same derivation as the Assets screen (override anchor +
+  // ledger, transfer-aware) so the assistant quotes what the user sees.
+  const allTxns = await db.transactions.toArray()
 
   const accountLines = accounts.map((a) => {
-    const bal = a.account_type === 'bank' ? (txnSums[a.id!] ?? 0) : (a.manual_balance_override ?? 0)
+    const bal = deriveBalance(a, allTxns)
     return `- id ${a.id}: ${a.name} (${a.institution}, ${a.account_type}) — balance Rp ${bal.toLocaleString('id-ID')}${a.is_protected ? ' [PROTECTED]' : ''}`
   })
 
@@ -74,8 +72,7 @@ export async function buildSystemPrompt(activeSkillIds: string[] = []): Promise<
     income_producing: 0, store_of_value: 0, debt_liability: 0, protected_living: 0, pass_through: 0,
   }
   for (const a of accounts) {
-    const bal = a.account_type === 'bank' ? (txnSums[a.id!] ?? 0) : (a.manual_balance_override ?? 0)
-    byLane[a.lane] += bal
+    byLane[a.lane] += deriveBalance(a, allTxns)
   }
   for (const a of assets) byLane[a.lane] += a.value
   const netWorth = byLane.income_producing + byLane.store_of_value - byLane.debt_liability + byLane.protected_living
@@ -83,9 +80,10 @@ export async function buildSystemPrompt(activeSkillIds: string[] = []): Promise<
   // Safe to spend
   let stsBlock = 'Not configured yet (no allowance set).'
   if (allowance && allowance.monthly_amount > 0) {
+    // isWeekDraw keeps this in lockstep with the UI gauge (also excludes
+    // transfers and recurring-tagged committed payments).
     const weekTxns = allTxns.filter(
-      (t) => t.direction === 'out' && t.lane !== 'pass_through' &&
-        t.date >= isoWeekStart(today) && t.date <= isoWeekEnd(today),
+      (t) => isWeekDraw(t) && t.date >= isoWeekStart(today) && t.date <= isoWeekEnd(today),
     )
     const spendThisWeek = weekTxns.reduce((s, t) => s + t.amount, 0)
     const sts = computeSafeToSpend({ allowance, activeRecurringItems: recurring, spendThisWeek, today })

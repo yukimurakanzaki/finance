@@ -27,6 +27,10 @@ describe('parseRpInput (strict, decimal-safe)', () => {
     expect(parseRpInput('1,250,000')).toBe(1_250_000)
     expect(parseRpInput('1.234.567')).toBe(1_234_567)
   })
+  it('accepts a wide leading group when later groups are all 3 digits', () => {
+    expect(parseRpInput('45000.000')).toBe(45_000_000)
+    expect(parseRpInput('1000.000')).toBe(1_000_000)
+  })
   it('rejects decimal-looking input rather than mis-parsing it', () => {
     expect(parseRpInput('12.5')).toBeNull()
     expect(parseRpInput('12,5')).toBeNull()

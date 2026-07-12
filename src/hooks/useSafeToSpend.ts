@@ -1,21 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
-import { computeSafeToSpend, type SafeToSpendResult } from '@engine/safeToSpend'
+import { computeSafeToSpend, isWeekDraw, type SafeToSpendResult } from '@engine/safeToSpend'
 import { isoWeekStart, isoWeekEnd } from '@lib/dates'
-import type { Transaction } from '@db/types'
 
-// A transaction draws down the personal safe-to-spend pool only if it is a
-// plain outgoing spend: not a transfer, not pass-through, and not tagged as a
-// committed recurring payment (bills/subs live in the recurring bucket, which
-// the allowance is already net of — see computeSafeToSpend).
-export function isWeekDraw(t: Transaction): boolean {
-  return (
-    t.direction === 'out' &&
-    !t.is_transfer &&
-    t.lane !== 'pass_through' &&
-    t.recurring_item_id === null
-  )
-}
+export { isWeekDraw }
 
 export function useSafeToSpend(): { result: SafeToSpendResult | null; isLoading: boolean } {
   const data = useLiveQuery(async () => {

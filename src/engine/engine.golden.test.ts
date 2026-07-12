@@ -95,6 +95,19 @@ describe('safeToSpend', () => {
     expect(r.isAmber).toBe(true)
   })
 
+  it('recurring items never tip the pool negative (T2 at the clamp boundary)', () => {
+    // Allowance 500k, weekend 450k → thin 50k pool. Piling on huge subs/bills
+    // must NOT flip isNegativePool — any regression back toward subtracting
+    // recurring totals from the pool fails here.
+    const r = computeSafeToSpend({
+      allowance: allowance(500_000, 450_000),
+      activeRecurringItems: [recurring('personal_sub', 9_000_000), recurring('household_bill', 5_000_000)],
+      spendThisWeek: 0, today: TUE,
+    })!
+    expect(r.isNegativePool).toBe(false)
+    expect(r.weekPool).toBeGreaterThan(0)
+  })
+
   it('weekend: zero workdays left means zero ceiling, no division blow-up', () => {
     const r = computeSafeToSpend({ allowance: allowance(3_000_000), activeRecurringItems: [], spendThisWeek: 0, today: SAT })!
     expect(r.remainingWorkdays).toBe(0)
