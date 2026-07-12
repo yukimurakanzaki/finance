@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useReconcileStore } from '@stores/reconcileStore'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
-import { formatRp } from '@lib/currency'
+import { formatRp, parseRpInput } from '@lib/currency'
 import { LanePill } from '@components/LanePill'
 import type { ValidImportRow } from '../../import/schema'
 
@@ -196,8 +196,8 @@ function ReconcileRow({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={() => {
-              const n = Number(draft.replace(/[.,]/g, ''))
-              if (n > 0) onOverride(n)
+              const n = parseRpInput(draft)
+              if (n !== null) onOverride(n)
               setEditing(false)
             }}
             style={{
