@@ -12,7 +12,7 @@ tracked in [USER-JOURNEY.md](USER-JOURNEY.md) (P1–P9, 7 of 9 resolved).
 
 | Rank | Issue | User impact | Effort | Order |
 |------|-------|-------------|--------|-------|
-| 1 | **T1–T3 trust bugs** — transfer-inflated Report actuals, bills double-counted against the safe-to-spend pool, "M" misread as *miliar* | The three numbers users check most are wrong; every decision made on them is misinformed | **S** (each is a few lines) | 1st — ship before anything else |
+| 1 | **T1–T3 trust bugs** — transfer-inflated Report actuals; safe-to-spend gauge counts personal subs twice and leaves bill handling unspecified (T2); "M" misread as *miliar* | The three numbers users check most are wrong; every decision made on them is misinformed | **S** for T1/T3; **M** for T2 (needs a pool-semantics decision first) | 1st — ship before anything else |
 | 2 | **F1 — no single "where do I stand" surface** | The daily question (can I buy lunch, from which account) takes 2–3 tab visits; the app's core loop never closes in one glance | **M** (standing strip on Today; data already exists) | 3rd |
 | 3 | **F2/F3 — fragmented transaction surface** | Users can't find a transaction by the title they typed, and where they *can* find it they can't edit it | **M** (one list: search title/category/note, tappable rows, period scope) | 3rd (with F1) |
 | 4 | **O1 — no starting balance at onboarding** | First-run impression is "the app says I have no money"; balances stay wrong until a buried override is found | **S** (one wizard field) | 2nd |
@@ -58,7 +58,7 @@ What remains is different in character:
 | # | Pain point | Evidence | Severity |
 |---|-----------|----------|----------|
 | T1 | **Report's monthly actuals count transfers as income & expenses.** Moving Rp 5jt between own accounts shows +5jt income, +5jt expense on the screen literally labeled "actuals". Today and TransactionHistory both exclude transfers; Report doesn't. | `src/features/report/ReportScreen.tsx:10-11` filters `direction` only, never `is_transfer` | 🔴 High |
-| T2 | **Committed bills double-count against the discretionary pool.** The safe-to-spend gauge subtracts *every* non-transfer expense from the weekly pool — pay the electricity bill from your wallet and log it, and the gauge drops even though bills were already carved out of the allowance. Diligent logging is punished with an artificially amber gauge. | `src/hooks/useSafeToSpend.ts:20` (only excludes `pass_through`) | 🔴 High |
+| T2 | **The gauge's deduction and draw sides disagree about what the pool funds.** Config side: `pool = monthly_amount − personal_subs − weekend`; `householdBillTotal` is computed and never subtracted (dead value). Draw side: *every* non-transfer expense draws the pool. Net effect: a logged **personal-sub payment hits the gauge twice** (deducted at config *and* drawn when logged); a logged **household bill's treatment is unspecified** — onboarding copy defines `monthly_amount` as "after pipes and bills," but the engine neither enforces nor reflects that. Requirement: define the pool's funding scope, then make both sides consistent so each committed item affects the gauge **exactly once**. A draw-side filter alone (excluding committed-lane transactions) is *not* sufficient — it would hide bill spending without fixing the allowance calculation. | `src/engine/safeToSpend.ts:38-56` (`householdBillTotal` unused; only `personal_sub` deducted), `src/hooks/useSafeToSpend.ts:20` (draw excludes only transfers/`pass_through`), `OnboardingWizard.tsx` step-3 copy | 🔴 High |
 | T3 | **`formatRp` abbreviates millions as "M"** (`Rp 2,5M`). In Indonesian convention **M = miliar (billion)**; juta is "jt". Every abbreviated figure reads 1000× off to an Indonesian reader. | `src/lib/currency.ts:17-19` | 🔴 High |
 | T4 | **The Today "Balance" chip** shows day income − expenses, amber-negative on any normal spending day, using the one word ("balance") users associate with *wallet* balance — which the page doesn't show. | `src/features/today/TodayScreen.tsx:76` | 🟠 Med |
 | T5 | **Decimal-input hazard.** Onboarding and the reconcile amount override strip `.` and `,` blindly (`12.5` → 125); `parseRpInput` shares the flaw. One slip corrupts the income event that drives savings rate and FI projection. | `OnboardingWizard.tsx:100-145`, `ReconcileConfirmScreen.tsx:199`, `currency.ts:31` | 🟠 Med |
@@ -198,8 +198,9 @@ time because nothing enforced it.
 
 ## Ranked requirements candidates (this round)
 
-1. **Trust fixes** (T1 transfer-inflated Report, T2 bill double-count, T3 jt/M
-   notation, T5 decimal parse) — small diffs, protect everything else.
+1. **Trust fixes** (T1 transfer-inflated Report, T2 gauge deduction/draw
+   inconsistency, T3 jt/M notation, T5 decimal parse) — small diffs (T2 needs a
+   pool-semantics decision first), protect everything else.
 2. **One transaction surface** — searchable (title + category + note), editable,
    day/week/month scoped; dissolves F2/F3, gives P4/F4 a home.
 3. **A "standing" strip on Today** — wallet balance + safe-to-spend remaining +
@@ -219,11 +220,14 @@ time because nothing enforced it.
 Each phase is independently shippable and leaves the app better than it found it;
 no phase depends on a later one.
 
-**Phase 1 — Trust & safety (S effort, 1 PR).**
-Fix T1 (exclude transfers from Report actuals), T2 (exclude committed-lane
-expenses from the pool draw), T3 (jt/M-miliar notation in `formatRp`), T5
-(decimal-safe parsing), O1 (starting-balance field in onboarding), S1
-(delete confirmation). Pure logic diffs; unit-testable; no visual change.
+**Phase 1 — Trust & safety (S–M effort, 1 PR).**
+Fix T1 (exclude transfers from Report actuals), T2 (first *decide the pool's
+funding scope*, then align the allowance deduction and the transaction draw so
+each committed item counts exactly once — a draw-side filter alone is not a fix;
+see T2), T3 (jt/M-miliar notation in `formatRp`), T5 (decimal-safe parsing),
+O1 (starting-balance field in onboarding), S1 (delete confirmation). Pure logic
+diffs; unit-testable; no visual change. T2 is the one item needing a product
+decision before code.
 
 **Phase 2 — Design primitives (M effort, 1 PR, no screen redesigns).**
 Build the enforcement layer from the Calm Ledger proposal: token update
@@ -255,7 +259,7 @@ build, measured the same way after each phase.
 | Tab visits to answer "can I buy this, from which account" | 2–3 (Budget + Assets + Today) | 1 (Today standing strip) | 3 |
 | Find-and-edit a transaction logged last week by its title | Impossible (F3) | ≤ 3 taps from Today | 3 |
 | Month "actuals" accuracy with intra-account transfers present | Wrong (inflated both directions) | Exact | 1 |
-| Safe-to-spend accuracy after logging a committed bill | Wrong (pool drops) | Unchanged pool | 1 |
+| Times a recurring committed item affects the gauge | Personal sub: twice (config deduction + draw); household bill: unspecified | Exactly once, per a defined pool scope | 1 |
 | Wallet balance correct immediately after onboarding | No (always Rp 0) | Yes | 1 |
 | Accidental-delete recovery | None | Confirm dialog (undo/trash later) | 1 |
 | Distinct font sizes in feature code | ~18 | 4 (type-scale roles) | 2–4 |
