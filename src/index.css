@@ -21,6 +21,32 @@
   --amber-border: #3d2900;
   --on-accent: #000;
 
+  /* Accent — honestly-named aliases of the --amber* slot (Calm Ledger v2 §4).
+     Same values, no rename: existing feature code keeps reading --amber*, while
+     Phase 3 primitives can reference the honest --accent* names. Amber-the-colour
+     stays reserved for governor states; here the accent happens to be amber in
+     dark and blue in light (see the light override below). */
+  --accent: #f0a500;
+  --accent-text: #fbbf24;
+  --accent-surface: #110d00;
+  --accent-border: #3d2900;
+
+  /* Type scale — four roles, nothing else (Calm Ledger v2 §1).
+     Not colours: no light/dark override needed. */
+  --text-display: 34px;   --leading-display: 40px;
+  --text-title: 17px;     --leading-title: 24px;
+  --text-body: 15px;      --leading-body: 22px;
+  --text-caption: 12px;   --leading-caption: 16px;
+
+  /* Spacing scale — 4 / 8 / 12 / 16 / 24 / 32 (Calm Ledger v2 §7).
+     Not colours: no light/dark override needed. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
   /* Lane colors */
   --engine: #34d399;
   --engine-bg: #021f15;
@@ -62,6 +88,11 @@
   --amber-surface: #e9f2fc;
   --amber-border: #bcd8f3;
   --on-accent: #ffffff;
+  /* Accent aliases — same blue values as the --amber* slot in this theme. */
+  --accent: #2b8ae0;
+  --accent-text: #1d6fc0;
+  --accent-surface: #e9f2fc;
+  --accent-border: #bcd8f3;
   --engine: #149e6d;
   --engine-bg: #e3f5ee;
   --store: #b17a00;
@@ -114,6 +145,16 @@ body {
 .scroll-area {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Pressed state for the <Row> primitive (src/components/ui/Row.tsx).
+   :active can't be expressed inline, so the row's base styles stay inline and
+   only the pressed feedback lives here (Calm Ledger v2 §6 — feedback layer). */
+.ui-row {
+  transition: background-color .12s ease-out;
+}
+.ui-row:active {
+  background-color: var(--bg-2);
 }
 
 /* Amber banner */
