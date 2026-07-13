@@ -38,6 +38,12 @@
   --text-body: 15px;      --leading-body: 22px;
   --text-caption: 12px;   --leading-caption: 16px;
 
+  /* Section-header role: the mock (design-direction-v2.html §3, ".section h3")
+     deliberately sizes this between caption and body, not a caption reused —
+     named so it stays a token, not a magic number, without pretending it's one
+     of the four body/data roles above. */
+  --text-section: 13px;   --leading-section: 18px;
+
   /* Spacing scale — 4 / 8 / 12 / 16 / 24 / 32 (Calm Ledger v2 §7).
      Not colours: no light/dark override needed. */
   --space-1: 4px;
@@ -148,9 +154,11 @@ body {
 }
 
 /* Pressed state for the <Row> primitive (src/components/ui/Row.tsx).
-   :active can't be expressed inline, so the row's base styles stay inline and
-   only the pressed feedback lives here (Calm Ledger v2 §6 — feedback layer). */
+   :active can't be expressed inline — and an inline background would always
+   beat this class's specificity anyway — so idle AND pressed backgrounds both
+   live here; Row's own inline style never sets `background`. */
 .ui-row {
+  background: none;
   transition: background-color .12s ease-out;
 }
 .ui-row:active {

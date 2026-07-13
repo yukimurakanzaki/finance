@@ -25,8 +25,8 @@ export function SectionHeader({ children, trailing, style, className }: Props) {
     >
       <span
         style={{
-          fontSize: 13,
-          lineHeight: '18px',
+          fontSize: 'var(--text-section)',
+          lineHeight: 'var(--leading-section)',
           fontWeight: 600,
           color: 'var(--ink-2)',
         }}

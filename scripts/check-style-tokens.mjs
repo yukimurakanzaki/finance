@@ -8,6 +8,8 @@
 // group has no `noRestrictedSyntax`, and GritQL plugins (which could express this)
 // are a Biome 2.x feature. So the "next-best enforceable thing in this version"
 // is this focused line scanner, wired into `npm run lint`.
+// TODO(biome-2.x): once the pinned Biome major version moves to 2.x, express
+// this as a GritQL plugin and delete this script.
 //
 // WHAT IT FLAGS (only under src/features/**):
 //   • fontSize:   <numeric literal>            — e.g. `fontSize: 13`
@@ -36,6 +38,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..')
 const SCAN_DIR = join(ROOT, 'src', 'features')
+const BASELINE_PATH = join(ROOT, 'scripts', 'style-tokens-baseline.json')
 
 const RULES = [
   { key: 'fontSize', re: /\bfontSize\s*:\s*\d/ },
@@ -43,7 +46,9 @@ const RULES = [
     key: 'padding',
     re: /\bpadding(?:Top|Right|Bottom|Left|Inline|Block|InlineStart|InlineEnd|BlockStart|BlockEnd)?\s*:\s*['"]?\d/,
   },
-  { key: 'borderRadius', re: /\bborderRadius\s*:\s*['"]?\d/ },
+  // Excludes percentage values ('50%', a circle/pill) — no radius token exists
+  // for those yet, and they're a legitimate token-agnostic CSS idiom.
+  { key: 'borderRadius', re: /\bborderRadius\s*:\s*['"]?\d+(?!\d*%)/ },
 ]
 
 function walk(dir) {
@@ -56,8 +61,17 @@ function walk(dir) {
   return out
 }
 
+const files = walk(SCAN_DIR)
+if (files.length === 0) {
+  console.error(
+    `check-style-tokens: found zero .tsx/.ts files under ${relative(ROOT, SCAN_DIR)} — ` +
+      'the scan directory looks stale (a reorg?). Refusing to silently report "OK".',
+  )
+  process.exit(1)
+}
+
 const findings = []
-for (const file of walk(SCAN_DIR)) {
+for (const file of files) {
   const lines = readFileSync(file, 'utf8').split('\n')
   lines.forEach((line, i) => {
     for (const { key, re } of RULES) {
@@ -89,7 +103,34 @@ for (const f of findings) {
     `  ${f.file}:${f.line}:${f.col}  raw ${f.key} literal — use a token (var(--text-*) / var(--space-*)) or a ui/ primitive`,
   )
 }
-console.error(
-  `\n${findings.length} raw-literal ${findings.length === 1 ? 'finding' : 'findings'} in src/features.`,
+
+// Ratchet, not a hard ban: Phase 3 migrates screens to the ui/ primitives
+// incrementally, so a fixed legacy baseline is allowed to pass — but the
+// count may never grow. This is what lets `npm run lint` mean something
+// again today instead of being permanently red until every screen migrates.
+let baseline = 0
+try {
+  baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).count ?? 0
+} catch {
+  baseline = 0
+}
+
+if (findings.length > baseline) {
+  console.error(
+    `\n${findings.length} raw-literal findings in src/features (baseline: ${baseline}) — ` +
+      `new violations were introduced. Use a design token or a ui/ primitive instead.`,
+  )
+  process.exit(1)
+}
+
+console.log(
+  `\n${findings.length} raw-literal findings in src/features, within the ${baseline}-finding ` +
+    'legacy baseline (Phase 3 migrates these screen by screen). No new violations — OK.',
 )
-process.exit(1)
+if (findings.length < baseline) {
+  console.log(
+    `(Down from ${baseline} — lower scripts/style-tokens-baseline.json's "count" to ` +
+      `${findings.length} to lock in the improvement.)`,
+  )
+}
+process.exit(0)

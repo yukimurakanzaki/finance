@@ -41,7 +41,15 @@ export function Icon({
       style={{ display: 'block', flexShrink: 0, ...style }}
       className={className}
     >
-      {ICON_PATHS[name]}
+      {ICON_PATHS[name] ?? warnUnknown(name)}
     </svg>
   )
+}
+
+// TS enforces IconName at every call site today, but a dynamic name sourced
+// from data (Phase 3+) can bypass that — warn instead of rendering a silent
+// blank icon.
+function warnUnknown(name: string) {
+  console.warn(`Icon: unknown icon name "${name}" — rendering blank.`)
+  return null
 }

@@ -28,6 +28,10 @@ export function Row({
   className,
   ...rest
 }: Props) {
+  // No `background` here on purpose: the button variant carries the .ui-row
+  // class, and an inline background would always outrank .ui-row:active's
+  // pressed state (inline beats any non-!important stylesheet rule). Idle
+  // background for both variants is "none" by default anyway.
   const base: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -38,7 +42,6 @@ export function Row({
     borderBottom: '1px solid var(--border-1)',
     textAlign: 'left',
     color: 'inherit',
-    background: 'none',
     ...style,
   }
 
@@ -91,8 +94,13 @@ export function Row({
         className={['ui-row', className].filter(Boolean).join(' ')}
         style={{
           ...base,
-          border: 'none',
-          borderBottom: base.borderBottom,
+          // Reset only the three sides a <button> gets a default border on —
+          // NOT the `border` shorthand, which would reset borderBottom too and
+          // (since reassigning an existing key doesn't move it) apply AFTER
+          // the spread's borderBottom regardless of source order, erasing it.
+          borderTop: 'none',
+          borderLeft: 'none',
+          borderRight: 'none',
           cursor: 'pointer',
           fontFamily: 'inherit',
         }}
