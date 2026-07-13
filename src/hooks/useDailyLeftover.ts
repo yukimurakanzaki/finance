@@ -1,6 +1,10 @@
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
-import { computeDailyLeftover, monthStartOf, type DailyLeftoverResult } from '@engine/dailyLeftover'
+import {
+  type DailyLeftoverResult,
+  computeDailyLeftover,
+  monthStartOf,
+} from '@engine/dailyLeftover'
+import { useLiveQuery } from 'dexie-react-hooks'
 
 /**
  * Live-query wrapper around `computeDailyLeftover` — matches the return shape

@@ -1,4 +1,4 @@
 {
-  "count": 507,
+  "count": 487,
   "note": "Legacy raw fontSize/padding/borderRadius literals under src/features, as of Phase 2 (design primitives). Phase 3 migrates screens to src/components/ui/* incrementally — this count should only go down. See scripts/check-style-tokens.mjs."
 }

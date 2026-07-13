@@ -1,6 +1,6 @@
-import { isWeekDraw } from './safeToSpend'
 import type { Transaction } from '@db/types'
 import { todayISO } from '@lib/dates'
+import { isWeekDraw } from './safeToSpend'
 
 // Running personal-allowance leftover for the month containing `asOfDate`.
 //

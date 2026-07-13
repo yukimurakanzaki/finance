@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import type { Transaction } from '@db/types'
+import { describe, expect, it } from 'vitest'
 import { computeDailyLeftover, monthStartOf } from './dailyLeftover'
 
 // Reuses the txn() factory shape from useSafeToSpend.test.ts — `dailyLeftover`
@@ -108,7 +108,12 @@ describe('computeDailyLeftover', () => {
     const result = computeDailyLeftover({
       monthlyAmount: 2_000_000,
       transactions: [
-        txn({ id: '1', date: '2000-07-15', amount: 500_000, lane: 'pass_through' }),
+        txn({
+          id: '1',
+          date: '2000-07-15',
+          amount: 500_000,
+          lane: 'pass_through',
+        }),
       ],
       asOfDate: '2000-07-15',
     })
@@ -141,7 +146,7 @@ describe('computeDailyLeftover', () => {
     expect(result.leftover).toBe(1_900_000)
   })
 
-  it('a future date returns isProjected: true and equals the last real day\'s leftover', () => {
+  it("a future date returns isProjected: true and equals the last real day's leftover", () => {
     // asOfDate must be in the future relative to todayISO(). Use 2999 as a
     // guaranteed-future year, and put the transaction in the SAME month so
     // it actually counts toward the leftover.
@@ -160,7 +165,9 @@ describe('computeDailyLeftover', () => {
     // Transaction and asOfDate in the same past month.
     const result = computeDailyLeftover({
       monthlyAmount: 2_000_000,
-      transactions: [txn({ id: '1', date: '2020-01-05', amount: 100_000, direction: 'out' })],
+      transactions: [
+        txn({ id: '1', date: '2020-01-05', amount: 100_000, direction: 'out' }),
+      ],
       asOfDate: '2020-01-15',
     })
     expect(result.leftover).toBe(1_900_000)
@@ -171,9 +178,19 @@ describe('computeDailyLeftover', () => {
     // No caching: the function is pure, but a regression that introduced a
     // memoization keyed on transactions alone would miss this. Caller-side
     // staleness test, basically.
-    const txns = [txn({ id: '1', date: '2000-07-10', amount: 100_000, direction: 'out' })]
-    const a = computeDailyLeftover({ monthlyAmount: 2_000_000, transactions: txns, asOfDate: '2000-07-15' })
-    const b = computeDailyLeftover({ monthlyAmount: 3_000_000, transactions: txns, asOfDate: '2000-07-15' })
+    const txns = [
+      txn({ id: '1', date: '2000-07-10', amount: 100_000, direction: 'out' }),
+    ]
+    const a = computeDailyLeftover({
+      monthlyAmount: 2_000_000,
+      transactions: txns,
+      asOfDate: '2000-07-15',
+    })
+    const b = computeDailyLeftover({
+      monthlyAmount: 3_000_000,
+      transactions: txns,
+      asOfDate: '2000-07-15',
+    })
     expect(a.leftover).toBe(1_900_000)
     expect(b.leftover).toBe(2_900_000)
   })
@@ -181,7 +198,14 @@ describe('computeDailyLeftover', () => {
   it('a negative leftover is returned as-is (overspent is a signal, not a clamp)', () => {
     const result = computeDailyLeftover({
       monthlyAmount: 500_000,
-      transactions: [txn({ id: '1', date: '2000-07-10', amount: 1_000_000, direction: 'out' })],
+      transactions: [
+        txn({
+          id: '1',
+          date: '2000-07-10',
+          amount: 1_000_000,
+          direction: 'out',
+        }),
+      ],
       asOfDate: '2000-07-15',
     })
     expect(result.leftover).toBe(-500_000)
