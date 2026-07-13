@@ -63,6 +63,20 @@ What remains is different in character:
 | T4 | **The Today "Balance" chip** shows day income − expenses, amber-negative on any normal spending day, using the one word ("balance") users associate with *wallet* balance — which the page doesn't show. | `src/features/today/TodayScreen.tsx:76` | 🟠 Med |
 | T5 | **Decimal-input hazard.** Onboarding and the reconcile amount override strip `.` and `,` blindly (`12.5` → 125); `parseRpInput` shares the flaw. One slip corrupts the income event that drives savings rate and FI projection. | `OnboardingWizard.tsx:100-145`, `ReconcileConfirmScreen.tsx:199`, `currency.ts:31` | 🟠 Med |
 
+> **DECISION (2026-07-12) — safe-to-spend pool scope.** The user splits net income
+> into personal allowance / recurring bills / investment. `allowance.monthly_amount`
+> **is** the personal allowance — already net of *all* recurring items (household
+> bills, personal subs, pay-yourself-first). Therefore the gauge counts each committed
+> item exactly once: (a) the **deduction side** stops subtracting `personalSubTotal`
+> from the pool — `monthlyDiscretionary = personalPool − weekendAllocation` — since the
+> allowance is already net of subs; (b) the **draw side** excludes any transaction
+> tagged with a `recurring_item_id`, so a logged bill/sub payment never redraws the
+> pool. `personalSubTotal` and `householdBillTotal` remain computed for display only.
+> Transactions gain a nullable `recurring_item_id`; the expense form lets a spend be
+> tagged to an active recurring item. The richer per-day leftover ledger view (running
+> leftover, future projection, backdated history) is **deferred to Phase 3's Today
+> standing strip**.
+
 ## F — Fragmentation: one question, three tabs
 
 | # | Pain point | Evidence | Severity |

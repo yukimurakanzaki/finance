@@ -206,6 +206,11 @@ class FIDatabase extends Dexie {
     this.version(11).stores({
       chatMessages: 'id, session_id, created_at, updated_at',
     })
+
+    // transactions.recurring_item_id (tags a committed recurring payment so it
+    // no longer draws the personal pool) needs NO schema version: it is not
+    // indexed, and readers treat missing/undefined as untagged (isWeekDraw),
+    // so a full-table backfill upgrade would only slow startup for nothing.
   }
 }
 

@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
 import type { Lane, NetWorthSnapshot } from '@db/types'
 import { todayISO } from '@lib/dates'
+import { deriveBalance } from '@lib/balances'
 
 const STALE_DAYS = 35
 const GOLD_STALE_DAYS = 30
@@ -16,12 +17,11 @@ export function useNetWorth() {
 
     const today = todayISO()
 
-    // Derive account balances from transactions for bank accounts
-    const txnSums: Record<string, number> = {}
-    const allTxns = await db.transactions.filter((t) => !t.is_transfer).toArray()
-    for (const t of allTxns) {
-      txnSums[t.account_id] = (txnSums[t.account_id] ?? 0) + (t.direction === 'in' ? t.amount : -t.amount)
-    }
+    // Same per-account derivation as the Assets screen (override anchor +
+    // ledger, transfer-aware) — net worth and the account list must agree,
+    // especially now that onboarding seeds manual_balance_override on the
+    // first (bank) account.
+    const allTxns = await db.transactions.toArray()
 
     const byLane: Record<Lane, number> = {
       income_producing: 0,
@@ -32,11 +32,7 @@ export function useNetWorth() {
     }
 
     for (const acc of accounts) {
-      const balance =
-        acc.account_type === 'bank'
-          ? (txnSums[acc.id!] ?? 0)
-          : (acc.manual_balance_override ?? 0)
-      byLane[acc.lane] += balance
+      byLane[acc.lane] += deriveBalance(acc, allTxns)
     }
 
     for (const asset of assets) {

@@ -1,5 +1,22 @@
-import type { Allowance, RecurringItem } from '@db/types'
+import type { Allowance, RecurringItem, Transaction } from '@db/types'
 import { workdaysRemaining, weeksInMonth } from '@lib/dates'
+
+// A transaction draws down the personal safe-to-spend pool only if it is a
+// plain outgoing spend: not a transfer, not pass-through, and not tagged as a
+// committed recurring payment (bills/subs live in the recurring bucket, which
+// the allowance is already net of — see computeSafeToSpend). Shared by the
+// UI hook and the AI context builder so both report the same gauge.
+export function isWeekDraw(t: Transaction): boolean {
+  return (
+    t.direction === 'out' &&
+    !t.is_transfer &&
+    t.lane !== 'pass_through' &&
+    // Falsy check, not === null: rows written before the field existed (cloud
+    // pulls from another device, restored pre-field backups) carry undefined
+    // and must still count as ordinary discretionary draws.
+    !t.recurring_item_id
+  )
+}
 
 export interface SafeToSpendInput {
   allowance: Allowance
@@ -49,7 +66,12 @@ export function computeSafeToSpend(
   const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
   const weeks = weeksInMonth(yearMonth)
 
-  const monthlyDiscretionary = personalPool - personalSubTotal - weekendAllocation
+  // personalPool (allowance.monthly_amount) is ALREADY net of every recurring
+  // item — bills, subs, pay-yourself-first — so only the weekend carve-out comes
+  // out here. Subtracting personalSubTotal again would double-count subs (they
+  // are also excluded from the draw side via recurring_item_id). personalSubTotal
+  // and householdBillTotal are still returned, for display only.
+  const monthlyDiscretionary = personalPool - weekendAllocation
   const isNegativePool = monthlyDiscretionary <= 0
   const weekPool = isNegativePool ? 0 : Math.floor(monthlyDiscretionary / weeks)
 

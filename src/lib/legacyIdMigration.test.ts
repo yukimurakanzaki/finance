@@ -36,7 +36,7 @@ describe('migrateLegacyIds', () => {
         id: 42 as unknown as string, date: '2026-06-01', amount: 50_000, direction: 'out',
         account_id: '1', category_id: '7', lane: 'protected_living', source: 'manual',
         title: null, note: null, original_amount: null, overridden_amount: null, override_note: null,
-        overridden_at: null, is_transfer: false, transfer_pair_id: null,
+        overridden_at: null, is_transfer: false, transfer_pair_id: null, recurring_item_id: null,
         created_at: '2026-06-01T00:00:00Z',
       })
     } finally {
