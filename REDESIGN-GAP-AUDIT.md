@@ -1586,18 +1586,18 @@ Compared to Today (12 raw literals / 916 LOC = 1.3 / 100 LOC), Settings has **~4
 
 | Element | Touch target | aria-label | Notes |
 |---|---|---|---|
-| `MenuRow` (11 instances) | default `<button>` height (~36dp native) | **none** | Primary navigation pattern; missing aria-label is a real a11y gap |
+| `MenuRow` (13 instances) | default `<button>` height (~36dp native) | **none** | Primary navigation pattern; missing aria-label is a real a11y gap |
 | `SectionLabel` | static text | — | OK |
 | `Btn` from `FormField` | not inspected in this audit | depends on usage | Out of scope; covered by `FormField` primitive audit |
 | Form fields (Field/Input/Select) | inherited from FormField | inherited | OK |
 | `ImportPromptSheet` textarea | `minHeight: 260` (textarea content height) | — | OK for textarea |
 
-**Accessibility: FAIL.** The 11 `MenuRow` buttons have:
+**Accessibility: FAIL.** The 13 `MenuRow` buttons have:
 - No `aria-label` (the visual label is in `<div>{label}</div>`, but `<button>` itself has no accessible name when the visual text is wrapped in nested elements — screen readers may announce both nested divs separately).
 - No explicit touch-target height enforcement.
 - No `role` attribute (default is `button`, which is correct, but no semantic confirmation).
 
-This is the **biggest concrete a11y gap** in the Settings surface.
+This is the **biggest concrete a11y gap** in the Settings surface. Verified by `grep -c "<MenuRow" src/features/more/MoreScreen.tsx` returning 13 (PR #20 review correction).
 
 ### 21.8 Responsive
 
@@ -1674,7 +1674,7 @@ This is a structural change, not a UI fix. Update:
 - TabBar label `"More"` → `"Settings"` (TabBar.tsx:12)
 - Tests under `src/features/more/` (none exist; safe)
 
-**Estimated PR scope:** 1 PR, ~9 files renamed, ~10 files modified, ~77 raw-literal fixes, ~11 a11y additions.
+**Estimated PR scope:** 1 PR, ~9 files renamed, ~10 files modified, ~77 raw-literal fixes, ~13 a11y additions.
 
 **Estimated outcome:**
 - Global token debt: 475 → 398 (-77)
