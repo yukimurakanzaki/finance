@@ -352,11 +352,12 @@ Experience migration must follow Calm Ledger, not a new aesthetic direction.
 
 | Topic | Current | Options | Decision | Owner |
 |---|---|---|---|---|
-| Today landing | Today | Keep Today / restore Home | Pending | PO |
+| Today landing | Today | Keep Today / restore Home | **Resolved: KEEP** — Already the front door, matches decision-engine philosophy, no competing model exists. | PO |
 | Today definition | Daily transaction surface | Dashboard / decision engine | Proposed: decision engine | PO |
-| Report naming | Report | Report / Insights | Pending | PO |
-| More naming | More | More / Settings | Pending | PO |
-| Manager placement | Dedicated tab | Keep dedicated / contextual only / hybrid | Pending | PO |
+| Report naming | Report | Report / Insights | **Resolved: KEEP** — Screen currently answers "what happened / how much / against budget". Rename to Insights only when it answers "why / what's next / what should I do". | PO |
+| More naming | More | More / Settings | **Resolved: RENAME → Settings** — Tab now hosts theme, PIN, household, backup/restore, assumptions, recurring, categories. Users think "Settings", not "More". | PO |
+| Manager placement | Dedicated tab | Keep dedicated / contextual only / hybrid | **Resolved: KEEP dedicated tab** — AI is currently a destination owning conversations, transaction tools, imports, memory, financial assistant. Not ambient yet; don't optimize for a future product. | PO |
+| Spending Lens ownership | Rendered via More sheet | (a) collapse into Settings, (b) promote to first-class, (c) contextual capability from Today/Budget | **Deferred** — Folder structure is not sufficient evidence; depends on capability ownership, not implementation location. Re-evaluate after Today/Budget Calm Ledger migration. | PO + Engineering |
 | Household onboarding | Shared generic flow | Admin flow + invited-member flow | Pending | PO |
 | Token debt threshold | Baseline 487 | <100 / lower | Proposed: <100 before launch polish | PO + Engineering |
 | Architecture source | `ARCHITECTURE.md` + `BACKEND.md` divergence | Update/retire/split authority | Pending | Engineering |
@@ -869,10 +870,12 @@ Measures product convergence. Counted from Decision Register rows with status `P
 
 | Sprint | Decision debt |
 |---|---:|
-| Current | 6 |
+| Current | 2 |
 | Target | 0 |
 
 When a decision is resolved or explicitly deferred, it is removed from the count.
+
+**M2 close-out update:** Resolved Today landing, Report naming, More → Settings rename, and Manager placement (4 resolved). Added Spending Lens ownership as Deferred. Remaining Pending: Household onboarding, Architecture source. Net change: 6 → 2.
 
 ### Token debt
 
