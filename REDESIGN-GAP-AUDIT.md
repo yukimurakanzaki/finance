@@ -1080,8 +1080,6 @@ Exit:
                              ┌────────────┴────────────┐
                              │                         │
                              ▼                         ▼
-                             │                         │
-                             ▼                         ▼
                   ┌──────────────────┐      ┌──────────────────┐
                   │ OnboardingWizard │      │ AppShell renders │
                   │ (admin-only)     │      │ (Today tab)      │
