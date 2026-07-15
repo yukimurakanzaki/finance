@@ -358,9 +358,9 @@ Experience migration must follow Calm Ledger, not a new aesthetic direction.
 | More naming | More | More / Settings | **Resolved: RENAME → Settings** — Tab now hosts theme, PIN, household, backup/restore, assumptions, recurring, categories. Users think "Settings", not "More". | PO |
 | Manager placement | Dedicated tab | Keep dedicated / contextual only / hybrid | **Resolved: KEEP dedicated tab** — AI is currently a destination owning conversations, transaction tools, imports, memory, financial assistant. Not ambient yet; don't optimize for a future product. | PO |
 | Spending Lens ownership | Rendered via More sheet | (a) collapse into Settings, (b) promote to first-class, (c) contextual capability from Today/Budget | **Deferred** — Folder structure is not sufficient evidence; depends on capability ownership, not implementation location. Re-evaluate after Today/Budget Calm Ledger migration. | PO + Engineering |
-| Household onboarding | Shared generic flow | Admin flow + invited-member flow | Pending | PO |
+| Household onboarding | Shared generic flow | Admin flow + invited-member flow | **Resolved: Dual-flow onboarding** — Admin and Invited Member are first-class flows, not variations of one shared flow. See §17 Onboarding State Diagram. | PO |
 | Token debt threshold | Baseline 487 | <100 / lower | Proposed: <100 before launch polish | PO + Engineering |
-| Architecture source | `ARCHITECTURE.md` + `BACKEND.md` divergence | Update/retire/split authority | Pending | Engineering |
+| Architecture source | `ARCHITECTURE.md` + `BACKEND.md` divergence | Update/retire/split authority | **Resolved: Split authority** — `ARCHITECTURE.md` = system structure (How is the system structured?). `BACKEND.md` = backend implementation (How is the backend implemented?). | Engineering |
 | Figma role | Not source of truth | Optional mock / required gate | Proposed: optional, code tokens authoritative | PO + Design |
 
 ---
@@ -870,12 +870,12 @@ Measures product convergence. Counted from Decision Register rows with status `P
 
 | Sprint | Decision debt |
 |---|---:|
-| Current | 2 |
+| Current | 0 |
 | Target | 0 |
 
 When a decision is resolved or explicitly deferred, it is removed from the count.
 
-**M2 close-out update:** Resolved Today landing, Report naming, More → Settings rename, and Manager placement (4 resolved). Added Spending Lens ownership as Deferred. Remaining Pending: Household onboarding, Architecture source. Net change: 6 → 2.
+**M2 close-out update:** Resolved Today landing, Report naming, More → Settings rename, Manager placement, Spending Lens (Deferred), Household onboarding, Architecture source. Net change: 6 → 2 → 0.
 
 ### Token debt
 
@@ -1033,6 +1033,159 @@ Exit:
 
 ---
 
+## 17. Onboarding State Diagram and Ownership Matrix
+
+*Resolves the "Household onboarding" decision in the Decision Register.*
+
+### 17.1 Onboarding flow
+
+```
+                            ┌─────────────────────────┐
+                            │  (no session)            │
+                            │  status: signed_out     │
+                            └────────────┬────────────┘
+                                         │
+                              sign in / sign up
+                            (email + password)
+                                         │
+                                         ▼
+                            ┌─────────────────────────┐
+                            │  status: loading        │
+                            │  resolveHousehold()     │
+                            └────────────┬────────────┘
+                                         │
+                ┌────────────────────────┼────────────────────────┐
+                │ no membership          │                        │ first-time user
+                ▼                        │                        │ (no household yet,
+       ┌─────────────────────────┐        │                        │  flow lands here)
+       │  status: no_household   │        │                        │
+       └────────────┬────────────┘        │                        │
+                    │                     │                        │
+        create household │ join            │                        │
+                         │                 │                        │
+                         ▼                 ▼                        ▼
+            ┌──────────────────────┐  ┌─────────────────────────────┐
+            │ create_household(p)  │  │ accept_invite(code)         │
+            │ → role='admin'       │  │ → role='member'             │
+            │ → assumptions seed   │  │                             │
+            └──────────┬───────────┘  └─────────────┬───────────────┘
+                       │                            │
+                       └─────────────┬──────────────┘
+                                     │
+                                     ▼
+                  ┌──────────────────────────┐
+                  │  status: ready            │
+                  │  householdId resolved     │
+                  │  kickSync() fires         │
+                  └─────────────┬─────────────┘
+                                │
+                  setup_complete in appSettings?
+                                │
+                  ┌─────────────┴──────────────┐
+                  │ no                         │ yes
+                  ▼                            ▼
+       ┌──────────────────────┐      ┌──────────────────────────┐
+       │  OnboardingWizard    │      │  AppShell renders        │
+       │  (admin-only flow)   │      │  (Today is default tab)  │
+       │  gross → pipes →     │      └──────────────────────────┘
+       │  accounts → allowance│
+       └──────────┬───────────┘
+                  │ mark setup_complete
+                  ▼
+       ┌──────────────────────────┐
+       │  AppShell renders         │
+       │  (Today is default tab)   │
+       └──────────────────────────┘
+```
+
+**Critical rules (implemented in code):**
+
+- `create_household(p_name)` RPC bootstraps the caller as `role='admin'` (SQL: `insert into memberships (... role) values (..., 'admin')`).
+- `accept_invite(p_code)` RPC assigns `role='member'` to the joining user.
+- Admin role is gated by `is_household_admin(hid)` SQL function on RLS policies for `households`, `invites`, and write paths on `memberships`.
+- `transfer_admin(p_household, p_to_user)` RPC allows the admin to hand the role to another member (after which the previous admin becomes `member`).
+
+### 17.2 Six-question decision matrix
+
+| # | Question | Decision | Evidence |
+|---|---|---|---|
+| 1 | Is **Admin** the default role? | **Yes — Admin is automatic for the household creator.** No manual assignment. | `create_household` RPC hardcodes `role='admin'` for caller. |
+| 2 | Is **Invited Member** a first-class flow? | **Yes — separate from Admin flow, not a variation.** | `accept_invite` is a distinct RPC. Member joins via `role='member'`. |
+| 3 | Is there a **Partner-light** mode? | **No.** Every member is a full member. Admin/member is the only role distinction. | `memberships.role check (role in ('admin','member'))`. |
+| 4 | When are **starting balances** captured? | **During OnboardingWizard (admin only).** Members join and inherit the household's existing data. | `OnboardingWizard.tsx:99-140` collects `startingBalance` and `accountName`. `setup_complete` flag gates first-run only. |
+| 5 | Who owns **allowance**, **recurring**, and **shared vs personal**? | **Allowance is per-member** (`D-3` in `BACKEND.md`). Recurring items are **per-household** (shared). Accounts are **shared by default** with optional `owner_member_id` (`D-2`). | `BACKEND.md` §Assumptions D-2, D-3. `allowance` table has `member_id`. `recurringItems` keyed to household. |
+| 6 | What if someone skips onboarding? | **They cannot.** `setup_complete` gates `AppShell`. Until marked, OnboardingWizard blocks first-run. Mid-run draft is persisted (`onboarding_draft` appSetting) so the user can return. | `App.tsx:51-53` returns `<OnboardingWizard>` when `ready === false`. `OnboardingWizard.tsx:88-97` persists draft on every field change. |
+
+### 17.3 Ownership matrix
+
+| Capability | Admin | Member | Shared/Household |
+|---|---|---|---|
+| Create household | ✅ (initial) | — | — |
+| Invite members | ✅ | ❌ | — |
+| Remove members | ✅ | ❌ | — |
+| Transfer admin | ✅ | ❌ | — |
+| Edit household name | ✅ | ❌ | household-level |
+| Accounts (shared) | ✅ | ✅ | household-level |
+| Accounts (personal, `owner_member_id`) | ✅ own | ✅ own | optional split |
+| Categories | ✅ | ✅ | household-level |
+| Recurring items | ✅ | ✅ | household-level |
+| Allowance | ✅ own | ✅ own | per-member |
+| Assumptions (FI projection inputs) | ✅ | ❌ | household-level |
+| Assets (household-owned) | ✅ | ✅ | household-level |
+| Backup/restore | ✅ | ❌ (or shared view) | household-level |
+| Settings (theme, language) | ✅ own | ✅ own | per-member |
+| PIN lock | ✅ own device | ✅ own device | per-device |
+
+### 17.4 Why "dual-flow", not "shared flow"
+
+The earlier §8 framed the open question as "shared generic flow vs admin-flow + invited-member-flow". The implementation evidence answers this:
+
+- The Supabase RPCs are **two distinct functions** (`create_household` vs `accept_invite`), not one parameterized RPC.
+- The role assignment is **automatic and role-specific** — admin for creator, member for joiner — so the data invariants differ.
+- The OnboardingWizard is **admin-only** because starting balances and account creation are household-state mutations, not member configuration.
+
+Therefore, in product terms, **Admin onboarding and Invited Member onboarding are two distinct flows** that share the auth screen but diverge immediately after household resolution.
+
+### 17.5 Implementation gaps (deferred to M3)
+
+The dual-flow structure exists in code but the UX surface is still rough:
+
+- `OnboardingWizard` is currently a single-user mental model — invited members fall through into the same setup flow (`setup_complete` gates first-run regardless of role).
+- An invited member should land directly in `AppShell` and inherit the household's existing config, not be re-prompted for income/pipes/allowance.
+- The `setup_complete` flag is per-device (Dexie), not per-household, so an invited member on a new device sees the wizard by mistake.
+
+These are M3 screen-migration concerns, not Decision Register blockers.
+
+---
+
+## 18. Documentation Authority Split
+
+*Resolves the "Architecture source" decision in the Decision Register.*
+
+The divergence between `ARCHITECTURE.md` and `BACKEND.md` was real at the time the audit was written, but became resolvable once M1.1 synchronized `ARCHITECTURE.md` v1.1 with the cloud-aware implementation.
+
+### 18.1 Authority split
+
+| Document | Question it answers | Scope |
+|---|---|---|
+| `ARCHITECTURE.md` | **How is the system structured?** | System-wide architecture: Presentation, Client storage, Identity, Household domain, Persistence, Synchronization, AI, Legacy boundaries. The eight responsibility areas span client and server. |
+| `BACKEND.md` | **How is the backend implemented?** | Server-side specifics: Supabase stack, RPC contracts, RLS policies, migration sequencing, billing assumptions, sync watermarking details. |
+
+### 18.2 What changes
+
+- `ARCHITECTURE.md` now describes the **whole system**, not just the local-first client. It includes the Sync Layer and Supabase Cloud blocks (added in M1.1).
+- `BACKEND.md` keeps its implementation-level scope: SQL migrations, RPC function bodies, RLS policies, sync edge cases, billing integration notes.
+- The earlier Appendix B description of `ARCHITECTURE.md` as "Original/local-first client technical architecture" is **superseded**. It now covers the cloud-aware whole.
+
+### 18.3 Authority rules
+
+- If a question is **"what runs where"** or **"how do components connect"** → `ARCHITECTURE.md`.
+- If a question is **"how does this RPC work"** or **"what columns does this table have"** or **"which policies guard this table"** → `BACKEND.md`.
+- If a contract spans both (e.g. `import_batch` RPC body and the `transactions.repo.importBatch` client caller), document the **client interface** in `ARCHITECTURE.md` and the **server contract** in `BACKEND.md`. Link between them.
+- If the two documents ever disagree on a structural fact (not an implementation detail), `ARCHITECTURE.md` wins for system structure; `BACKEND.md` wins for backend specifics.
+
+---
+
 ## Appendix A — Source Evidence
 
 | Source | Relevant evidence |
@@ -1057,7 +1210,7 @@ Exit:
 | Document | Primary Responsibility |
 |---|---|
 | `BRD.md` | Product intent. |
-| `ARCHITECTURE.md` | Original/local-first client technical architecture. Must be updated or scoped to avoid conflict with cloud reality. |
+| `ARCHITECTURE.md` | System structure (Presentation, Client storage, Identity, Household domain, Persistence, Synchronization, AI, Legacy boundaries). Authority for "what runs where / how components connect". |
 | `BACKEND.md` | Cloud/multi-tenant backend architecture. |
 | `PROPOSAL.md` | Production rebuild plan and threat model. |
 | `PAIN-POINTS.md` | UX findings, defects, and Calm Ledger direction. |
