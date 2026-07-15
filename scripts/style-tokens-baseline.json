@@ -1,4 +1,4 @@
 {
-  "count": 487,
-  "note": "Legacy raw fontSize/padding/borderRadius literals under src/features, as of Phase 2 (design primitives). Phase 3 migrates screens to src/components/ui/* incrementally — this count should only go down. See scripts/check-style-tokens.mjs."
+  "count": 475,
+  "note": "Legacy raw fontSize/padding/borderRadius literals under src/features. Reduced from 487 → 475 by M3-001 Today migration (12 raw literals replaced with design tokens in TransactionForm.tsx and WalletPicker.tsx). Phase 3 migrates screens to src/components/ui/* incrementally — this count should only go down. See scripts/check-style-tokens.mjs."
 }
