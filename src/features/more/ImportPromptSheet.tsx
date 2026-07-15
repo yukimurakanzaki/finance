@@ -94,7 +94,7 @@ export function ImportPromptSheet() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
-      <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-2)', lineHeight: 1.5 }}>
         Copy this prompt, paste it into Claude, then add your bank transactions at the bottom.
         Claude will reply with a JSON array you can import here.
       </div>
@@ -108,9 +108,10 @@ export function ImportPromptSheet() {
           minHeight: 260,
           background: 'var(--bg-2)',
           border: '1px solid var(--border-1)',
-          borderRadius: 10,
-          padding: '12px 14px',
-          fontSize: 11,
+          borderRadius: 'var(--space-2)',
+          paddingBlock: 'var(--space-3)',
+          paddingInline: 'var(--space-3)',
+          fontSize: 'var(--text-caption)',
           fontFamily: 'var(--font-mono)',
           color: 'var(--ink-1)',
           lineHeight: 1.6,
@@ -121,7 +122,7 @@ export function ImportPromptSheet() {
       />
 
       {accounts.length === 0 && (
-        <div style={{ fontSize: 11, color: '#f59e0b', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 'var(--text-caption)', color: '#f59e0b', lineHeight: 1.5 }}>
           No active accounts found. Add accounts first so the prompt includes your real account IDs.
         </div>
       )}

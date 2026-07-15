@@ -27,10 +27,10 @@ export function AllowanceEditor() {
   }
 
   return (
-    <div style={{ padding: '16px 0 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ paddingBlock: 'var(--space-4) var(--space-6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {allowance && (
-        <div style={{ background: 'var(--bg-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Current: {formatRpFull(allowance.monthly_amount)} / month · {formatRpFull(allowance.weekend_allocation)} weekend</div>
+        <div style={{ background: 'var(--bg-2)', borderRadius: 'var(--space-2)', paddingBlock: 'var(--space-2)', paddingInline: 'var(--space-3)', marginBottom: 4 }}>
+          <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>Current: {formatRpFull(allowance.monthly_amount)} / month · {formatRpFull(allowance.weekend_allocation)} weekend</div>
         </div>
       )}
 
@@ -52,7 +52,7 @@ export function AllowanceEditor() {
           placeholder="800.000"
         />
       </Field>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', lineHeight: 1.5 }}>
         Weekend is pre-carved before workweek pool is calculated. The daily ceiling = (pool − subs − weekend) ÷ workweeks ÷ days left.
       </div>
       <Btn onClick={handleSave} disabled={!monthly} fullWidth>

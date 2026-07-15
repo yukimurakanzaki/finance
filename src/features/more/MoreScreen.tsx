@@ -14,6 +14,7 @@ import { CategoryManager } from './CategoryManager'
 import { ImportPromptSheet } from './ImportPromptSheet'
 import { HouseholdSheet } from './HouseholdSheet'
 import { BottomSheet } from '@components/BottomSheet'
+import { Icon, Row, SectionHeader } from '@components/ui'
 import { DecideScreen } from '@features/decide/DecideScreen'
 
 type Sheet = 'recurring' | 'allowance' | 'pin' | 'assumptions' | 'restore' | 'categories' | 'import_prompt' | 'household' | 'decide' | null
@@ -70,46 +71,116 @@ export function MoreScreen() {
   const pinSub = pinConfigured ? 'App is locked on switch' : 'Lock app when you switch away'
 
   return (
-    <div style={{ padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <SectionLabel>Appearance</SectionLabel>
-      <MenuRow
-        label={`Theme: ${theme === 'light' ? 'Light (blue)' : 'Dark'}`}
-        sub="Tap to switch between dark and light"
+    <div style={{ paddingInline: 'var(--space-4)', paddingBlock: 'var(--space-4) var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <SectionHeader>Appearance</SectionHeader>
+      <Row
+        primary={`Theme: ${theme === 'light' ? 'Light (blue)' : 'Dark'}`}
+        caption="Tap to switch between dark and light"
         onClick={toggleTheme}
+        right={<Icon name="chevron-right" />}
+        aria-label={`Switch theme, currently ${theme === 'light' ? 'light' : 'dark'}`}
       />
 
-      <SectionLabel style={{ marginTop: 12 }}>Setup</SectionLabel>
-      <MenuRow label="Allowance" sub="Monthly pool & weekend allocation" onClick={() => setSheet('allowance')} />
-      <MenuRow label="Recurring Register" sub="Pipe, bills, subs — what's committed monthly" onClick={() => setSheet('recurring')} />
-      <MenuRow label={pinLabel} sub={pinSub} onClick={() => setSheet('pin')} />
-      <MenuRow label="FI Assumptions" sub="Target, return rates, inflation" onClick={() => setSheet('assumptions')} />
-      <MenuRow label="Categories" sub="Tag transactions by lane for import auto-match" onClick={() => setSheet('categories')} />
+      <SectionHeader style={{ marginTop: 'var(--space-3)' }}>Setup</SectionHeader>
+      <Row
+        primary="Allowance"
+        caption="Monthly pool & weekend allocation"
+        onClick={() => setSheet('allowance')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open Allowance settings"
+      />
+      <Row
+        primary="Recurring Register"
+        caption="Pipe, bills, subs — what's committed monthly"
+        onClick={() => setSheet('recurring')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open Recurring Register"
+      />
+      <Row
+        primary={pinLabel}
+        caption={pinSub}
+        onClick={() => setSheet('pin')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open PIN lock settings"
+      />
+      <Row
+        primary="FI Assumptions"
+        caption="Target, return rates, inflation"
+        onClick={() => setSheet('assumptions')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open FI Assumptions"
+      />
+      <Row
+        primary="Categories"
+        caption="Tag transactions by lane for import auto-match"
+        onClick={() => setSheet('categories')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open Categories manager"
+      />
 
-      <SectionLabel style={{ marginTop: 12 }}>Plan</SectionLabel>
-      <MenuRow label="Decide" sub="What does this buy? Milestones, income, spending lens" onClick={() => setSheet('decide')} />
+      <SectionHeader style={{ marginTop: 'var(--space-3)' }}>Plan</SectionHeader>
+      <Row
+        primary="Decide"
+        caption="What does this buy? Milestones, income, spending lens"
+        onClick={() => setSheet('decide')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open Decide lens"
+      />
 
-      <SectionLabel style={{ marginTop: 12 }}>Household</SectionLabel>
-      <MenuRow label="Members & Invites" sub="See who's in, invite your partner, transfer admin" onClick={() => setSheet('household')} />
+      <SectionHeader style={{ marginTop: 'var(--space-3)' }}>Household</SectionHeader>
+      <Row
+        primary="Members & Invites"
+        caption="See who's in, invite your partner, transfer admin"
+        onClick={() => setSheet('household')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open Household members and invites"
+      />
 
-      <SectionLabel style={{ marginTop: 12 }}>Data</SectionLabel>
-      <MenuRow label="Get Claude Prompt" sub="Copy ready-made prompt to paste into Claude" onClick={() => setSheet('import_prompt')} />
-      <MenuRow label="Import Transactions" sub="Paste Claude's JSON output" onClick={handleReconcile} />
-      <MenuRow label="Export Backup" sub="Download all data as JSON" onClick={handleExport} />
-      <MenuRow label="Restore Backup" sub="Replace all data from a backup file" onClick={() => setSheet('restore')} />
-      <MenuRow
-        label="Sign out of AI Manager"
-        sub="End your household session on this device"
+      <SectionHeader style={{ marginTop: 'var(--space-3)' }}>Data</SectionHeader>
+      <Row
+        primary="Get Claude Prompt"
+        caption="Copy ready-made prompt to paste into Claude"
+        onClick={() => setSheet('import_prompt')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Open Claude import prompt"
+      />
+      <Row
+        primary="Import Transactions"
+        caption="Paste Claude's JSON output"
+        onClick={handleReconcile}
+        right={<Icon name="chevron-right" />}
+        aria-label="Import transactions from Claude output"
+      />
+      <Row
+        primary="Export Backup"
+        caption="Download all data as JSON"
+        onClick={handleExport}
+        right={<Icon name="chevron-right" />}
+        aria-label="Export data backup as JSON"
+      />
+      <Row
+        primary="Restore Backup"
+        caption="Replace all data from a backup file"
+        onClick={() => setSheet('restore')}
+        right={<Icon name="chevron-right" />}
+        aria-label="Restore data from backup file"
+      />
+      <Row
+        primary="Sign out of AI Manager"
+        caption="End your household session on this device"
         onClick={async () => {
           if (window.confirm('Sign out of the AI Manager? The Manager tab will ask you to sign in again.')) {
             await supabase.auth.signOut()
             window.alert('Signed out.')
           }
         }}
+        right={<Icon name="chevron-right" />}
+        aria-label="Sign out of AI Manager"
       />
 
-      <div style={{ marginTop: 24, padding: '0 4px' }}>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.6 }}>
-          FI Dashboard v0.1.0 · Offline-first with household cloud sync · Chat history stays on this device.
+      <div style={{ paddingBlock: 'var(--space-4)' }}>
+        <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', lineHeight: 1.6 }}>
+          FI Dashboard v0.3.0 · Offline-first with household cloud sync · Chat history stays on this device.
         </div>
       </div>
 
@@ -149,33 +220,5 @@ export function MoreScreen() {
         <DecideScreen />
       </BottomSheet>
     </div>
-  )
-}
-
-function SectionLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={{ fontSize: 10, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4, ...style }}>
-      {children}
-    </div>
-  )
-}
-
-function MenuRow({ label, sub, onClick }: { label: string; sub: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: 'var(--bg-1)', border: '1px solid var(--border-1)', borderRadius: 10,
-        padding: '13px 14px', cursor: 'pointer', width: '100%', textAlign: 'left',
-        fontFamily: 'var(--font-ui)',
-      }}
-    >
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-1)' }}>{label}</div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{sub}</div>
-      </div>
-      <span style={{ color: 'var(--ink-3)', fontSize: 16 }}>›</span>
-    </button>
   )
 }

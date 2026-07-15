@@ -113,7 +113,7 @@ export function RestoreBackup({ onDone }: { onDone: () => void }) {
   if (phase === 'idle') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-2)', lineHeight: 1.6 }}>
           This will <strong style={{ color: '#ef4444' }}>erase all current data</strong> and replace it with the backup.
           Make sure you've exported your current data first.
         </div>
@@ -127,7 +127,7 @@ export function RestoreBackup({ onDone }: { onDone: () => void }) {
   if (phase === 'error') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 13, color: '#ef4444' }}>{errorMsg}</div>
+        <div style={{ fontSize: 'var(--text-section)', color: '#ef4444' }}>{errorMsg}</div>
         <Btn onClick={() => setPhase('idle')} fullWidth>Try again</Btn>
         <Btn variant="secondary" onClick={onDone} fullWidth>Cancel</Btn>
       </div>
@@ -137,7 +137,7 @@ export function RestoreBackup({ onDone }: { onDone: () => void }) {
   if (phase === 'done') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 13, color: 'var(--engine)' }}>
+        <div style={{ fontSize: 'var(--text-section)', color: 'var(--engine)' }}>
           Restore complete. Reload the app to see your data.
         </div>
         <Btn onClick={() => window.location.reload()} fullWidth>Reload now</Btn>
@@ -147,7 +147,7 @@ export function RestoreBackup({ onDone }: { onDone: () => void }) {
 
   if (phase === 'restoring') {
     return (
-      <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>Restoring…</div>
+      <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-2)' }}>Restoring…</div>
     )
   }
 
@@ -158,21 +158,21 @@ export function RestoreBackup({ onDone }: { onDone: () => void }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>
+      <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-2)' }}>
         Backup from <strong style={{ color: 'var(--ink-1)' }}>{exportedAt}</strong>
       </div>
       <div style={{
-        background: 'var(--bg-2)', borderRadius: 10, padding: '12px 14px',
-        display: 'flex', flexDirection: 'column', gap: 6,
+        background: 'var(--bg-2)', borderRadius: 'var(--space-2)', paddingBlock: 'var(--space-3)', paddingInline: 'var(--space-3)',
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
       }}>
         {Object.entries(counts).filter(([, v]) => v > 0).map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-caption)' }}>
             <span style={{ color: 'var(--ink-3)' }}>{k}</span>
             <span style={{ color: 'var(--ink-1)', fontFamily: 'var(--font-mono)' }}>{v}</span>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 12, color: '#ef4444', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 'var(--text-caption)', color: '#ef4444', lineHeight: 1.5 }}>
         All current data will be erased. This cannot be undone.
       </div>
       <Btn variant="danger" onClick={handleRestore} fullWidth>Restore this backup</Btn>

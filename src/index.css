@@ -50,6 +50,11 @@
      A 5th role is justified because this is data entry, not hierarchy. */
   --text-amount-input: 20px;  --leading-amount-input: 26px;
 
+  /* Label-tracking role: the uppercase section labels used in Settings
+     sheets (Members, Invite a member, Active, Paused, etc.). Pairs with
+     text-caption; the 0.5px tracking is a deliberate Calm Ledger cue. */
+  --tracking-label: .5px;
+
   /* Spacing scale — 4 / 8 / 12 / 16 / 24 / 32 (Calm Ledger v2 §7).
      Not colours: no light/dark override needed. */
   --space-1: 4px;
