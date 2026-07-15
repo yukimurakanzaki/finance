@@ -70,7 +70,7 @@ export function AssumptionsEditor() {
     })
   }
 
-  if (!data) return <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Loading…</div>
+  if (!data) return <div style={{ color: 'var(--ink-3)', fontSize: 'var(--text-section)' }}>Loading…</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -93,7 +93,7 @@ export function AssumptionsEditor() {
           </Field>
         </div>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+      <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>
         Low: {formatRp(parseNum(targetLow) || 0)} · High: {formatRp(parseNum(targetHigh) || 0)}
       </div>
 
@@ -130,7 +130,7 @@ export function AssumptionsEditor() {
             value={equitySwitch} onChange={(e) => setEquitySwitch(e.target.value)} placeholder="6" />
         </Field></div>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', lineHeight: 1.5 }}>
         Path B: stay in RDPU for first N months then switch to equity.
       </div>
 
@@ -146,7 +146,7 @@ export function AssumptionsEditor() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 10, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 4 }}>
+    <div style={{ fontSize: 'var(--text-caption)', letterSpacing: 'var(--tracking-label)', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 'var(--space-1)' }}>
       {children}
     </div>
   )

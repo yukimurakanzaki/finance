@@ -36,13 +36,13 @@ export function CategoryManager() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+        <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>
           {categories.length} categories
         </div>
         <button
           onClick={() => setAddOpen(true)}
           style={{
-            fontSize: 12, color: 'var(--amber-text)', background: 'none', border: 'none',
+            fontSize: 'var(--text-caption)', color: 'var(--amber-text)', background: 'none', border: 'none',
             cursor: 'pointer', fontFamily: 'var(--font-ui)', fontWeight: 600,
           }}
         >
@@ -51,7 +51,7 @@ export function CategoryManager() {
       </div>
 
       {categories.length === 0 && (
-        <div style={{ padding: '12px 0', fontSize: 13, color: 'var(--ink-3)' }}>
+        <div style={{ paddingBlock: 'var(--space-3)', fontSize: 'var(--text-section)', color: 'var(--ink-3)' }}>
           No categories yet. Add one to enable auto-categorisation during import.
         </div>
       )}
@@ -59,12 +59,12 @@ export function CategoryManager() {
       {byLane.map((group) => (
         <div key={group.lane}>
           <div style={{
-            fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px',
-            color: LANE_COLOR[group.lane], marginBottom: 6,
+            fontSize: 'var(--text-caption)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-label)',
+            color: LANE_COLOR[group.lane], marginBottom: 'var(--space-2)',
           }}>
             {group.label}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {group.items.map((cat) => (
               <button
                 key={cat.id}
@@ -72,18 +72,18 @@ export function CategoryManager() {
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   background: 'var(--bg-1)', border: '1px solid var(--border-1)',
-                  borderRadius: 8, padding: '9px 12px', cursor: 'pointer',
+                  borderRadius: 'var(--space-2)', paddingBlock: 'var(--space-2)', paddingInline: 'var(--space-3)', cursor: 'pointer',
                   fontFamily: 'var(--font-ui)', width: '100%', textAlign: 'left',
                 }}
               >
-                <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{cat.name}</div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-1)' }}>{cat.name}</div>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                   {cat.is_protected && (
-                    <span style={{ fontSize: 10, color: 'var(--ink-3)', background: 'var(--bg-3)', borderRadius: 4, padding: '2px 5px' }}>
+                    <span style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', background: 'var(--bg-3)', borderRadius: 'var(--space-1)', paddingInline: 'var(--space-1)' }}>
                       protected
                     </span>
                   )}
-                  <span style={{ color: 'var(--ink-3)', fontSize: 14 }}>›</span>
+                  <span style={{ color: 'var(--ink-3)', fontSize: 'var(--text-body)' }}>›</span>
                 </div>
               </button>
             ))}

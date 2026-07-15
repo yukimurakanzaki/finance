@@ -96,16 +96,16 @@ export function RecurringRegister() {
   const inactive = items.filter((i) => !i.is_active)
 
   return (
-    <div style={{ padding: '16px 0 24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 10, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+    <div style={{ paddingBlock: 'var(--space-4) var(--space-6)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+        <div style={{ fontSize: 'var(--text-caption)', letterSpacing: 'var(--tracking-label)', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
           Active ({active.length})
         </div>
         <button
           onClick={openAdd}
           style={{
-            background: 'var(--amber)', border: 'none', borderRadius: 8,
-            padding: '6px 14px', fontSize: 12, fontWeight: 700,
+            background: 'var(--amber)', border: 'none', borderRadius: 'var(--space-2)',
+            paddingBlock: 'var(--space-1)', paddingInline: 'var(--space-3)', fontSize: 'var(--text-caption)', fontWeight: 700,
             color: 'var(--on-accent)', cursor: 'pointer', fontFamily: 'var(--font-ui)',
           }}
         >
@@ -113,9 +113,9 @@ export function RecurringRegister() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {active.length === 0 && (
-          <div style={{ color: 'var(--ink-3)', fontSize: 13, padding: '8px 0' }}>No recurring items yet.</div>
+          <div style={{ color: 'var(--ink-3)', fontSize: 'var(--text-section)', paddingBlock: 'var(--space-2)' }}>No recurring items yet.</div>
         )}
         {active.map((item) => (
           <ItemRow key={item.id} item={item} onEdit={() => openEdit(item)} onDeactivate={() => handleDeactivate(item)} />
@@ -123,8 +123,8 @@ export function RecurringRegister() {
       </div>
 
       {inactive.length > 0 && (
-        <div style={{ marginTop: 20 }}>
-          <div style={{ fontSize: 10, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 8 }}>
+        <div style={{ marginTop: 'var(--space-5)' }}>
+          <div style={{ fontSize: 'var(--text-caption)', letterSpacing: 'var(--tracking-label)', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 'var(--space-2)' }}>
             Paused ({inactive.length})
           </div>
           {inactive.map((item) => (
@@ -139,7 +139,7 @@ export function RecurringRegister() {
         title={editing ? 'Edit recurring item' : 'Add recurring item'}
         height="85dvh"
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           <Field label="Name *">
             <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Claude Pro, KPR BRI" />
           </Field>
@@ -164,7 +164,7 @@ export function RecurringRegister() {
             <Input value={form.note} onChange={(e) => set('note', e.target.value)} placeholder="Optional note" />
           </Field>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
             {editing && (
               <Btn variant="danger" style={{ flex: 1 }} onClick={async () => { await handleDeactivate(editing); setOpen(false) }}>
                 Pause
@@ -183,23 +183,23 @@ export function RecurringRegister() {
 function ItemRow({ item, onEdit, onDeactivate, dim }: { item: RecurringItem; onEdit: () => void; onDeactivate?: () => void; dim?: boolean }) {
   return (
     <div style={{
-      background: 'var(--bg-1)', border: '1px solid var(--border-1)', borderRadius: 10,
-      padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10,
+      background: 'var(--bg-1)', border: '1px solid var(--border-1)', borderRadius: 'var(--space-2)',
+      paddingBlock: 'var(--space-2)', paddingInline: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
       opacity: dim ? .5 : 1,
     }}>
       <div style={{ width: 6, height: 6, borderRadius: '50%', background: KIND_COLORS[item.kind], flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: 'var(--text-section)', fontWeight: 500, color: 'var(--ink-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item.name}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>
+        <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', marginTop: 'var(--space-1)' }}>
           {KIND_LABELS[item.kind]} · {item.cadence}
         </div>
       </div>
-      <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--ink-1)', fontWeight: 600 }}>
+      <div style={{ fontSize: 'var(--text-section)', fontFamily: 'var(--font-mono)', color: 'var(--ink-1)', fontWeight: 600 }}>
         {formatRp(item.amount)}
       </div>
-      <button onClick={onEdit} style={{ background: 'none', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}>
+      <button onClick={onEdit} aria-label={`Edit ${item.name}`} style={{ background: 'none', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 'var(--text-body)', paddingInline: 'var(--space-1)' }}>
         ✎
       </button>
     </div>

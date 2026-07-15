@@ -90,29 +90,29 @@ export function HouseholdSheet() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '4px 2px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', paddingInline: 'var(--space-1)' }}>
       <div>
-        <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 8 }}>
+        <div style={{ fontSize: 'var(--text-caption)', letterSpacing: 'var(--tracking-label)', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 'var(--space-2)' }}>
           Members
         </div>
         {members === null && !error && (
-          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Loading…</div>
+          <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>Loading…</div>
         )}
         {members?.map((m) => (
           <div
             key={m.user_id}
             style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '10px 12px', background: 'var(--bg-1)', border: '1px solid var(--border-1)',
-              borderRadius: 10, marginBottom: 6,
+              paddingBlock: 'var(--space-2)', paddingInline: 'var(--space-3)', background: 'var(--bg-1)', border: '1px solid var(--border-1)',
+              borderRadius: 'var(--space-2)', marginBottom: 'var(--space-2)',
             }}
           >
             <div>
-              <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>
+              <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-1)' }}>
                 {m.display_name ?? 'Member'}
                 {m.user_id === user?.id ? ' (you)' : ''}
               </div>
-              <div style={{ fontSize: 11, color: m.role === 'admin' ? 'var(--amber-text)' : 'var(--ink-3)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--text-caption)', color: m.role === 'admin' ? 'var(--amber-text)' : 'var(--ink-3)', marginTop: 'var(--space-1)' }}>
                 {m.role}
               </div>
             </div>
@@ -120,9 +120,10 @@ export function HouseholdSheet() {
               <button
                 onClick={() => transferAdmin(m.user_id)}
                 disabled={busy}
+                aria-label={`Make ${m.display_name ?? 'member'} admin`}
                 style={{
-                  background: 'none', border: '1px solid var(--border-2)', borderRadius: 8,
-                  color: 'var(--ink-2)', fontSize: 11, padding: '6px 10px', cursor: 'pointer',
+                  background: 'none', border: '1px solid var(--border-2)', borderRadius: 'var(--space-2)',
+                  color: 'var(--ink-2)', fontSize: 'var(--text-caption)', paddingBlock: 'var(--space-1)', paddingInline: 'var(--space-2)', cursor: 'pointer',
                   fontFamily: 'var(--font-ui)',
                 }}
               >
@@ -135,19 +136,19 @@ export function HouseholdSheet() {
 
       {isAdmin && (
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 8 }}>
+          <div style={{ fontSize: 'var(--text-caption)', letterSpacing: 'var(--tracking-label)', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 'var(--space-2)' }}>
             Invite a member
           </div>
           {inviteCode ? (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'var(--bg-1)', border: '1px solid var(--amber)', borderRadius: 10,
-              padding: '12px 14px',
+              background: 'var(--bg-1)', border: '1px solid var(--amber)', borderRadius: 'var(--space-2)',
+              paddingBlock: 'var(--space-3)', paddingInline: 'var(--space-3)',
             }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, letterSpacing: '3px', color: 'var(--ink-1)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-title)', letterSpacing: '3px', color: 'var(--ink-1)' }}>
                 {inviteCode}
               </span>
-              <Btn variant="secondary" onClick={copyCode} style={{ padding: '8px 14px' }}>
+              <Btn variant="secondary" onClick={copyCode} style={{ paddingBlock: 'var(--space-2)', paddingInline: 'var(--space-3)' }}>
                 {copied ? 'Copied' : 'Copy'}
               </Btn>
             </div>
@@ -156,14 +157,14 @@ export function HouseholdSheet() {
               {busy ? 'Generating…' : 'Generate invite code'}
             </Btn>
           )}
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', marginTop: 'var(--space-2)', lineHeight: 1.5 }}>
             Codes expire after 7 days and admit one member. Your partner enters it after signing
             up, via "Join a household".
           </div>
         </div>
       )}
 
-      {error && <div style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>}
+      {error && <div style={{ fontSize: 'var(--text-caption)', color: 'var(--amber-text)' }}>{error}</div>}
     </div>
   )
 }

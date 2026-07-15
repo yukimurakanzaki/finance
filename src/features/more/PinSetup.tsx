@@ -68,7 +68,7 @@ export function PinSetup({ onDone }: Props) {
   if (mode === 'set-new') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>
+        <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-2)' }}>
           Set a PIN to lock the app when you switch away.
         </div>
         <Field label="New PIN (4+ digits)" {...(error ? { error } : {})}>

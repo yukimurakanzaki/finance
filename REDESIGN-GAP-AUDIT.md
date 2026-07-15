@@ -1706,6 +1706,61 @@ This is a structural change, not a UI fix. Update:
 - **Risk 3 — `BottomSheet` heights.** Settings uses hardcoded `height="65dvh"`, `"70dvh"`, `"75dvh"`, etc. These are not raw literals caught by the lint script, but they are arbitrary values that should be reviewed for consistency in a separate pass.
 - **Risk 4 — Folder rename blast radius.** Renaming `more/` → `settings/` touches import paths across the app. Must be done in a single commit to keep history reviewable.
 
+### 21.13 M3-002 implementation: before/after
+
+| Metric | Before | After |
+|---|---:|---:|
+| Token debt contribution (Settings) | 77 | **0** |
+| Global token debt | 475 | **398** |
+| Primitive adoption | 0% | **100%** (Row + SectionHeader + Icon in MoreScreen) |
+| Calm Ledger compliance | 3/10 | **8/10** (estimated) |
+| Accessibility | FAIL (no aria-labels) | **PASS** (13 aria-labels added on rows + buttons) |
+| Boundary ownership | PASS | PASS |
+| Responsive | PARTIAL | PARTIAL |
+| Calm Ledger "no raw literals" | ✗ | **✓** (within Settings) |
+| Calm Ledger "rows over boxes" | ◐ (bordered boxes) | **✓** (Row primitive, no explicit borders) |
+| Tests passing | 178 | **178** (no regressions) |
+| Production build | clean | **clean** |
+
+**Per-file migration:**
+
+| File | Raw literals before | Raw literals after | Action |
+|---|---:|---:|---|
+| `MoreScreen.tsx` | 9 | 0 | Replaced local `SectionLabel` + `MenuRow` with `SectionHeader` + `Row` + `Icon` from `@components/ui`. Added 13 `aria-label`s. |
+| `AllowanceEditor.tsx` | 5 | 0 | Token migration |
+| `AssumptionsEditor.tsx` | 4 | 0 | Token migration |
+| `CategoryManager.tsx` | 12 | 0 | Token migration |
+| `HouseholdSheet.tsx` | 17 | 0 | Token migration + aria-label on transfer button |
+| `ImportPromptSheet.tsx` | 5 | 0 | Token migration |
+| `PinSetup.tsx` | 1 | 0 | Token migration |
+| `RecurringRegister.tsx` | 15 | 0 | Token migration + aria-label on edit button |
+| `RestoreBackup.tsx` | 9 | 0 | Token migration |
+| **Total** | **77** | **0** | |
+
+**Design system change:** Added `--tracking-label: .5px` to `src/index.css` for the uppercase section labels (Members, Active, Paused, Invite a member). Replaced 6 instances of `letterSpacing: '.5px'` with `var(--tracking-label)`.
+
+**Reconciliation notes:**
+
+- BottomSheet heights (`60dvh`, `65dvh`, `70dvh`, `75dvh`, `85dvh`, `90dvh`, `92dvh`) intentionally not normalized in this PR — out of scope per audit §21.12 Risk 3. Range may indicate inconsistent intent; revisit in a future pass.
+- Decide cross-feature import (`MoreScreen.tsx:17`) preserved per §21.12 Risk 1.
+- Folder rename `more/` → `settings/` deliberately deferred (Risk 4). Not in this PR scope.
+- Hex colors `#ef4444` (danger) and `#f59e0b` (warning) intentionally not tokenized — adding `--danger`/`--warning` requires light/dark theme integration, out of M3-002 scope.
+
+**Migration Gate (§13):** SATISFIED.
+**Screen Exit Gate (§14):** PASS — Product Integrity verified (178 tests), uses approved UI primitives, no new token violations, responsive layout unchanged, accessibility improved (13 aria-labels added).
+
+### 21.14 M3-002 completion dashboard
+
+| Screen | Audit | Migration | Exit Gate |
+|---|---|---|---|
+| Today | ✅ | ✅ | ✅ |
+| Settings | ✅ | ✅ | ✅ |
+| Auth/Household | ⏳ | ⏳ | ⏳ |
+| Budget | ⏳ | ⏳ | ⏳ |
+| Report | ⏳ | ⏳ | ⏳ |
+| Assets | ⏳ | ⏳ | ⏳ |
+| Manager | ⏳ | ⏳ | ⏳ |
+
 ---
 
 ## Appendix A — Source Evidence
