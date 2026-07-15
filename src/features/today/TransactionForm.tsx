@@ -21,7 +21,11 @@ const chipStyle = (active: boolean): React.CSSProperties => ({
   background: active ? 'var(--amber)' : 'var(--bg-2)',
   color: active ? 'var(--on-accent, #000)' : 'var(--ink-2)',
   border: `1px solid ${active ? 'var(--amber)' : 'var(--border-2)'}`,
-  borderRadius: 14, padding: '5px 11px', fontSize: 12, cursor: 'pointer',
+  borderRadius: 'var(--space-3)',
+  paddingInline: 'var(--space-3)',
+  paddingBlock: 'var(--space-1)',
+  fontSize: 'var(--text-caption)',
+  cursor: 'pointer',
   fontFamily: 'var(--font-ui)',
 })
 
@@ -181,7 +185,7 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
           <Input
             type="text" inputMode="numeric" mono autoFocus={!editing}
             value={amount} onChange={(e) => setAmount(e.target.value)}
-            placeholder="50.000" style={{ fontSize: 20, textAlign: 'center' }}
+            placeholder="50.000" style={{ fontSize: 'var(--text-amount-input)', textAlign: 'center' }}
           />
         </Field>
 
@@ -236,7 +240,7 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
           <Input value={note ?? ''} onChange={(e) => setNote(e.target.value)} placeholder="Add a note…" />
         </Field>
 
-        {error && <div style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>}
+        {error && <div style={{ fontSize: 'var(--text-caption)', color: 'var(--amber-text)' }}>{error}</div>}
 
         <Btn onClick={handleSave} disabled={saving} fullWidth>
           {saving ? 'Saving…' : 'Save'}
@@ -266,7 +270,8 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
 }
 
 const walletBtnStyle: React.CSSProperties = {
-  background: 'var(--bg-2)', border: '1px solid var(--border-2)', borderRadius: 8,
-  color: 'var(--ink-1)', padding: '10px 12px', fontSize: 14, width: '100%',
+  background: 'var(--bg-2)', border: '1px solid var(--border-2)', borderRadius: 'var(--space-2)',
+  color: 'var(--ink-1)', paddingBlock: 'var(--space-2)', paddingInline: 'var(--space-3)',
+  fontSize: 'var(--text-body)', width: '100%',
   textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-ui)',
 }

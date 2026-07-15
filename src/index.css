@@ -44,6 +44,12 @@
      of the four body/data roles above. */
   --text-section: 13px;   --leading-section: 18px;
 
+  /* Amount-input role: the entry point for a money value (TransactionForm
+     amount field, WalletPicker tile). Larger than body so the digits have
+     stage when typing, smaller than display so it doesn't dominate the form.
+     A 5th role is justified because this is data entry, not hierarchy. */
+  --text-amount-input: 20px;  --leading-amount-input: 26px;
+
   /* Spacing scale — 4 / 8 / 12 / 16 / 24 / 32 (Calm Ledger v2 §7).
      Not colours: no light/dark override needed. */
   --space-1: 4px;
