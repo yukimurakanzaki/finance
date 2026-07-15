@@ -1,5 +1,5 @@
 import { db } from '../db'
-import type { Transaction, NetWorthSnapshot, Lane, AssetType } from '../types'
+import type { Transaction, NetWorthSnapshot, Lane, AssetType, RecurringItem } from '../types'
 import type { ValidImportRow } from '../../import/schema'
 import { advanceByOneMonth } from '@lib/dates'
 
@@ -114,6 +114,8 @@ export const transactionsRepo = {
       db.netWorthSnapshots,
       db.recurringItems,
       async () => {
+        const activeRecurring = await db.recurringItems.filter((r) => r.is_active).toArray()
+
         // 1. Write transactions
         const txnRecords: Omit<Transaction, 'id'>[] = rows.map((row) => ({
           date: row.date,
@@ -131,7 +133,7 @@ export const transactionsRepo = {
           overridden_at: null,
           is_transfer: row.is_transfer ?? false,
           transfer_pair_id: row.transfer_pair_id ?? null,
-          recurring_item_id: null,
+          recurring_item_id: matchRecurringItem(row, activeRecurring)?.id ?? null,
           created_at: now(),
         }))
         await db.transactions.bulkAdd(txnRecords)
@@ -165,15 +167,21 @@ export const transactionsRepo = {
 async function advanceNextDueFromBatch(rows: ValidImportRow[]) {
   const activeRecurring = await db.recurringItems.filter((r) => r.is_active).toArray()
   for (const item of activeRecurring) {
-    const matched = rows.some(
-      (row) =>
-        row.direction === 'out' &&
-        row.note?.toLowerCase().includes(item.name.toLowerCase()),
-    )
+    const matched = rows.some((row) => matchRecurringItem(row, [item]))
     if (matched && item.cadence === 'monthly') {
       await db.recurringItems.update(item.id!, {
         next_due: advanceByOneMonth(item.next_due),
       })
     }
   }
+}
+
+export function matchRecurringItem(
+  row: { direction: 'in' | 'out'; note?: string | null },
+  activeRecurring: RecurringItem[],
+): RecurringItem | null {
+  if (row.direction !== 'out') return null
+  const note = row.note?.toLowerCase()
+  if (!note) return null
+  return activeRecurring.find((item) => note.includes(item.name.toLowerCase())) ?? null
 }
