@@ -1186,6 +1186,135 @@ The divergence between `ARCHITECTURE.md` and `BACKEND.md` was real at the time t
 
 ---
 
+## 19. M3 Backlog
+
+*Prepared while PRs #16 and #17 are under review. Do not begin implementation until both are merged.*
+
+### 19.1 Migration order
+
+```text
+M3-001 Today
+   ↓
+M3-002 Settings
+   ↓
+M3-003 Auth/Household
+   ↓
+M3-004 Budget
+   ↓
+M3-005 Report
+   ↓
+M3-006 Assets
+   ↓
+M3-007 Manager
+```
+
+Auth/Household comes after Today and Settings so the visual language is established before onboarding improvements from §17.5 are implemented.
+
+### 19.2 Story template
+
+Each story references:
+
+- **Migration Gate** — §13 preconditions for entering visual migration
+- **Screen Exit Gate** — §14 conditions for marking the screen complete
+- **Product Integrity items** — relevant engines and integration tests
+- **Decision Register links** — resolved decisions that constrain scope
+- **Implementation gaps** — from §17.5 (where applicable)
+
+### 19.3 Stories
+
+#### M3-001 — Today migration
+
+- **Migration Gate:** Product Integrity = Pass (already 94% overall, Today engine verified). IA ownership decided (§17 Today boundary). No Decision Register items pending.
+- **Screen Exit Gate:** Uses approved UI primitives (already Phase 3 rebuilt). No new token violations. Responsive + a11y verified.
+- **Product Integrity items:** Safe-to-Spend engine + 9 integration tests; Daily Leftover projection + 13 tests; Recurring Semantics (in scope of Today's pool draw) + contract fix.
+- **Decision Register links:** "Today landing → KEEP" (§17 Today boundary).
+- **Goal:** Apply Calm Ledger tokens consistently across `TodayScreen`, `TransactionForm`, `SpeedDialFAB`. Validate visual language for downstream screens.
+- **Exit signal:** Token debt reduction visible; design primitives reused in M3-002.
+
+#### M3-002 — Settings migration
+
+- **Migration Gate:** Product Integrity = Pass (no engine work; UI surface only). IA ownership decided ("More → Settings → RENAME").
+- **Screen Exit Gate:** All sheets (recurring, allowance, PIN, assumptions, restore, categories, household, theme) use approved primitives. No token violations introduced.
+- **Product Integrity items:** None engine-level. UI work only.
+- **Decision Register links:** "More → Settings → RENAME" decision.
+- **Goal:** Rename tab label and folder; ensure all 9 sheets in `MoreScreen` adopt Calm Ledger primitives.
+- **Exit signal:** Tab label is "Settings" everywhere (TabBar, App.tsx, i18n); folder rename is `features/settings/` (or equivalent).
+
+#### M3-003 — Auth/Household migration
+
+- **Migration Gate:** Product Integrity = Pass (auth and household flows verified through Supabase RLS + integration tests in M1). IA ownership decided (§17 dual-flow onboarding).
+- **Screen Exit Gate:** All three §17.5 implementation gaps closed. Token debt reduced by AuthScreen + HouseholdSheet + OnboardingWizard. A11y verified (form inputs, error states).
+- **Product Integrity items:** None new; this is UX work.
+- **Decision Register links:** "Household onboarding → Dual-flow" (§17). M3.5 implementation gaps.
+- **Goal:** Implement the three concrete §17.5 gaps:
+  1. Invited members bypass the admin `OnboardingWizard`.
+  2. Invited members land directly in `AppShell` with inherited household configuration.
+  3. `setup_complete` becomes household-aware rather than device-only.
+- **Exit signal:** Members joining via invite code land on Today without re-running wizard. Admin's wizard runs only on first household creation.
+
+#### M3-004 — Budget migration
+
+- **Migration Gate:** Product Integrity = Pass for Safe-to-Spend (engine + 9 tests), Transfers (16 tests), Balances (11 tests). IA ownership decided (Budget tab is weekly/monthly/yearly horizons).
+- **Screen Exit Gate:** All three horizon screens (weekly Safe-to-Spend, monthly envelopes, yearly) use approved primitives. Recurring linkage behavior preserved (contract fix from M1).
+- **Product Integrity items:** Safe-to-Spend, Transfers, Balances, Recurring Semantics integration tests must still pass after UI migration.
+- **Decision Register links:** None directly, but Spending Lens ownership is Deferred — deferral to be revisited post-migration.
+- **Goal:** Migrate `BudgetScreen`, weekly/monthly/yearly sub-screens. Validate that recurring linkage contract (no double-counting) holds in the migrated UI.
+- **Exit signal:** All three horizon screens render under Calm Ledger; integration tests still green.
+
+#### M3-005 — Report migration
+
+- **Migration Gate:** Product Integrity = PARTIAL (capability/evidence gaps documented but engine verified). IA ownership decided ("Report → KEEP" until it answers why/next/what).
+- **Screen Exit Gate:** `ReportScreen` uses approved primitives; no new token violations. A11y verified (tables, breakdowns).
+- **Product Integrity items:** Report Actuals engine + 8 integration tests must remain green.
+- **Decision Register links:** "Report naming → KEEP" until scope expands.
+- **Goal:** Migrate ReportScreen. Do not introduce "Insights"-style interpretation features during migration (that would trigger rename review).
+- **Exit signal:** Report screen renders under Calm Ledger; integration tests still green.
+
+#### M3-006 — Assets migration
+
+- **Migration Gate:** Product Integrity = Pass for Balances (11 tests). IA ownership decided (Assets tab owns accounts, assets, balances).
+- **Screen Exit Gate:** `AssetsScreen`, `AccountList`, `AssetList` use approved primitives. Bank-account balance derivation preserved (AI Tool Integrity contract: bank balance is derived from transactions, not directly editable).
+- **Product Integrity items:** Balances integration tests; AI Tool Integrity contract (block direct bank balance updates).
+- **Decision Register links:** None directly.
+- **Goal:** Migrate Assets screen. Validate that bank-balance-derivation invariant holds in the migrated UI.
+- **Exit signal:** Assets screen renders under Calm Ledger; integration tests still green.
+
+#### M3-007 — Manager migration
+
+- **Migration Gate:** Product Integrity = Pass for AI Tool Integrity (15 integration tests). IA ownership decided ("Manager → KEEP dedicated tab"). Tools contracts verified through four-contract audit (Read, Write, Tool, Failure).
+- **Screen Exit Gate:** `ChatScreen` uses approved primitives. Token debt reduced. A11y verified (chat history scrolling, message rendering).
+- **Product Integrity items:** AI Tool Integrity tests must remain green. Recurring linkage contract (AI tool links `recurring_item_id` on log) preserved.
+- **Decision Register links:** "Manager placement → KEEP dedicated tab".
+- **Goal:** Migrate ChatScreen to Calm Ledger. Validate that the AI recurring-linkage contract (M1 fix) still holds in the migrated UI.
+- **Exit signal:** Chat screen renders under Calm Ledger; AI Tool Integrity tests still green.
+
+### 19.4 Migration Scoreboard
+
+Tracks §14 last-bullet requirement (Migration Scoreboard updated per screen).
+
+| Screen | Story | Migration Gate | UI Migration | Exit Gate | Status |
+|---|---|---|---|---|---|
+| Today | M3-001 | ✅ Pass | pending | pending | Not started |
+| Settings | M3-002 | ✅ Pass | pending | pending | Not started |
+| Auth/Household | M3-003 | ✅ Pass | pending | pending | Not started |
+| Budget | M3-004 | ✅ Pass | pending | pending | Not started |
+| Report | M3-005 | 🟡 Partial | pending | pending | Not started |
+| Assets | M3-006 | ✅ Pass | pending | pending | Not started |
+| Manager | M3-007 | ✅ Pass | pending | pending | Not started |
+
+### 19.5 M3 success criteria
+
+```text
+- Token debt: 487 → <100
+- Every migrated screen passes Migration Gate
+- Every migrated screen satisfies Screen Exit Gate
+- No Product Integrity regressions (all 178 tests remain green)
+- Calm Ledger design language applied consistently
+- §17.5 implementation gaps closed (M3-003)
+```
+
+---
+
 ## Appendix A — Source Evidence
 
 | Source | Relevant evidence |
