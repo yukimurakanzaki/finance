@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
-import { transactionsRepo } from '@db/repositories/transactions.repo'
+import { transactionsRepo, matchRecurringItem } from '@db/repositories/transactions.repo'
 import type { Lane, Cadence, RecurringKind } from '@db/types'
 import { formatRpFull } from '@lib/currency'
 import { todayISO } from '@lib/dates'
@@ -285,9 +285,10 @@ async function createAccount(input: ToolInput): Promise<string> {
 
 async function logTransactions(input: ToolInput): Promise<string> {
   const txns = (input['transactions'] ?? []) as TxnRow[]
-  const [accounts, categories] = await Promise.all([
+  const [accounts, categories, activeRecurring] = await Promise.all([
     db.accounts.filter((a) => a.is_active).toArray(),
     db.categories.toArray(),
+    db.recurringItems.filter((r) => r.is_active).toArray(),
   ])
   const accountIds = new Set(accounts.map((a) => a.id))
 
@@ -337,7 +338,7 @@ async function logTransactions(input: ToolInput): Promise<string> {
       overridden_at: null,
       is_transfer: isTransfer,
       transfer_pair_id: isTransfer && t.transfer_pair_key ? pairIdFor(t.transfer_pair_key) : null,
-      recurring_item_id: null,
+      recurring_item_id: matchRecurringItem(t, activeRecurring)?.id ?? null,
       created_at: now(),
     })
     saved++

@@ -1,6 +1,6 @@
 # FI Dashboard — Architecture, Schema & API Contract
-**Version:** 1.0 · **Date:** June 2026  
-**Stack:** React 19 + Vite + Tailwind + Dexie 4 · PWA · Local-first · No server
+**Version:** 1.1 · **Date:** July 2026  
+**Stack:** React 19 + Vite + Tailwind + Dexie 4 · Supabase Cloud Sync · Local-first · PWA
 
 ---
 
@@ -54,12 +54,25 @@
 │  db.ts      (singleton Dexie instance)                           │
 │  types.ts   (all TypeScript entity types)                        │
 │                                                                  │
-│  IndexedDB  ·  Local device  ·  No network                       │
+│  IndexedDB  ·  Local device  ·  Primary state store              │
+└───────────────────┬────────────────────────▲─────────────────────┘
+                    │ push (LWW since)       │ pull (applyingRemote)
+┌───────────────────▼────────────────────────┴─────────────────────┐
+│  SYNC LAYER  src/lib/sync.ts  +  src/lib/syncMappers.ts          │
+│                                                                  │
+│  watermark-based LWW pull & push on heartbeat/visibilitychange   │
+└───────────────────┬────────────────────────▲─────────────────────┘
+                    │ REST / RLS             │ REST / RLS
+┌───────────────────▼────────────────────────┴─────────────────────┐
+│  SUPABASE CLOUD                                                  │
+│                                                                  │
+│  Postgres tables  ·  Row-Level Security (RLS) by household_id    │
 └──────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────┐
-│  ZUSTAND  (ephemeral UI state only — never data)                 │
+│  ZUSTAND & AUTH STATE  src/stores/                               │
 │                                                                  │
+│  authStore       — supabase session, household_id, sync trigger  │
 │  pinStore        — locked / unlocked / attempt count             │
 │  reconcileStore  — in-progress flag, parsed rows, step           │
 │  appStore        — active tab, modal stack, install banner       │
@@ -83,7 +96,7 @@
 | Engine functions | Pure functions, no Dexie | Testable in isolation. Consumers pass data in; engine returns result |
 | Repositories | One file per entity group | Clear write boundary. Atomic Dexie transactions live here, nowhere else |
 | Workers | Inline blob URL | No extra bundler config. `transferDetector` is the only heavy computation |
-| No server | — | No auth, no sync, no network dependency. Backup = JSON export |
+| Supabase sync | Local-first + Cloud | Device-local primary db (Dexie), synced asynchronously to Supabase Postgres. RLS enforced at household boundary |
 
 ---
 
@@ -100,6 +113,7 @@ src/
 │   ├── db.ts             # Dexie singleton (export default db)
 │   ├── schema.ts         # Version declarations + upgrade callbacks
 │   ├── types.ts          # All entity TypeScript types (source of truth)
+│   ├── supabase.types.ts # Auto-generated Supabase schema types
 │   └── repositories/
 │       ├── accounts.repo.ts
 │       ├── assets.repo.ts
@@ -126,7 +140,15 @@ src/
 │   ├── schema.ts         # ImportRow type + field contracts
 │   └── transferDetector.worker.ts  # Web Worker
 │
+├── ai/
+│   ├── tools.ts          # LLM function calling registry
+│   ├── context.ts        # Dynamic prompt context generation
+│   ├── models.ts         # Provider-agnostic model routing
+│   └── skills.ts         # Prompt-injected procedural knowledge
+│
 ├── stores/
+│   ├── authStore.ts      # Supabase Auth, household session, & sync manager
+│   ├── chatStore.ts      # Chat history & session management
 │   ├── pinStore.ts       # PIN lock state
 │   ├── reconcileStore.ts # Reconcile flow state
 │   └── appStore.ts       # Tab, modals, install banner
@@ -137,74 +159,33 @@ src/
 │   ├── useSafeToSpend.ts
 │   ├── useSavingsRate.ts
 │   ├── useFIProjection.ts
+│   ├── useDailyLeftover.ts
 │   ├── useStoragePersist.ts
-│   └── useGoldStaleness.ts
-│
-├── workers/
-│   └── transferDetector.ts  # Worker logic (imported by parser via blob)
+│   └── useAccountBalances.ts
 │
 ├── features/
-│   ├── home/
-│   │   ├── HomeScreen.tsx
-│   │   ├── NetWorthHero.tsx
-│   │   ├── LaneBreakdown.tsx
-│   │   └── FIReadout.tsx
-│   ├── budget/
-│   │   ├── BudgetScreen.tsx       # Segment control router
-│   │   ├── weekly/
-│   │   │   ├── SafeToSpendScreen.tsx
-│   │   │   ├── GaugeCard.tsx
-│   │   │   ├── DayDots.tsx
-│   │   │   └── Waterfall.tsx
-│   │   ├── monthly/
-│   │   │   ├── MonthlyScreen.tsx
-│   │   │   └── EnvelopeList.tsx
-│   │   └── yearly/
-│   │       └── YearlyScreen.tsx
-│   ├── reconcile/
-│   │   ├── ReconcileEntryScreen.tsx
-│   │   ├── ReconcileConfirmScreen.tsx
-│   │   ├── ReconcileRow.tsx
-│   │   └── ReconcileToolbar.tsx
-│   ├── assets/
-│   │   ├── AssetsScreen.tsx
-│   │   ├── AccountList.tsx
-│   │   └── AssetList.tsx
-│   ├── decide/
-│   │   ├── DecideScreen.tsx
-│   │   └── SpendingLens.tsx
-│   ├── more/
-│   │   ├── MoreScreen.tsx
-│   │   ├── RaiseTracker.tsx
-│   │   ├── Milestones.tsx
-│   │   ├── RecurringRegister.tsx
-│   │   └── BackupRestore.tsx
-│   └── onboarding/
-│       ├── OnboardingWizard.tsx
-│       ├── TakeHomeStep.tsx
-│       ├── AssetsStep.tsx
-│       ├── PipesStep.tsx
-│       └── AllowanceStep.tsx
+│   ├── today/            # QuickLog, SpeedDial, Daily Leftover
+│   ├── home/             # Net Worth, Lanes, FI date
+│   ├── budget/           # Envelopes, Horizon-based goals
+│   ├── reconcile/        # Dexie/Supabase reconciliation flow
+│   ├── report/           # Actual vs Budget, Month-over-month
+│   ├── onboarding/       # Multi-step household setup wizard
+│   └── more/             # Settings, Household, Sync status
 │
-├── components/
-│   ├── QuickLogFAB.tsx
-│   ├── QuickLogSheet.tsx
-│   ├── PinLockScreen.tsx
-│   ├── PinSetupScreen.tsx
-│   ├── TabBar.tsx
-│   ├── AmberBanner.tsx
-│   ├── LanePill.tsx
-│   ├── Toast.tsx
-│   └── BottomSheet.tsx
+├── components/           # Atomic UI primitives & common layouts
+│   └── ui/               # Button, Input, Sheet, Card, AmountFormat
 │
 ├── lib/
-│   ├── currency.ts       # IDR formatting: formatRp(n) → "Rp 58.000"
+│   ├── sync.ts           # LWW pull & push synchronization pipeline
+│   ├── syncMappers.ts    # Dexie ↔ Supabase Postgres row mapping
+│   ├── supabaseClient.ts # Supabase singleton instance
+│   ├── currency.ts       # IDR formatting primitives
 │   ├── dates.ts          # ISO week arithmetic, workday count
 │   ├── crypto.ts         # PIN hashing (SHA-256 + salt)
-│   └── storage.ts        # navigator.storage.persist() wrapper
+│   └── legacyIdMigration.ts # v7 UUID migration helper
 │
-├── App.tsx               # Router + tab shell
-├── main.tsx              # Entry: PWA register, storage persist, PIN guard
+├── App.tsx               # Auth guard + Router shell
+├── main.tsx              # Entry: Auth init, storage persist, PIN gate
 └── vite-env.d.ts
 ```
 
@@ -221,7 +202,8 @@ export type Lane =
   | 'income_producing'
   | 'store_of_value'
   | 'debt_liability'
-  | 'protected_living';
+  | 'protected_living'
+  | 'pass_through';
 
 export type AccountType = 'bank' | 'digital_wallet' | 'cash';
 
@@ -239,7 +221,10 @@ export type AssetType =
   | 'gold'
   | 'dplk'
   | 'storyforge'
+  | 'currency'
   | 'other';
+
+export type AutoPriceSource = 'gold_spot' | 'fx';
 
 export type EnvelopeHorizon = 'yearly' | 'monthly' | 'weekly';
 
@@ -250,105 +235,117 @@ export type Cadence = 'monthly' | 'weekly' | 'yearly' | 'one_off';
 // ─── Account ─────────────────────────────────────────────────────────────────
 
 export interface Account {
-  id?: number;                  // auto-increment primary key
-  name: string;                 // e.g. "BCA Tabungan"
-  institution: string;          // e.g. "BCA", "blu", "GoPay"
+  id?: string;                   // UUID primary key (assigned on client)
+  name: string;                  // e.g. "BCA Tabungan"
+  institution: string;           // e.g. "BCA", "blu", "GoPay"
   account_type: AccountType;
   lane: Lane;
-  currency: string;             // default 'IDR'
+  currency: string;              // default 'IDR'
   is_protected: boolean;
   is_active: boolean;
   // Cash / wallet: stored balance when no transaction history exists
   manual_balance_override: number | null;
   // Timestamp of last manual_balance_override update
   last_balance_updated_at: string | null; // ISO 8601
-  created_at: string;           // ISO 8601
+  created_at: string;            // ISO 8601
+  updated_at: string;            // Sync watermark
 }
 
 // ─── Asset ───────────────────────────────────────────────────────────────────
 
 export interface Asset {
-  id?: number;
-  name: string;                 // e.g. "Reksadana RDPU", "Gold 37g"
+  id?: string;
+  name: string;                  // e.g. "Reksadana RDPU", "Gold 37g"
   lane: Lane;
   asset_type: AssetType;
   // Computed value stored for display (derived from qty × price for gold)
-  value: number;                // IDR
+  value: number;                 // IDR
   // Gold-specific fields
   quantity_grams: number | null;
   price_per_gram: number | null;
-  last_valued_at: string;       // ISO 8601 — triggers staleness indicator > 30 days
+  auto_price: AutoPriceSource | null;
+  fx_code: string | null;
+  fx_amount: number | null;
+  last_valued_at: string;        // ISO 8601 — triggers staleness indicator > 30 days
   note: string | null;
   created_at: string;
+  updated_at: string;            // Sync watermark
 }
 
 // ─── Transaction ─────────────────────────────────────────────────────────────
 
 export interface Transaction {
-  id?: number;
-  date: string;                 // ISO date YYYY-MM-DD (device local, no UTC conversion)
-  amount: number;               // always positive; direction indicates sign
+  id?: string;
+  date: string;                  // ISO date YYYY-MM-DD (device local, no UTC conversion)
+  amount: number;                // always positive; direction indicates sign
+  title: string | null;          // Short description, e.g. "Lunch", "Internet bill"
   direction: 'in' | 'out';
-  account_id: number;           // FK → Account.id
-  category_id: number | null;   // FK → Category.id (nullable pre-Phase 2)
+  account_id: string;            // FK → Account.id (UUID)
+  category_id: string | null;    // FK → Category.id (UUID)
   lane: Lane;
   source: TransactionSource;
-  note: string | null;
+  note: string | null;           // Long note/description
   // Receipt override audit trail (US-14)
   original_amount: number | null;
   overridden_amount: number | null;
   override_note: string | null;
-  overridden_at: string | null;  // ISO 8601
+  overridden_at: string | null;   // ISO 8601
   // Transfer auto-collapse (US-15)
   is_transfer: boolean;
   transfer_pair_id: string | null; // shared UUID between matched pair
+  // Tag committed recurring payments to prevent double-drawing the pool
+  recurring_item_id: string | null; // FK → RecurringItem.id
   created_at: string;
+  updated_at: string;            // Sync watermark
 }
 
 // ─── Category ────────────────────────────────────────────────────────────────
 
 export interface Category {
-  id?: number;
+  id?: string;
   name: string;
   lane: Lane;
   is_protected: boolean;
-  envelope_id: number | null;   // FK → Envelope.id (null pre-Phase 2 envelopes)
+  envelope_id: string | null;    // FK → Envelope.id (UUID)
+  updated_at: string;            // Sync watermark
 }
 
 // ─── Envelope (Budget) ───────────────────────────────────────────────────────
 
 export interface Envelope {
-  id?: number;
+  id?: string;
   name: string;
   horizon: EnvelopeHorizon;
   target_amount: number;
-  period: string;               // "2026-06" for monthly, "2026-W25" for weekly, "2026" for yearly
-  parent_envelope_id: number | null; // FK → Envelope.id (rollup hierarchy)
+  period: string;                // "2026-06" for monthly, "2026-W25" for weekly, "2026" for yearly
+  parent_envelope_id: string | null; // FK → Envelope.id (UUID rollup hierarchy)
   created_at: string;
+  updated_at: string;            // Sync watermark
 }
 
 // ─── RecurringItem ───────────────────────────────────────────────────────────
 
 export interface RecurringItem {
-  id?: number;
+  id?: string;
   name: string;
-  amount: number;               // IDR per cadence
+  amount: number;                // IDR per cadence
   cadence: Cadence;
   kind: RecurringKind;
   lane: Lane;
   is_protected: boolean;
-  is_active: boolean;           // soft-delete / pause
-  next_due: string;             // ISO date YYYY-MM-DD
-  end_date: string | null;      // null = ongoing
+  is_active: boolean;            // soft-delete / pause
+  next_due: string;              // ISO date YYYY-MM-DD
+  end_date: string | null;       // null = ongoing
   note: string | null;
   created_at: string;
+  updated_at: string;            // Sync watermark
 }
 
 // ─── Allowance ───────────────────────────────────────────────────────────────
 // Single-row table (id = 1, always upserted)
 
 export interface Allowance {
-  id?: number;
+  id?: string;
   monthly_amount: number;       // IDR — personal discretionary pool
   weekend_allocation: number;   // IDR — one monthly chunk, carved before workweek
   updated_at: string;
@@ -357,17 +354,18 @@ export interface Allowance {
 // ─── NetWorthSnapshot ────────────────────────────────────────────────────────
 
 export interface NetWorthSnapshot {
-  id?: number;
+  id?: string;
   year_month: string;           // "2026-06" — unique, upserted on reconcile complete
   total: number;                // IDR
   by_lane: Record<Lane, number>;
   taken_at: string;             // ISO 8601 full timestamp
+  updated_at: string;
 }
 
 // ─── IncomeEvent ─────────────────────────────────────────────────────────────
 
 export interface IncomeEvent {
-  id?: number;
+  id?: string;
   date: string;                 // ISO date — effective date of income change
   gross: number;                // IDR
   take_home_net: number;        // IDR — what lands in account (waterfall start)
@@ -377,40 +375,36 @@ export interface IncomeEvent {
   note: string | null;
   source: 'manual' | 'seed';
   created_at: string;
+  updated_at: string;
 }
 
 // ─── Milestone ───────────────────────────────────────────────────────────────
 
 export interface Milestone {
-  id?: number;
+  id?: string;
   title: string;
   description: string | null;
   flag_date: string | null;     // ISO date — when to surface this milestone
   status: MilestoneStatus;
   source: string | null;        // e.g. "roadmap", "manual"
-  income_event_id: number | null; // FK → IncomeEvent.id (for raise milestones)
+  income_event_id: string | null; // FK → IncomeEvent.id (UUID)
   created_at: string;
+  updated_at: string;
 }
 
 // ─── Assumptions ─────────────────────────────────────────────────────────────
-// Single-row table (id = 1, always upserted)
 
 export interface Assumptions {
-  id?: number;
-  // FI targets (real IDR)
-  target_low: number;           // default 4_500_000_000
-  target_high: number;          // default 6_000_000_000
-  // Real return rates (decimal, net of inflation)
-  return_rdpu: number;          // default 0.03
-  return_equity: number;        // default 0.07
-  return_dplk: number;          // default 0.04  (7% nominal − 3% inflation)
-  return_gold: number;          // default 0.01
-  // Inflation assumption used to deflate nominals
-  inflation_rate: number;       // default 0.03
-  // Path B equity switch month (months from first pipe contribution)
-  equity_switch_month: number;  // default 6
-  // Lifestyle ceiling — used by raise tracker drift alert
-  lifestyle_ceiling_monthly: number | null; // null until first raise logged
+  id?: string;
+  target_low: number;
+  target_high: number;
+  return_rdpu: number;
+  return_equity: number;
+  return_dplk: number;
+  return_gold: number;
+  inflation_rate: number;
+  equity_switch_month: number;
+  lifestyle_ceiling_monthly: number | null;
   updated_at: string;
 }
 
@@ -1192,15 +1186,14 @@ export function parseRpInput(raw: string): number | null
 
 | Not included | Why |
 |---|---|
-| REST API / backend | Local-first. No network dependency. No server to maintain. |
-| Authentication / JWT | Single-user, device-local PIN is the auth model. |
+| Direct UI-to-Cloud writes | Local-first. All UI writes hit Dexie (repositories). Sync layer propagates to Supabase asynchronously. |
 | React Query / SWR | Data is synchronous IndexedDB. Dexie liveQuery is the reactive layer. |
 | Redux | Zustand handles the thin UI state slice. No global reducer needed. |
 | ORM beyond Dexie | Dexie IS the ORM for IndexedDB. No abstraction layer above it. |
-| Real-time sync | Multi-device sync is post-MVP (requires auth + server). |
+| Socket-based Real-time sync | Watermark-based async pull/push. Prioritizes battery life and reliable offline-first operation. |
 | Error boundary beyond app shell | Local data reads don't fail. Only writes can fail (atomic rollback). |
 | Service worker push notifications | No market data, no push needed. |
-| Analytics / telemetry | Solo user. Data stays on device. |
+| Analytics / telemetry | Private household data. No external tracking. |
 
 ---
 
