@@ -6,6 +6,7 @@ import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import { accountsRepo } from '@db/repositories/accounts.repo'
 import { Field, Input, Select, Btn } from '@components/FormField'
+import { parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import type { Lane, AssetType, AccountType, RecurringKind } from '@db/types'
 
@@ -24,6 +25,7 @@ interface DraftState {
   accountName: string
   accountInstitution: string
   accountType: AccountType
+  startingBalance: string
 }
 
 const DEFAULT_DRAFT: DraftState = {
@@ -37,6 +39,7 @@ const DEFAULT_DRAFT: DraftState = {
   accountName: 'BCA Tabungan',
   accountInstitution: 'BCA',
   accountType: 'bank',
+  startingBalance: '',
 }
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
@@ -52,7 +55,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [accountName, setAccountName] = useState('BCA Tabungan')
   const [accountInstitution, setAccountInstitution] = useState('BCA')
   const [accountType, setAccountType] = useState<AccountType>('bank')
+  const [startingBalance, setStartingBalance] = useState('')
   const [saving, setSaving] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
 
   // Restore draft on mount
   useEffect(() => {
@@ -70,6 +75,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           setAccountName(draft.accountName ?? DEFAULT_DRAFT.accountName)
           setAccountInstitution(draft.accountInstitution ?? DEFAULT_DRAFT.accountInstitution)
           setAccountType(draft.accountType ?? DEFAULT_DRAFT.accountType)
+          setStartingBalance(draft.startingBalance ?? '')
         } catch {
           // corrupt draft — ignore, start fresh
         }
@@ -85,33 +91,59 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     const draft: DraftState = {
       step, gross, takeHome, pipes, dplk, monthly, weekend,
-      accountName, accountInstitution, accountType,
+      accountName, accountInstitution, accountType, startingBalance,
     }
     settingsRepo.set('onboarding_draft', JSON.stringify(draft))
-  }, [step, gross, takeHome, pipes, dplk, monthly, weekend, accountName, accountInstitution, accountType, loaded])
+  }, [step, gross, takeHome, pipes, dplk, monthly, weekend, accountName, accountInstitution, accountType, startingBalance, loaded])
 
   async function handleFinish() {
+    // Validate every non-empty money field BEFORE writing anything — a silent
+    // `?? 0` here corrupts the income/allowance figures that drive savings
+    // rate, FI projection, and the safe-to-spend gauge (PAIN-POINTS T5).
+    const invalid: string[] = []
+    const money = (label: string, raw: string): number | null => {
+      if (!raw.trim()) return null
+      const n = parseRpInput(raw)
+      if (n === null) invalid.push(label)
+      return n
+    }
+    const grossN = money('Gross salary', gross)
+    const takeHomeN = money('Take-home net', takeHome)
+    const pipeNs = pipes.map((p, i) =>
+      p.name && p.amount ? money(`Pipe ${i + 1}`, p.amount) : null,
+    )
+    const dplkN = money('DPLK', dplk)
+    const monthlyN = money('Monthly pool', monthly)
+    const weekendN = money('Weekend allocation', weekend)
+    const openingBalance = money('Current balance', startingBalance)
+    if (invalid.length > 0) {
+      setFinishError(
+        `Check these amounts — digits with optional thousand separators (e.g. 12.500.000): ${invalid.join(', ')}`,
+      )
+      return
+    }
+    setFinishError(null)
     setSaving(true)
     const today = todayISO()
 
-    if (takeHome) {
+    if (takeHomeN !== null) {
       await incomeEventsRepo.create({
         date: today,
-        gross: Number(gross.replace(/[.,]/g, '')) || 0,
-        take_home_net: Number(takeHome.replace(/[.,]/g, '')),
+        gross: grossN ?? 0,
+        take_home_net: takeHomeN,
         delta_vs_prev: null,
-        routed_to_pipe: pipes.reduce((s, p) => s + (Number(p.amount.replace(/[.,]/g, '')) || 0), 0),
-        routed_to_lifestyle: Number(monthly.replace(/[.,]/g, '')) || 0,
+        routed_to_pipe: pipeNs.reduce<number>((s, n) => s + (n ?? 0), 0),
+        routed_to_lifestyle: monthlyN ?? 0,
         note: 'Onboarding',
         source: 'seed',
       })
     }
 
-    for (const pipe of pipes) {
+    for (const [i, pipe] of pipes.entries()) {
       if (pipe.name && pipe.amount) {
         await recurringRepo.create({
           name: pipe.name,
-          amount: Number(pipe.amount.replace(/[.,]/g, '')),
+          amount: pipeNs[i] ?? 0,
           cadence: 'monthly',
           kind: 'pay_yourself_first' as RecurringKind,
           lane: 'income_producing' as Lane,
@@ -124,10 +156,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       }
     }
 
-    if (dplk) {
+    if (dplkN !== null) {
       await recurringRepo.create({
         name: 'DPLK',
-        amount: Number(dplk.replace(/[.,]/g, '')),
+        amount: dplkN,
         cadence: 'monthly',
         kind: 'pay_yourself_first' as RecurringKind,
         lane: 'income_producing' as Lane,
@@ -139,14 +171,22 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       })
     }
 
-    if (monthly) {
+    if (monthlyN !== null) {
       await allowanceRepo.set({
-        monthly_amount: Number(monthly.replace(/[.,]/g, '')),
-        weekend_allocation: Number(weekend.replace(/[.,]/g, '')) || 0,
+        monthly_amount: monthlyN,
+        weekend_allocation: weekendN ?? 0,
       })
     }
 
     if (accountName) {
+      // Optional starting balance seeds the manual override. Anchor it to
+      // YESTERDAY: deriveBalance ignores transactions dated on-or-before the
+      // anchor day, and a brand-new account has no earlier transactions — so a
+      // day-zero anchor of today would silently exclude the very first expense
+      // the user logs after finishing setup. Left null when blank.
+      const anchor = new Date(`${today}T12:00:00`)
+      anchor.setDate(anchor.getDate() - 1)
+      const anchorDay = anchor.toISOString().slice(0, 10)
       await accountsRepo.create({
         name: accountName,
         institution: accountInstitution,
@@ -155,8 +195,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         currency: 'IDR',
         is_protected: false,
         is_active: true,
-        manual_balance_override: null,
-        last_balance_updated_at: null,
+        manual_balance_override: openingBalance,
+        last_balance_updated_at: openingBalance !== null ? anchorDay : null,
       })
     }
 
@@ -318,11 +358,26 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   <option value="cash">Cash</option>
                 </Select>
               </Field>
+              <Field label="Current balance (Rp)">
+                <Input
+                  type="text" inputMode="numeric" mono
+                  placeholder="e.g. 3.500.000"
+                  value={startingBalance} onChange={(e) => setStartingBalance(e.target.value)}
+                />
+              </Field>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+                Optional. What's in this account right now, so balances start correct. You can adjust it later.
+              </div>
             </div>
           </>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 'auto' }}>
+        {finishError && (
+          <div role="alert" style={{ fontSize: 12, color: 'var(--amber-text)', lineHeight: 1.5, marginTop: 'auto' }}>
+            {finishError}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, marginTop: finishError ? 0 : 'auto' }}>
           {step > 1 && (
             <Btn variant="secondary" style={{ flex: 1 }} onClick={() => setStep((s) => s - 1)}>
               Back

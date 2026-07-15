@@ -1,15 +1,19 @@
-import { useState } from 'react'
+import { Icon, type IconName } from '@components/ui'
 import { useAppStore } from '@stores/appStore'
+import { useState } from 'react'
 
 interface Props {
   onAdd: (mode: 'out' | 'in' | 'transfer') => void
 }
 
-const ACTIONS: { key: 'out' | 'in' | 'transfer' | 'ai'; label: string; icon: string; bg: string; fg: string }[] = [
-  { key: 'ai', label: 'Ask AI', icon: '✦', bg: '#4a9df0', fg: '#fff' },
-  { key: 'transfer', label: 'Transfer', icon: '⇄', bg: 'var(--debt)', fg: '#fff' },
-  { key: 'in', label: 'Income', icon: '+', bg: 'var(--amber)', fg: 'var(--on-accent, #000)' },
-  { key: 'out', label: 'Expense', icon: '−', bg: '#e35d5b', fg: '#fff' },
+const ACTIONS: {
+  key: 'in' | 'transfer' | 'ai'
+  label: string
+  icon: IconName
+}[] = [
+  { key: 'in', label: 'Income', icon: 'add' },
+  { key: 'transfer', label: 'Transfer', icon: 'transfer' },
+  { key: 'ai', label: 'Ask AI', icon: 'manager' },
 ]
 
 export function SpeedDialFAB({ onAdd }: Props) {
@@ -23,34 +27,105 @@ export function SpeedDialFAB({ onAdd }: Props) {
   }
 
   return (
-    <div style={{ position: 'fixed', right: 18, bottom: 'calc(68px + env(safe-area-inset-bottom))', zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
-      {open && ACTIONS.map((a) => (
-        <div key={a.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-1)', background: 'var(--bg-1)', border: '1px solid var(--border-1)', borderRadius: 6, padding: '3px 8px' }}>
-            {a.label}
-          </span>
-          <button
-            onClick={() => handle(a.key)}
-            aria-label={a.label}
-            style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: a.bg, color: a.fg, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    <div
+      style={{
+        position: 'fixed',
+        right: 'var(--space-4)',
+        bottom: 'calc(68px + env(safe-area-inset-bottom))',
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: 'var(--space-3)',
+      }}
+    >
+      {open &&
+        ACTIONS.map((a) => (
+          <div
+            key={a.key}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+            }}
           >
-            {a.icon}
-          </button>
-        </div>
-      ))}
-      <button
-        onClick={() => setOpen(!open)}
-        aria-label={open ? 'Close actions' : 'Add transaction'}
-        style={{
-          width: 52, height: 52, borderRadius: '50%', border: 'none',
-          background: 'var(--amber)', color: 'var(--on-accent, #000)', fontSize: 24, cursor: 'pointer',
-          boxShadow: '0 4px 16px rgba(240,165,0,.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transform: open ? 'rotate(45deg)' : 'none', transition: 'transform .15s',
-        }}
+            <span
+              style={{
+                fontSize: 'var(--text-caption)',
+                lineHeight: 'var(--leading-caption)',
+                color: 'var(--ink-1)',
+                background: 'var(--bg-1)',
+                border: '1px solid var(--border-1)',
+                borderRadius: 'var(--space-2)',
+                padding: 'var(--space-1) var(--space-2)',
+              }}
+            >
+              {a.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => handle(a.key)}
+              aria-label={a.label}
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                border: '1px solid var(--border-2)',
+                background: 'var(--bg-2)',
+                color: 'var(--ink-1)',
+                cursor: 'pointer',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <Icon name={a.icon} />
+            </button>
+          </div>
+        ))}
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
       >
-        +
-      </button>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-label={open ? 'Close secondary actions' : 'More actions'}
+          style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            border: '1px solid var(--accent-border)',
+            background: 'var(--accent-surface)',
+            color: 'var(--accent-text)',
+            cursor: 'pointer',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          <Icon name={open ? 'close' : 'more'} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false)
+            onAdd('out')
+          }}
+          aria-label="Add expense"
+          style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            border: 'none',
+            background: 'var(--accent)',
+            color: 'var(--on-accent)',
+            cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(240,165,0,.4)',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          <Icon name="add" size={24} />
+        </button>
+      </div>
     </div>
   )
 }

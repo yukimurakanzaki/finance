@@ -337,6 +337,7 @@ async function logTransactions(input: ToolInput): Promise<string> {
       overridden_at: null,
       is_transfer: isTransfer,
       transfer_pair_id: isTransfer && t.transfer_pair_key ? pairIdFor(t.transfer_pair_key) : null,
+      recurring_item_id: null,
       created_at: now(),
     })
     saved++

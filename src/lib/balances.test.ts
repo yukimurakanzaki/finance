@@ -12,7 +12,7 @@ const txn = (over: Partial<Transaction>): Transaction => ({
   id: 't1', date: '2026-07-01', amount: 100, direction: 'out', account_id: 'a1',
   category_id: null, lane: 'protected_living', source: 'manual', title: null, note: null,
   original_amount: null, overridden_amount: null, override_note: null, overridden_at: null,
-  is_transfer: false, transfer_pair_id: null, created_at: '', ...over,
+  is_transfer: false, transfer_pair_id: null, recurring_item_id: null, created_at: '', ...over,
 })
 
 describe('deriveBalance', () => {

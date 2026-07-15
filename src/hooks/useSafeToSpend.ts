@@ -1,7 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
-import { computeSafeToSpend, type SafeToSpendResult } from '@engine/safeToSpend'
+import { computeSafeToSpend, isWeekDraw, type SafeToSpendResult } from '@engine/safeToSpend'
 import { isoWeekStart, isoWeekEnd } from '@lib/dates'
+
+export { isWeekDraw }
 
 export function useSafeToSpend(): { result: SafeToSpendResult | null; isLoading: boolean } {
   const data = useLiveQuery(async () => {
@@ -17,7 +19,7 @@ export function useSafeToSpend(): { result: SafeToSpendResult | null; isLoading:
       db.transactions
         .where('date')
         .between(weekStart, weekEnd, true, true)
-        .filter((t) => t.direction === 'out' && !t.is_transfer && t.lane !== 'pass_through')
+        .filter(isWeekDraw)
         .toArray(),
     ])
 

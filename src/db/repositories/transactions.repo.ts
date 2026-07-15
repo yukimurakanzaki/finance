@@ -58,6 +58,7 @@ export const transactionsRepo = {
       overridden_at: null,
       is_transfer: true,
       transfer_pair_id: pairId,
+      recurring_item_id: null,
       created_at: now(),
     }
     return db.transaction('rw', db.transactions, async () => {
@@ -130,6 +131,7 @@ export const transactionsRepo = {
           overridden_at: null,
           is_transfer: row.is_transfer ?? false,
           transfer_pair_id: row.transfer_pair_id ?? null,
+          recurring_item_id: null,
           created_at: now(),
         }))
         await db.transactions.bulkAdd(txnRecords)

@@ -84,6 +84,10 @@ export interface Transaction {
   overridden_at: string | null
   is_transfer: boolean
   transfer_pair_id: string | null
+  // Set when this expense pays a configured recurring item (bill/sub/PYF). Such
+  // committed payments live in the recurring bucket and are excluded from the
+  // personal safe-to-spend pool draw. null for ordinary discretionary spend.
+  recurring_item_id: string | null
   created_at: string
 }
 
