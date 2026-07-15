@@ -1040,62 +1040,58 @@ Exit:
 ### 17.1 Onboarding flow
 
 ```
-                            ┌─────────────────────────┐
-                            │  (no session)            │
-                            │  status: signed_out     │
-                            └────────────┬────────────┘
-                                         │
-                              sign in / sign up
-                            (email + password)
-                                         │
-                                         ▼
-                            ┌─────────────────────────┐
-                            │  status: loading        │
-                            │  resolveHousehold()     │
-                            └────────────┬────────────┘
-                                         │
-                ┌────────────────────────┼────────────────────────┐
-                │ no membership          │                        │ first-time user
-                ▼                        │                        │ (no household yet,
-       ┌─────────────────────────┐        │                        │  flow lands here)
-       │  status: no_household   │        │                        │
-       └────────────┬────────────┘        │                        │
-                    │                     │                        │
-        create household │ join            │                        │
-                         │                 │                        │
-                         ▼                 ▼                        ▼
-            ┌──────────────────────┐  ┌─────────────────────────────┐
-            │ create_household(p)  │  │ accept_invite(code)         │
-            │ → role='admin'       │  │ → role='member'             │
-            │ → assumptions seed   │  │                             │
-            └──────────┬───────────┘  └─────────────┬───────────────┘
-                       │                            │
-                       └─────────────┬──────────────┘
-                                     │
-                                     ▼
-                  ┌──────────────────────────┐
-                  │  status: ready            │
-                  │  householdId resolved     │
-                  │  kickSync() fires         │
-                  └─────────────┬─────────────┘
-                                │
+                              (no session)
+                            status: signed_out
+                                    │
+                                    │   sign in / sign up
+                                    │   (email + password)
+                                    ▼
+                              status: loading
+                            resolveHousehold()
+                                    │
+            ┌───────────────────────┼───────────────────────┐
+            │                       │                       │
+            │ no membership         │ existing membership   │ first-time user
+            │                       │                       │ (no household yet)
+            ▼                       ▼                       ▼
+     ┌─────────────────┐    ┌──────────────────┐    (lands here)
+     │ HouseholdSetup  │    │ AppShell renders │
+     │ (create / join) │    │ (Today tab)      │
+     └────────┬────────┘    └──────────────────┘
+              │
+       createHousehold       joinHousehold
+              │                       │
+              ▼                       ▼
+     ┌─────────────────────┐  ┌─────────────────────┐
+     │ create_household(p) │  │ accept_invite(code) │
+     │ → role='admin'      │  │ → role='member'     │
+     │ → assumptions seed  │  │                     │
+     └──────────┬──────────┘  └──────────┬──────────┘
+                │                        │
+                └────────────┬───────────┘
+                             │
+                             ▼
+                      status: ready
+                  householdId resolved
+                      kickSync() fires
+                             │
                   setup_complete in appSettings?
-                                │
-                  ┌─────────────┴──────────────┐
-                  │ no                         │ yes
-                  ▼                            ▼
-       ┌──────────────────────┐      ┌──────────────────────────┐
-       │  OnboardingWizard    │      │  AppShell renders        │
-       │  (admin-only flow)   │      │  (Today is default tab)  │
-       │  gross → pipes →     │      └──────────────────────────┘
-       │  accounts → allowance│
-       └──────────┬───────────┘
-                  │ mark setup_complete
-                  ▼
-       ┌──────────────────────────┐
-       │  AppShell renders         │
-       │  (Today is default tab)   │
-       └──────────────────────────┘
+                             │
+                ┌────────────┴────────────┐
+                │ no                     │ yes
+                ▼                        ▼
+      ┌────────────────────┐    ┌──────────────────┐
+      │ OnboardingWizard   │    │ AppShell renders │
+      │ (admin-only flow)  │    │ (Today tab)      │
+      │ gross → pipes →    │    └──────────────────┘
+      │ accounts → allowance
+      └─────────┬──────────┘
+                │ mark setup_complete
+                ▼
+      ┌──────────────────┐
+      │ AppShell renders │
+      │ (Today tab)      │
+      └──────────────────┘
 ```
 
 **Critical rules (implemented in code):**
