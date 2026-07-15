@@ -1473,14 +1473,16 @@ Today is substantially migrated. Phase 3 reduced Today-specific token debt to 12
 - `padding: '5px 11px'` (chip) → `paddingBlock: var(--space-1)` (4px) / `paddingInline: var(--space-3)` (12px). Slight visual change; chip remains legible.
 - `padding: '10px 12px'` (wallet btn) → `paddingBlock: var(--space-2)` (8px) / `paddingInline: var(--space-3)` (12px). Slight vertical reduction (10→8px).
 - `borderRadius: 10` (wallet tile) → `var(--space-2)` (8px). Slight reduction.
+- `padding: '12px 6px'` (wallet tile) → `paddingBlock: var(--space-3)` (12px) / `paddingInline: var(--space-1)` (4px). Horizontal padding reduced 6px → 4px.
+- `gap: 3` (wallet tile column gap) → `var(--space-1)` (4px). 1px increase between name and balance rows.
 - `fontSize: 20` (amount input) → `var(--text-amount-input)` (20px). Same size via token.
 - `fontSize: 14` (wallet btn) → `var(--text-body)` (15px). 1px larger; visually equivalent.
 - `fontSize: 13` (wallet name) → `var(--text-section)` (13px). Same size via token.
 - `fontSize: 12` (chip / error) → `var(--text-caption)` (12px). Same size via token.
-- `minHeight: 28px` (Back-to-today pill) → `var(--space-5)` (24px). Increase to 44dp-equivalent when combined with internal padding; verified visually unchanged at desktop size, properly tappable on mobile.
+- `minHeight: 28px` (Back-to-today pill) → `var(--space-5)` (24px) + `paddingBlock: var(--space-4)` (16px). Rendered height: max(24, 16+16+16) = 48px ≥ 44dp target. Token-only solution, no raw literals. (Earlier claim of "44dp via padding" without `paddingBlock` was wrong — pill had only `paddingInline`, so the original change shrunk the target to 24px. Fixed in follow-up commit.)
 
 **Migration Gate (§13):** SATISFIED (was already satisfied before implementation).
-**Screen Exit Gate (§14):** PASS — Product Integrity verified (178 tests), uses approved UI primitives, no new token violations, responsive layout unchanged, accessibility improved (touch target fixed).
+**Screen Exit Gate (§14):** PASS — Product Integrity verified (178 tests), uses approved UI primitives, no new token violations, responsive layout unchanged, accessibility improved (touch target fixed to 48px ≥ 44dp).
 
 ---
 

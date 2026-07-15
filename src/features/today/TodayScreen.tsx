@@ -462,6 +462,7 @@ const pillStyle: React.CSSProperties = {
   zIndex: 1,
   marginTop: 'var(--space-1)',
   minHeight: 'var(--space-5)',
+  paddingBlock: 'var(--space-4)',
   border: '1px solid var(--accent-border)',
   borderRadius: '50%',
   paddingInline: 'var(--space-3)',
