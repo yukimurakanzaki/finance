@@ -1486,6 +1486,228 @@ Today is substantially migrated. Phase 3 reduced Today-specific token debt to 12
 
 ---
 
+## 21. M3-002 Settings Migration Audit
+
+*Pre-implementation audit, conducted on `main` at v0.3.0 + post-M3-001 (token baseline 475). Audit-only — no production code changed.*
+
+### 21.1 Scope
+
+`src/features/more/` (folder not yet renamed to `settings/` — see §21.7) contains **9 files / 1,366 LOC**:
+
+| File | LOC | Role |
+|---|---:|---|
+| `MoreScreen.tsx` | 181 | Main Settings surface — menu of 11 sheets |
+| `AllowanceEditor.tsx` | 63 | Allowance monthly/weekend editor |
+| `AssumptionsEditor.tsx` | 153 | FI target + return rates editor |
+| `CategoryManager.tsx` | 137 | Lane + category CRUD |
+| `HouseholdSheet.tsx` | 169 | Members, invites, household name |
+| `ImportPromptSheet.tsx` | 134 | Copy-paste Claude import prompt |
+| `PinSetup.tsx` | 139 | PIN lock configuration |
+| `RecurringRegister.tsx` | 207 | Recurring bills/subs/PYF register |
+| `RestoreBackup.tsx` | 183 | Backup JSON export / restore |
+
+### 21.2 Migration Gate (§13) check
+
+| Gate condition | Status |
+|---|---|
+| Product Integrity = Pass for that screen's core calculations | **Pass** — N/A for Settings (no calculation engine); PIN setup, allowance, assumptions, recurring register all write through their respective repositories, which are tested. |
+| IA ownership decided for that screen | **Pass** — Decision Register: "More → Settings → RENAME". Household onboarding & admin roles resolved in §17. |
+| Decision Register items affecting that screen are resolved or explicitly deferred | **Pass** — Spending Lens Deferred; doesn't block Settings migration. |
+| Primitive migration plan identified | **Pass** — this audit identifies the gap (zero primitive adoption) and the plan below. |
+
+**Migration Gate: SATISFIED.**
+
+### 21.3 Standardized audit metrics
+
+| Metric | Result |
+|---|---:|
+| Primitive adoption | **0%** (no `@components/ui` imports; uses local `SectionLabel` + `MenuRow` instead) |
+| Token debt contribution | **77 / 475 (16.2%)** |
+| Boundary ownership | **PASS** (no cross-feature imports beyond read paths; see §21.5) |
+| Accessibility | **FAIL** — zero `aria-label`, zero `role` attributes, no explicit touch-target sizing |
+| Responsive | **PARTIAL** — single layout, no breakpoint handling, relies on flex collapse |
+| Calm Ledger compliance | **3/10** — typography hierarchy, spacing, colors all use tokens, but the screen builds its own `SectionLabel`/`MenuRow` primitives instead of using `SectionHeader`/`Row` |
+| Migration Gate (§13) | **PASS** |
+| Estimated token reduction | **~77** (all raw literals → tokens) |
+| Recommendation | **Moderate** (not rewrite — underlying logic is fine; UI primitives need full replacement) |
+
+### 21.4 Primitive adoption (per-file)
+
+| Primitive | Used in Settings? | Notes |
+|---|---|---|
+| `Screen` | ✗ | `MoreScreen.tsx` uses raw `<div>` with padding |
+| `Card` | ✗ | Not used; MenuRow substitutes |
+| `Row` | ✗ | Local `MenuRow` reimplements the pattern |
+| `StatTile` | ✗ | N/A |
+| `Amount` | ✗ | N/A |
+| `SectionHeader` | ✗ | Local `SectionLabel` substitutes |
+| `Icon` | ✗ | Uses raw `›` character (line 178) instead of chevron-right icon |
+
+**Composite components in use:** `BottomSheet` (3 files), `Field/Input/Select/Btn` from `FormField` (5 files).
+
+**Primitive adoption: 0%** of `@components/ui`. This is the **critical finding** — Settings predates the Calm Ledger primitive system. Every other feature screen (`today/`, `budget/`, `assets/`, `report/`) uses 7/7 primitives; Settings is the outlier.
+
+### 21.5 Boundary ownership
+
+Imports in `src/features/more/`:
+
+- `@db/db`, `@db/types` (data access)
+- `@db/repositories/*` (8 repos: allowance, assumptions, categories, recurringItems, settings, etc.)
+- `@lib/currency`, `@lib/crypto`, `@lib/dates`, `@lib/supabaseClient`
+- `@components/BottomSheet`, `@components/FormField` (composite components)
+- `@components/ui` — **NONE** (zero primitive usage — confirmed via `grep -E "from '@components/ui'"`)
+- `@stores/authStore`, `@stores/appStore`, `@stores/reconcileStore` (cross-store reads only)
+- `@features/decide/DecideScreen` (referenced from MoreScreen line 17 — used inside `decide` sheet)
+
+**Note on cross-feature import:** `MoreScreen.tsx:17` imports `DecideScreen` from `@features/decide/`. This is the only cross-feature import. Per §17.4, Spending Lens ownership is Deferred; this reference will need to remain or be replaced depending on M3-005 (decide resolution).
+
+**Boundary: PASS** with one tracking note for cross-feature `decide/` import.
+
+### 21.6 Token debt contribution
+
+Source: `node scripts/check-style-tokens.mjs`. Per-file:
+
+| File | Raw-literal findings | LOC | Density |
+|---|---:|---:|---:|
+| `HouseholdSheet.tsx` | 17 | 169 | 10.1 / 100 LOC |
+| `RecurringRegister.tsx` | 15 | 207 | 7.2 / 100 LOC |
+| `CategoryManager.tsx` | 12 | 137 | 8.8 / 100 LOC |
+| `RestoreBackup.tsx` | 9 | 183 | 4.9 / 100 LOC |
+| `MoreScreen.tsx` | 9 | 181 | 5.0 / 100 LOC |
+| `ImportPromptSheet.tsx` | 5 | 134 | 3.7 / 100 LOC |
+| `AllowanceEditor.tsx` | 5 | 63 | 7.9 / 100 LOC |
+| `AssumptionsEditor.tsx` | 4 | 153 | 2.6 / 100 LOC |
+| `PinSetup.tsx` | 1 | 139 | 0.7 / 100 LOC |
+| **Settings total** | **77** | **1,366** | **5.6 / 100 LOC** |
+
+Compared to Today (12 raw literals / 916 LOC = 1.3 / 100 LOC), Settings has **~4× the per-LOC raw-literal density**.
+
+**Estimated token reduction: 77** (if every literal replaced by tokens). This would bring global token debt from 475 → 398 — a 22% reduction.
+
+### 21.7 Accessibility (44dp touch targets, aria, focus)
+
+| Element | Touch target | aria-label | Notes |
+|---|---|---|---|
+| `MenuRow` (13 instances) | default `<button>` height (~36dp native) | **none** | Primary navigation pattern; missing aria-label is a real a11y gap |
+| `SectionLabel` | static text | — | OK |
+| `Btn` from `FormField` | not inspected in this audit | depends on usage | Out of scope; covered by `FormField` primitive audit |
+| Form fields (Field/Input/Select) | inherited from FormField | inherited | OK |
+| `ImportPromptSheet` textarea | `minHeight: 260` (textarea content height) | — | OK for textarea |
+
+**Accessibility: FAIL.** The 13 `MenuRow` buttons have:
+- No `aria-label` (the visual label is in `<div>{label}</div>`, but `<button>` itself has no accessible name when the visual text is wrapped in nested elements — screen readers may announce both nested divs separately).
+- No explicit touch-target height enforcement.
+- No `role` attribute (default is `button`, which is correct, but no semantic confirmation).
+
+This is the **biggest concrete a11y gap** in the Settings surface. Verified by `grep -c "<MenuRow" src/features/more/MoreScreen.tsx` returning 13 (PR #20 review correction).
+
+### 21.8 Responsive
+
+- Single-column layout with vertical scrolling.
+- Uses `<div>` flex containers with `gap` tokens.
+- Bottom sheets have hardcoded `height="65dvh"`, `"70dvh"`, etc. (line 116-149 of MoreScreen.tsx).
+- No breakpoint handling.
+- Primary target: mobile portrait.
+
+**Responsive: PARTIAL.** Mobile portrait works; tablet/desktop not explicitly tested.
+
+### 21.9 Calm Ledger compliance
+
+| Principle | Status | Evidence |
+|---|---|---|
+| Typography leads hierarchy | ✓ | Most files use `var(--text-*)` tokens |
+| Rows over boxes | ◐ | Uses bordered boxes (MenuRow has `border: '1px solid var(--border-1)'`) instead of the row primitive |
+| One accent | ✓ | Amber accent reserved for error states (ImportPromptSheet); settings uses neutral palette |
+| Numbers have stage | ✓ | Currency formats via `formatRp` / `formatRpFull` |
+| Slim AppBar | N/A | Settings is a tab content, not a screen with its own AppBar |
+| Calm spacing | ✓ | Most padding/gap uses `var(--space-*)` |
+| SVG icons | ✗ | Uses `›` character (line 178 of MoreScreen.tsx) instead of chevron-right icon |
+| Minimal borders | ✗ | MenuRow has explicit `border: '1px solid var(--border-1)'` on every row |
+| No raw literals | ✗ | 77 violations |
+| Heading hierarchy | ◐ | SectionLabel is `<div>`, not `<h2>`/`<h3>` |
+
+**Calm Ledger compliance: 3/10.**
+
+### 21.10 Migration recommendation
+
+**Moderate rewrite of primitives layer, surgical fixes everywhere else.**
+
+Settings is structurally sound but visually pre-Calm Ledger. The migration has three layers:
+
+#### Layer 1 — Replace local primitives with `ui/` primitives (foundational)
+
+1. Replace local `SectionLabel` with `SectionHeader` from `@components/ui` (uses `var(--text-section)`, 7 file imports).
+2. Replace local `MenuRow` with `Row` from `@components/ui`. Use `Row`'s `primary`/`caption` props instead of bespoke label/sub layout. Remove the explicit `border` (Row primitive handles this).
+3. Replace `›` character with `<Icon name="chevron-right" />` in the Row's right slot.
+
+**Estimated raw-literal reduction:** ~15 (the 9 in MoreScreen.tsx + cascading simplifications).
+
+#### Layer 2 — Replace raw literals in sheet sub-components (mechanical)
+
+For each of the 9 files, run `node scripts/check-style-tokens.mjs`, identify the violation lines, and replace with token equivalents. Pattern matches M3-001 exactly:
+
+- `borderRadius: 10/14/8` → `var(--space-2)` or `var(--space-3)`
+- `padding: '13px 14px'` → `paddingBlock: var(--space-3)`, `paddingInline: var(--space-3)`
+- `fontSize: 11/13/16` → `var(--text-caption)` / `var(--text-section)` / `var(--text-body)`
+- `minHeight: 260` (textarea) — consider whether a new token is needed or use `var(--space-5) * N`
+
+**Estimated raw-literal reduction:** 60+ across the 9 files.
+
+#### Layer 3 — Accessibility hardening (correctness)
+
+For each `Row` / `MenuRow`, add `aria-label` based on the row's primary text. Example:
+```tsx
+<Row
+  primary="Allowance"
+  caption="Monthly pool & weekend allocation"
+  right={<Icon name="chevron-right" />}
+  onClick={...}
+  aria-label="Open Allowance settings"
+/>
+```
+
+This makes every row independently navigable by screen reader and satisfies the migration's a11y expectation.
+
+#### Layer 4 — Folder rename (`more/` → `settings/`)
+
+This is a structural change, not a UI fix. Update:
+- `src/features/more/` → `src/features/settings/`
+- Import paths in `src/App.tsx` (MoreScreen reference)
+- TabBar label `"More"` → `"Settings"` (TabBar.tsx:12)
+- Tests under `src/features/more/` (none exist; safe)
+
+**Estimated PR scope:** 1 PR, ~9 files renamed, ~10 files modified, ~77 raw-literal fixes, ~13 a11y additions.
+
+**Estimated outcome:**
+- Global token debt: 475 → 398 (-77)
+- Settings token contribution: 77 → 0
+- Calm Ledger compliance: 3/10 → 8/10
+- Accessibility: FAIL → PASS
+- Primitive adoption: 0% → 100%
+- Migration Gate: PASS (was already)
+- Screen Exit Gate: PASS after migration
+
+### 21.11 Migration Completion dashboard
+
+| Screen | Audit | Migration | Exit Gate |
+|---|---|---|---|
+| Today | ✅ | ✅ | ✅ |
+| Settings | ✅ | ⏳ | ⏳ |
+| Auth/Household | ⏳ | ⏳ | ⏳ |
+| Budget | ⏳ | ⏳ | ⏳ |
+| Report | ⏳ | ⏳ | ⏳ |
+| Assets | ⏳ | ⏳ | ⏳ |
+| Manager | ⏳ | ⏳ | ⏳ |
+
+### 21.12 Risks and open questions
+
+- **Risk 1 — Decide import resolution.** `MoreScreen.tsx:17` imports `DecideScreen` from `@features/decide/`. M3-002 should preserve this import until Spending Lens ownership is decided (post-M3-005). Don't remove the cross-feature reference; just preserve.
+- **Risk 2 — `Btn` and `FormField` audit.** Settings uses `@components/FormField` (Field/Input/Select/Btn). These are composite components, not `ui/` primitives. Their token usage should be verified, but out of scope for M3-002 — covered by a future M3 if any violations surface.
+- **Risk 3 — `BottomSheet` heights.** Settings uses hardcoded `height="65dvh"`, `"70dvh"`, `"75dvh"`, etc. These are not raw literals caught by the lint script, but they are arbitrary values that should be reviewed for consistency in a separate pass.
+- **Risk 4 — Folder rename blast radius.** Renaming `more/` → `settings/` touches import paths across the app. Must be done in a single commit to keep history reviewable.
+
+---
+
 ## Appendix A — Source Evidence
 
 | Source | Relevant evidence |
