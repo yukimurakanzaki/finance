@@ -3,11 +3,6 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@lib/supabaseClient'
 import { syncNow } from '@lib/sync'
 
-// Fire-and-forget cloud sync once a household is resolved.
-function kickSync(householdId: string | null, user: User | null) {
-  if (householdId && user) syncNow(householdId, user.id).catch((e) => console.error('sync', e))
-}
-
 // Auth + household lifecycle:
 //   loading      → resolving session/household on boot
 //   signed_out   → no session; show sign in / sign up
@@ -22,6 +17,11 @@ interface AuthState {
   householdId: string | null
   error: string | null
   notice: string | null
+  // True once the first cloud sync for this session has completed (or failed),
+  // so local tables reflect the cloud before onboarding decides whether setup
+  // is needed. Prevents re-onboarding (and duplicate account creation) on a
+  // device whose local `setup_complete` flag never synced.
+  synced: boolean
 
   init: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -44,57 +44,69 @@ async function resolveHousehold(): Promise<{ householdId: string | null; status:
     : { householdId: null, status: 'no_household' as AuthStatus }
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  status: 'loading',
-  session: null,
-  user: null,
-  householdId: null,
-  error: null,
-  notice: null,
+export const useAuthStore = create<AuthState>((set, get) => {
+  // Cloud sync once a household is resolved. Marks `synced` once the first
+  // sync of this session settles, so callers can wait for local tables to
+  // reflect the cloud before making decisions (e.g. whether onboarding ran).
+  function kickSync(householdId: string | null, user: User | null) {
+    if (!householdId || !user) return
+    syncNow(householdId, user.id)
+      .catch((e) => console.error('sync', e))
+      .finally(() => set({ synced: true }))
+  }
 
-  init: async () => {
-    if (!subscribed) {
-      subscribed = true
-      // Re-sync when the app returns to the foreground (second device catching up)
-      // and on a slow heartbeat while open. syncNow() self-guards against overlap.
-      const resync = () => {
-        const { status, householdId, user } = get()
-        if (status === 'ready' && document.visibilityState === 'visible') kickSync(householdId, user)
-      }
-      document.addEventListener('visibilitychange', resync)
-      setInterval(resync, 5 * 60 * 1000)
+  return {
+    status: 'loading',
+    session: null,
+    user: null,
+    householdId: null,
+    error: null,
+    notice: null,
+    synced: false,
 
-      supabase.auth.onAuthStateChange((_event, session) => {
-        // Keep session/user fresh; re-resolve household on sign-in/out.
-        if (!session) {
-          set({ status: 'signed_out', session: null, user: null, householdId: null })
-          return
+    init: async () => {
+      if (!subscribed) {
+        subscribed = true
+        // Re-sync when the app returns to the foreground (second device catching up)
+        // and on a slow heartbeat while open. syncNow() self-guards against overlap.
+        const resync = () => {
+          const { status, householdId, user } = get()
+          if (status === 'ready' && document.visibilityState === 'visible') kickSync(householdId, user)
         }
-        set({ session, user: session.user })
-        resolveHousehold()
-          .then(({ householdId, status }) => {
-            set({ householdId, status })
-            if (status === 'ready') kickSync(householdId, session.user)
-          })
-          .catch((e) => set({ error: String(e), status: 'no_household' }))
-      })
-    }
+        document.addEventListener('visibilitychange', resync)
+        setInterval(resync, 5 * 60 * 1000)
 
-    const { data } = await supabase.auth.getSession()
-    const session = data.session
-    if (!session) {
-      set({ status: 'signed_out', session: null, user: null })
-      return
-    }
-    set({ session, user: session.user })
-    try {
-      const { householdId, status } = await resolveHousehold()
-      set({ householdId, status })
-      if (status === 'ready') kickSync(householdId, session.user)
-    } catch (e) {
-      set({ error: String(e), status: 'no_household' })
-    }
-  },
+        supabase.auth.onAuthStateChange((_event, session) => {
+          // Keep session/user fresh; re-resolve household on sign-in/out.
+          if (!session) {
+            set({ status: 'signed_out', session: null, user: null, householdId: null })
+            return
+          }
+          set({ session, user: session.user })
+          resolveHousehold()
+            .then(({ householdId, status }) => {
+              set({ householdId, status })
+              if (status === 'ready') kickSync(householdId, session.user)
+            })
+            .catch((e) => set({ error: String(e), status: 'no_household' }))
+        })
+      }
+
+      const { data } = await supabase.auth.getSession()
+      const session = data.session
+      if (!session) {
+        set({ status: 'signed_out', session: null, user: null })
+        return
+      }
+      set({ session, user: session.user })
+      try {
+        const { householdId, status } = await resolveHousehold()
+        set({ householdId, status })
+        if (status === 'ready') kickSync(householdId, session.user)
+      } catch (e) {
+        set({ error: String(e), status: 'no_household' })
+      }
+    },
 
   signIn: async (email, password) => {
     set({ error: null, notice: null })
@@ -148,4 +160,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ householdId, status: 'ready' })
     kickSync(householdId, get().user)
   },
-}))
+  }
+})

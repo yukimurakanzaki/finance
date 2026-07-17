@@ -187,17 +187,25 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       const anchor = new Date(`${today}T12:00:00`)
       anchor.setDate(anchor.getDate() - 1)
       const anchorDay = anchor.toISOString().slice(0, 10)
-      await accountsRepo.create({
-        name: accountName,
-        institution: accountInstitution,
-        account_type: accountType,
-        lane: 'protected_living' as Lane,
-        currency: 'IDR',
-        is_protected: false,
-        is_active: true,
-        manual_balance_override: openingBalance,
-        last_balance_updated_at: openingBalance !== null ? anchorDay : null,
-      })
+      const existing = await accountsRepo.getAll()
+      const duplicate = existing.some(
+        (a) =>
+          a.name.trim().toLowerCase() === accountName.trim().toLowerCase() &&
+          a.institution.trim().toLowerCase() === accountInstitution.trim().toLowerCase(),
+      )
+      if (!duplicate) {
+        await accountsRepo.create({
+          name: accountName,
+          institution: accountInstitution,
+          account_type: accountType,
+          lane: 'protected_living' as Lane,
+          currency: 'IDR',
+          is_protected: false,
+          is_active: true,
+          manual_balance_override: openingBalance,
+          last_balance_updated_at: openingBalance !== null ? anchorDay : null,
+        })
+      }
     }
 
     await settingsRepo.set('setup_complete', 'true')
