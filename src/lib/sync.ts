@@ -86,8 +86,22 @@ export async function syncNow(householdId: string, userId: string): Promise<void
     // so they become pushable. No-op on devices without legacy rows.
     const migrated = await migrateLegacyIds()
     if (migrated > 0) console.info(`sync: re-keyed ${migrated} legacy rows to UUIDs`)
-    for (const table of SYNC_TABLES) await pushTable(table, householdId, userId)
+    // A push failure on one table (e.g. a local row the server rejects) must not
+    // block pulls for every table — otherwise a single bad row wedges the device
+    // permanently behind the cloud. Collect push errors but always run pulls.
+    const pushErrors: string[] = []
+    for (const table of SYNC_TABLES) {
+      try {
+        await pushTable(table, householdId, userId)
+      } catch (e) {
+        pushErrors.push(String(e))
+        console.error('sync: push failed, continuing with other tables', e)
+      }
+    }
     for (const table of SYNC_TABLES) await pullTable(table, householdId, userId)
+    if (pushErrors.length > 0) {
+      throw new Error(`sync: ${pushErrors.length} table(s) failed to push: ${pushErrors.join('; ')}`)
+    }
   } finally {
     syncing = false
   }

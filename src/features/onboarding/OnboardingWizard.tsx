@@ -177,6 +177,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const anchor = new Date(`${today}T12:00:00`)
     anchor.setDate(anchor.getDate() - 1)
     const anchorDay = anchor.toISOString().slice(0, 10)
+    // Idempotency guard: `setup_complete` is local-only, so a device whose flag
+    // never synced can re-run onboarding against a household that already has
+    // this account. Creating it again would duplicate the default account.
+    const existing = await accountsRepo.getAll()
+    const duplicate = existing.some(
+      (a) =>
+        a.name.trim().toLowerCase() === accountName.trim().toLowerCase() &&
+        a.institution.trim().toLowerCase() ===
+          accountInstitution.trim().toLowerCase(),
+    )
+    if (duplicate) return
     await accountsRepo.create({
       name: accountName,
       institution: accountInstitution,

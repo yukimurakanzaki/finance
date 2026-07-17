@@ -1,5 +1,6 @@
 import { PinLockScreen } from '@components/PinLockScreen'
 import { TabBar } from '@components/TabBar'
+import { db } from '@db/db'
 import { settingsRepo } from '@db/repositories/settings.repo'
 import { AssetsScreen } from '@features/assets/AssetsScreen'
 import { AuthScreen } from '@features/auth/AuthScreen'
@@ -22,10 +23,18 @@ import { useReconcileStore } from '@stores/reconcileStore'
 import { useEffect, useState } from 'react'
 
 function useSetupComplete() {
+  const synced = useAuthStore((s) => s.synced)
   const [ready, setReady] = useState<boolean | null>(null)
   useEffect(() => {
-    settingsRepo.get('setup_complete').then((v) => setReady(v === 'true'))
-  }, [])
+    // `setup_complete` is a local-only flag (never synced to the cloud), so a
+    // fresh device/browser profile always starts without it. Wait for the
+    // first cloud sync to land before deciding — if the household already
+    // has accounts, treat setup as done rather than re-running onboarding.
+    if (!synced) return
+    Promise.all([settingsRepo.get('setup_complete'), db.accounts.count()]).then(
+      ([flag, accountCount]) => setReady(flag === 'true' || accountCount > 0),
+    )
+  }, [synced])
   return { ready, markDone: () => setReady(true) }
 }
 
