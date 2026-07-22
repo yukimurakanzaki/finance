@@ -41,7 +41,11 @@ export function computeDailyLeftover(
     // spend, which is what this ledger also tracks.
     if (!isWeekDraw(t)) continue
     if (t.date < monthStart || t.date > asOfDate) continue
-    leftover += t.direction === 'in' ? t.amount : -t.amount
+    // isWeekDraw guarantees direction === 'out', so every matching row is a
+    // draw — income never reaches here (see the out-only test in
+    // dailyLeftover.test.ts). Subtract unconditionally rather than branching on
+    // a direction that can't occur.
+    leftover -= t.amount
   }
 
   return {

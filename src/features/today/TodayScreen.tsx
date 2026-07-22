@@ -9,6 +9,7 @@ import {
 } from '@components/ui'
 import { db } from '@db/db'
 import type { Transaction } from '@db/types'
+import { isWeekDraw } from '@engine/safeToSpend'
 import { isoWeekEnd, isoWeekStart, todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
@@ -110,13 +111,17 @@ export function TodayScreen() {
 
   // Spent today: the day nav's own day, regardless of the list's scope — the
   // standing strip always answers "today", the list below answers "this scope".
+  // Uses isWeekDraw (the same discretionary definition as the safe-to-spend hero
+  // and the monthly-leftover tile beside it), so the three numbers in the strip
+  // tell one coherent story: committed bills / transfers / pass-through don't
+  // count against "spent today" any more than they draw the leftover pool.
   const spentToday =
     useLiveQuery(
       () => db.transactions.where('date').equals(day).toArray(),
       [day],
     ) ?? []
   const spentTodayTotal = spentToday
-    .filter((t) => t.direction === 'out' && !t.is_transfer)
+    .filter(isWeekDraw)
     .reduce((s, t) => s + t.amount, 0)
 
   const rows = useMemo(() => {
