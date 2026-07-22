@@ -1,55 +1,148 @@
-import { useState } from 'react'
+import { Icon, type IconName } from '@components/ui'
 import { useAppStore } from '@stores/appStore'
+import { useRef, useState } from 'react'
 
 interface Props {
   onAdd: (mode: 'out' | 'in' | 'transfer') => void
 }
 
-const ACTIONS: { key: 'out' | 'in' | 'transfer' | 'ai'; label: string; icon: string; bg: string; fg: string }[] = [
-  { key: 'ai', label: 'Ask AI', icon: '✦', bg: '#4a9df0', fg: '#fff' },
-  { key: 'transfer', label: 'Transfer', icon: '⇄', bg: 'var(--debt)', fg: '#fff' },
-  { key: 'in', label: 'Income', icon: '+', bg: 'var(--amber)', fg: 'var(--on-accent, #000)' },
-  { key: 'out', label: 'Expense', icon: '−', bg: '#e35d5b', fg: '#fff' },
+// Secondary actions reachable via long-press (PHASE-3-HANDOFF.md §2.4). Expense
+// is the dominant case and is the FAB's single-tap action; these three stay one
+// press-and-hold away instead of behind an extra tap. No new stray accent colours
+// (D8) — every action uses a neutral bg-2/ink-1 surface; the FAB itself keeps the
+// one sanctioned accent.
+const ACTIONS: {
+  key: 'ai' | 'transfer' | 'in'
+  label: string
+  icon: IconName
+}[] = [
+  { key: 'ai', label: 'Ask AI', icon: 'manager' },
+  { key: 'transfer', label: 'Transfer', icon: 'transfer' },
+  { key: 'in', label: 'Income', icon: 'add' },
 ]
+
+const LONG_PRESS_MS = 450
 
 export function SpeedDialFAB({ onAdd }: Props) {
   const [open, setOpen] = useState(false)
   const setTab = useAppStore((s) => s.setTab)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressFired = useRef(false)
 
-  function handle(key: (typeof ACTIONS)[number]['key']) {
+  function handleSecondary(key: (typeof ACTIONS)[number]['key']) {
     setOpen(false)
     if (key === 'ai') setTab('chat')
     else onAdd(key)
   }
 
+  function startPress() {
+    longPressFired.current = false
+    pressTimer.current = setTimeout(() => {
+      longPressFired.current = true
+      setOpen((o) => !o)
+    }, LONG_PRESS_MS)
+  }
+
+  function cancelPress() {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+  }
+
+  // Single tap: primary action (add expense) directly — the dominant 90% case,
+  // now one tap instead of "open dial → Expense". A long-press (or a tap while
+  // already open, to dismiss) reaches the secondary actions instead.
+  function handleTap() {
+    if (longPressFired.current) {
+      longPressFired.current = false
+      return
+    }
+    if (open) {
+      setOpen(false)
+      return
+    }
+    onAdd('out')
+  }
+
   return (
-    <div style={{ position: 'fixed', right: 18, bottom: 'calc(68px + env(safe-area-inset-bottom))', zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
-      {open && ACTIONS.map((a) => (
-        <div key={a.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-1)', background: 'var(--bg-1)', border: '1px solid var(--border-1)', borderRadius: 6, padding: '3px 8px' }}>
-            {a.label}
-          </span>
-          <button
-            onClick={() => handle(a.key)}
-            aria-label={a.label}
-            style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: a.bg, color: a.fg, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    <div
+      style={{
+        position: 'fixed',
+        right: 18,
+        bottom: 'calc(68px + env(safe-area-inset-bottom))',
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: 10,
+      }}
+    >
+      {open &&
+        ACTIONS.map((a) => (
+          <div
+            key={a.key}
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            {a.icon}
-          </button>
-        </div>
-      ))}
+            <span
+              style={{
+                fontSize: 'var(--text-caption)',
+                color: 'var(--ink-1)',
+                background: 'var(--bg-1)',
+                border: '1px solid var(--border-1)',
+                borderRadius: 6,
+                padding: '3px 8px',
+              }}
+            >
+              {a.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSecondary(a.key)}
+              aria-label={a.label}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                border: 'none',
+                background: 'var(--bg-2)',
+                color: 'var(--ink-1)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name={a.icon} size={18} />
+            </button>
+          </div>
+        ))}
       <button
-        onClick={() => setOpen(!open)}
-        aria-label={open ? 'Close actions' : 'Add transaction'}
+        type="button"
+        onPointerDown={startPress}
+        onPointerUp={cancelPress}
+        onPointerLeave={cancelPress}
+        onClick={handleTap}
+        aria-label={
+          open ? 'Close actions' : 'Add expense — hold for more actions'
+        }
         style={{
-          width: 52, height: 52, borderRadius: '50%', border: 'none',
-          background: 'var(--amber)', color: 'var(--on-accent, #000)', fontSize: 24, cursor: 'pointer',
-          boxShadow: '0 4px 16px rgba(240,165,0,.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transform: open ? 'rotate(45deg)' : 'none', transition: 'transform .15s',
+          width: 56,
+          height: 56,
+          borderRadius: 18,
+          border: 'none',
+          background: 'var(--accent)',
+          color: 'var(--on-accent)',
+          cursor: 'pointer',
+          boxShadow: '0 8px 24px rgba(240,165,0,.35)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: open ? 'rotate(45deg)' : 'none',
+          transition: 'transform .15s',
         }}
       >
-        +
+        <Icon name="add" size={26} strokeWidth={2} />
       </button>
     </div>
   )
