@@ -1,17 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
 import { formatRp } from '@lib/currency'
+import { useI18n } from '@i18n/index'
 import type { RecurringKind } from '@db/types'
 
-const KIND_LABELS: Record<RecurringKind, string> = {
-  pay_yourself_first: 'Pay Yourself First',
-  household_bill: 'Household Bills',
-  personal_sub: 'Personal Subscriptions',
-  other: 'Other Committed',
-}
-
 const KIND_ORDER: RecurringKind[] = ['pay_yourself_first', 'household_bill', 'personal_sub', 'other']
-
 const KIND_COLOR: Record<RecurringKind, string> = {
   pay_yourself_first: 'var(--engine)',
   household_bill: 'var(--protected)',
@@ -20,12 +13,19 @@ const KIND_COLOR: Record<RecurringKind, string> = {
 }
 
 export function MonthlyScreen() {
+  const { t } = useI18n()
   const items = useLiveQuery(() => db.recurringItems.filter((r) => r.is_active).toArray()) ?? []
   const allowance = useLiveQuery(() => db.allowance.get('local'))
   const latestIncome = useLiveQuery(() => db.incomeEvents.orderBy('date').last())
 
   const takeHome = latestIncome?.take_home_net ?? 0
   const pool = allowance?.monthly_amount ?? 0
+  const kindLabels: Record<RecurringKind, string> = {
+    pay_yourself_first: t.budget.payYourselfFirst,
+    household_bill: t.budget.billsAndSubs,
+    personal_sub: 'Subscriptions', // ponytail: untranslated niche label, add key when full copy pass lands
+    other: 'Other Committed', // ponytail: untranslated niche label, add key when full copy pass lands
+  }
 
   const byKind = KIND_ORDER.map((kind) => ({
     kind,
@@ -39,44 +39,32 @@ export function MonthlyScreen() {
 
   return (
     <div style={{ padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Summary card */}
-      <div style={{
-        background: 'var(--bg-1)', border: '1px solid var(--border-1)',
-        borderRadius: 12, padding: '16px',
-      }}>
+      <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border-1)', borderRadius: 12, padding: '16px' }}>
         <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
-          Monthly waterfall
+          {t.budget.monthlyWaterfall}
         </div>
-        <WaterfallRow label="Take-home net" value={takeHome} accent="var(--engine)" total={takeHome} />
+        <WaterfallRow label={t.budget.takeHomeNet} value={takeHome} accent="var(--engine)" total={takeHome} />
         <div style={{ height: 1, background: 'var(--border-1)', margin: '10px 0' }} />
-        <WaterfallRow label="Pay Yourself First" value={pyfTotal} accent="var(--engine)" total={takeHome} indent />
-        <WaterfallRow label="Bills & subs" value={committedTotal - pyfTotal} accent="var(--protected)" total={takeHome} indent />
-        <WaterfallRow label="Discretionary pool" value={pool} accent="var(--amber)" total={takeHome} indent />
+        <WaterfallRow label={t.budget.payYourselfFirst} value={pyfTotal} accent="var(--engine)" total={takeHome} indent />
+        <WaterfallRow label={t.budget.billsAndSubs} value={committedTotal - pyfTotal} accent="var(--protected)" total={takeHome} indent />
+        <WaterfallRow label={t.budget.discretionaryPool} value={pool} accent="var(--amber)" total={takeHome} indent />
         <div style={{ height: 1, background: 'var(--border-1)', margin: '10px 0' }} />
-        <WaterfallRow label="Unallocated" value={takeHome - barsTotal} accent="var(--ink-3)" total={takeHome} />
+        <WaterfallRow label={t.budget.unallocated} value={takeHome - barsTotal} accent="var(--ink-3)" total={takeHome} />
       </div>
 
-      {/* Grouped recurring items */}
       {byKind.map((group) => (
         <div key={group.kind}>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-            marginBottom: 8,
-          }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
             <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px', color: KIND_COLOR[group.kind] }}>
-              {KIND_LABELS[group.kind]}
+              {kindLabels[group.kind]}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-2)', fontFamily: 'var(--font-mono)' }}>
-              {formatRp(group.total)}/mo
+              {formatRp(group.total)}{t.budget.perMonthShort}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {group.items.map((item) => (
-              <div key={item.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                background: 'var(--bg-1)', border: '1px solid var(--border-1)',
-                borderRadius: 8, padding: '10px 12px',
-              }}>
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-1)', border: '1px solid var(--border-1)', borderRadius: 8, padding: '10px 12px' }}>
                 <div>
                   <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{item.name}</div>
                   {item.note && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{item.note}</div>}
@@ -92,22 +80,17 @@ export function MonthlyScreen() {
 
       {items.length === 0 && (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-          No recurring items yet. Add them in More → Recurring Register.
+          {t.budget.recurringItemsEmpty}
         </div>
       )}
 
-      {/* Pool card */}
       {pool > 0 && (
         <div>
           <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--amber-text)', marginBottom: 8 }}>
-            Discretionary pool
+            {t.budget.discretionaryPool}
           </div>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            background: 'var(--amber-surface)', border: '1px solid var(--amber-border)',
-            borderRadius: 8, padding: '10px 12px',
-          }}>
-            <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>Monthly allowance</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--amber-surface)', border: '1px solid var(--amber-border)', borderRadius: 8, padding: '10px 12px' }}>
+            <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{t.budget.monthlyAllowance}</div>
             <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--amber-text)' }}>
               {formatRp(pool)}
             </div>
@@ -118,11 +101,7 @@ export function MonthlyScreen() {
   )
 }
 
-function WaterfallRow({
-  label, value, accent, total, indent,
-}: {
-  label: string; value: number; accent: string; total: number; indent?: boolean
-}) {
+function WaterfallRow({ label, value, accent, total, indent }: { label: string; value: number; accent: string; total: number; indent?: boolean }) {
   const pct = total > 0 ? Math.min(1, Math.max(0, value / total)) : 0
   return (
     <div style={{ marginBottom: 8, paddingLeft: indent ? 8 : 0 }}>

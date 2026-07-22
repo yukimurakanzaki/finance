@@ -1,5 +1,6 @@
 import type { SafeToSpendResult } from '@engine/safeToSpend'
 import { formatRp, formatRpFull } from '@lib/currency'
+import { useI18n } from '@i18n/index'
 import { DayDots } from './DayDots'
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 
 export function GaugeCard({ result }: Props) {
   const { todayCeiling, remainingPool, remainingWorkdays, isNegativePool } = result
+  const { t } = useI18n()
 
   return (
     <div style={{
@@ -17,7 +19,7 @@ export function GaugeCard({ result }: Props) {
       padding: '16px 16px 14px',
     }}>
       <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--amber-dim)', fontWeight: 600 }}>
-        Safe to spend today
+        {t.budget.safeToSpend}
       </div>
 
       {isNegativePool ? (
@@ -26,16 +28,16 @@ export function GaugeCard({ result }: Props) {
             Rp 0<small style={{ fontSize: 18, color: 'var(--amber-dim)', fontWeight: 500 }}> /day</small>
           </div>
           <div style={{ fontSize: 12, color: 'var(--amber-text)', marginTop: 6 }}>
-            Committed items exceed your allowance this month. Review your recurring items.
+            {t.budget.negativePoolWarning}
           </div>
         </div>
       ) : remainingWorkdays === 0 ? (
         <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--amber-text)', fontFamily: 'var(--font-mono)' }}>
-            Weekend
+            {t.budget.weekendLabel}
           </div>
           <div style={{ fontSize: 12, color: 'var(--amber-dim)', marginTop: 4 }}>
-            Your weekend allocation is pre-carved. Resets Monday.
+            {t.budget.weekendReset}
           </div>
         </div>
       ) : (
