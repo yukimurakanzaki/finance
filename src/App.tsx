@@ -1,25 +1,25 @@
-import { useEffect, useState } from 'react'
-import { useAppStore } from '@stores/appStore'
-import { usePinStore } from '@stores/pinStore'
-import { useAuthStore } from '@stores/authStore'
-import { useI18n } from '@i18n/index'
-import { AuthScreen } from '@features/auth/AuthScreen'
-import { TabBar } from '@components/TabBar'
 import { PinLockScreen } from '@components/PinLockScreen'
-import { TodayScreen } from '@features/today/TodayScreen'
-import { ReportScreen } from '@features/report/ReportScreen'
-import { BudgetScreen } from '@features/budget/BudgetScreen'
-import { AssetsScreen } from '@features/assets/AssetsScreen'
-import { MoreScreen } from '@features/more/MoreScreen'
-import { ChatScreen } from '@features/chat/ChatScreen'
-import { useReconcileStore } from '@stores/reconcileStore'
-import { ReconcileEntryScreen } from '@features/reconcile/ReconcileEntryScreen'
-import { ReconcileConfirmScreen } from '@features/reconcile/ReconcileConfirmScreen'
-import { OnboardingWizard } from '@features/onboarding/OnboardingWizard'
-import { hasPin } from '@lib/crypto'
+import { TabBar } from '@components/TabBar'
 import { settingsRepo } from '@db/repositories/settings.repo'
-import { refreshAssetPrices } from '@lib/marketPrices'
+import { AssetsScreen } from '@features/assets/AssetsScreen'
+import { AuthScreen } from '@features/auth/AuthScreen'
+import { BudgetScreen } from '@features/budget/BudgetScreen'
+import { ChatScreen } from '@features/chat/ChatScreen'
+import { MoreScreen } from '@features/more/MoreScreen'
+import { OnboardingWizard } from '@features/onboarding/OnboardingWizard'
+import { ReconcileConfirmScreen } from '@features/reconcile/ReconcileConfirmScreen'
+import { ReconcileEntryScreen } from '@features/reconcile/ReconcileEntryScreen'
+import { ReportScreen } from '@features/report/ReportScreen'
+import { TodayScreen } from '@features/today/TodayScreen'
+import { useI18n } from '@i18n/index'
 import { seedTransactionsIfNeeded } from '@import/seedTransactions'
+import { hasPin } from '@lib/crypto'
+import { refreshAssetPrices } from '@lib/marketPrices'
+import { useAppStore } from '@stores/appStore'
+import { useAuthStore } from '@stores/authStore'
+import { usePinStore } from '@stores/pinStore'
+import { useReconcileStore } from '@stores/reconcileStore'
+import { useEffect, useState } from 'react'
 
 function useSetupComplete() {
   const [ready, setReady] = useState<boolean | null>(null)
@@ -55,29 +55,36 @@ function AppShell() {
   if (isInProgress && activeTab === 'budget') {
     if (step === 'confirm' || step === 'committing') {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <AppBar title="Reconcile" subtitle="Review & approve" />
-          <main style={{ flex: 1, overflowY: 'auto' }}><ReconcileConfirmScreen /></main>
+        <div
+          style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+        >
+          <AppBar title="Reconcile" />
+          <main style={{ flex: 1, overflowY: 'auto' }}>
+            <ReconcileConfirmScreen />
+          </main>
           <TabBar />
         </div>
       )
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <AppBar title="Reconcile" subtitle="Import transactions" />
-        <main style={{ flex: 1, overflowY: 'auto' }}><ReconcileEntryScreen /></main>
+        <AppBar title="Reconcile" />
+        <main style={{ flex: 1, overflowY: 'auto' }}>
+          <ReconcileEntryScreen />
+        </main>
         <TabBar />
       </div>
     )
   }
 
+  // Slim AppBar (PAIN-POINTS.md D9): title only, no subtitle line.
   const SCREENS = {
-    today:  { title: 'Today',  subtitle: 'Daily transaction log',    component: <TodayScreen /> },
-    budget: { title: 'Budget', subtitle: 'This workweek',            component: <BudgetScreen /> },
-    chat:   { title: 'Manager', subtitle: 'Your AI finance partner', component: <ChatScreen /> },
-    assets: { title: 'Assets', subtitle: 'Accounts & assets',        component: <AssetsScreen /> },
-    report: { title: 'Report', subtitle: 'The Scoreboard',           component: <ReportScreen /> },
-    more:   { title: 'More',   subtitle: '',                         component: <MoreScreen /> },
+    today: { title: 'Today', component: <TodayScreen /> },
+    budget: { title: 'Budget', component: <BudgetScreen /> },
+    chat: { title: 'Manager', component: <ChatScreen /> },
+    assets: { title: 'Assets', component: <AssetsScreen /> },
+    report: { title: 'Report', component: <ReportScreen /> },
+    more: { title: 'More', component: <MoreScreen /> },
   }
 
   const screen = SCREENS[activeTab]
@@ -86,7 +93,7 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <AppBar title={screen.title} subtitle={screen.subtitle} />
+      <AppBar title={screen.title} />
       <main style={{ flex: 1, overflowY: isChat ? 'hidden' : 'auto' }}>
         {screen.component}
       </main>
@@ -95,17 +102,34 @@ function AppShell() {
   )
 }
 
-function AppBar({ title, subtitle }: { title: string; subtitle: string }) {
+// Slim, single-row app bar (PAIN-POINTS.md D9): ~44-48px tall, title only —
+// down from the old ~64px title+subtitle bar. Reclaimed space goes to each
+// screen's own hero number (Calm Ledger v2 §8).
+function AppBar({ title }: { title: string }) {
   return (
-    <div style={{
-      padding: '12px 16px 10px',
-      paddingTop: 'calc(12px + env(safe-area-inset-top))',
-      borderBottom: '1px solid var(--border-1)',
-      background: 'var(--bg-1)',
-      flexShrink: 0,
-    }}>
-      <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.2px', margin: 0 }}>{title}</h1>
-      {subtitle && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{subtitle}</div>}
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '12px 16px',
+        paddingTop: 'calc(12px + env(safe-area-inset-top))',
+        borderBottom: '1px solid var(--border-1)',
+        background: 'var(--bg-1)',
+        flexShrink: 0,
+      }}
+    >
+      <h1
+        style={{
+          fontSize: 'var(--text-title)',
+          lineHeight: 'var(--leading-title)',
+          fontWeight: 700,
+          color: 'var(--ink-1)',
+          letterSpacing: '-.2px',
+          margin: 0,
+        }}
+      >
+        {title}
+      </h1>
     </div>
   )
 }
