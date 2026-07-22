@@ -83,7 +83,7 @@ export function AccountForm({ open, onClose, editing }: Props) {
           </Field>
         )}
         {!needsManualBalance && (
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', lineHeight: 1.5 }}>
             Bank account balance is derived from imported transactions — no manual entry needed.
           </div>
         )}

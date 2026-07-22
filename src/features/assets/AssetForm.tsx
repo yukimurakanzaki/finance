@@ -128,7 +128,7 @@ export function AssetForm({ open, onClose, editing }: Props) {
               </Field>
             )}
             {computedGoldValue !== null && (
-              <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+              <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-2)' }}>
                 Computed value: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-1)' }}>
                   Rp {computedGoldValue.toLocaleString('id-ID')}
                 </span>
@@ -147,7 +147,7 @@ export function AssetForm({ open, onClose, editing }: Props) {
             <Field label={`Amount held (${fxCode})`}>
               <Input type="text" inputMode="decimal" mono value={fxAmount} onChange={(e) => setFxAmount(e.target.value)} placeholder="e.g. 500" />
             </Field>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)', lineHeight: 1.5 }}>
               IDR value is fetched from today's exchange rate and refreshed automatically every day.
             </div>
           </>
@@ -160,10 +160,10 @@ export function AssetForm({ open, onClose, editing }: Props) {
         )}
 
         {fetchNote && (
-          <div style={{ fontSize: 11, color: 'var(--amber-text)' }}>{fetchNote}</div>
+          <div style={{ fontSize: 'var(--text-caption)', color: 'var(--amber-text)' }}>{fetchNote}</div>
         )}
 
-        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+        <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>
           Lane auto-set to <strong style={{ color: 'var(--ink-2)' }}>{TYPE_LANE[assetType].replace(/_/g, ' ')}</strong> based on asset type.
         </div>
 
