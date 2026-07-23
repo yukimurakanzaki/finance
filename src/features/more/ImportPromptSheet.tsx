@@ -117,8 +117,12 @@ export function ImportPromptSheet() {
           lineHeight: 1.5,
         }}
       >
-        Copy this prompt, paste it into Claude, then add your bank transactions
-        at the bottom. Claude will reply with a JSON array you can import here.
+        Advanced path for large or multi-month imports. Most statement imports
+        are faster done directly in the AI Manager chat (paste a screenshot
+        there) — use this only when you have more transactions than fit in a
+        chat message. Copy this prompt, paste it into a separate Claude session,
+        then add your bank transactions at the bottom. Claude will reply with a
+        JSON array you can import here.
       </div>
 
       <textarea
