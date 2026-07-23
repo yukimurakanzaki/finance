@@ -1,5 +1,6 @@
-import { AVAILABLE_MODELS, type ModelConfig } from '../../ai/models'
 import { BottomSheet } from '@components/BottomSheet'
+import { Badge, type BadgeTone, Row } from '@components/ui'
+import { AVAILABLE_MODELS, type ModelConfig } from '../../ai/models'
 
 interface Props {
   open: boolean
@@ -8,10 +9,12 @@ interface Props {
   onSelect: (modelId: string) => void
 }
 
-const TIER_COLORS: Record<string, string> = {
-  free: '#22c55e',
-  standard: '#f59e0b',
-  premium: '#a855f7',
+// costTier -> <Badge> tone. 'free'/'standard' aren't in the list yet, but the
+// mapping is total so a future tier doesn't fall through to an unstyled badge.
+const TIER_TONE: Record<ModelConfig['costTier'], BadgeTone> = {
+  free: 'positive',
+  standard: 'default',
+  premium: 'warning',
 }
 
 function formatTokens(n: number): string {
@@ -19,6 +22,9 @@ function formatTokens(n: number): string {
   return `${(n / 1_000).toFixed(0)}K`
 }
 
+// M2 fix: rows show `m.name` (a human label, e.g. "Claude Sonnet") — the raw
+// `m.id` model-ID string is never rendered, only sent as the stored value via
+// onSelect(m.id).
 export function ModelPicker({ open, onClose, currentModel, onSelect }: Props) {
   function handleSelect(m: ModelConfig) {
     onSelect(m.id)
@@ -26,39 +32,27 @@ export function ModelPicker({ open, onClose, currentModel, onSelect }: Props) {
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Choose model" height="50dvh">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title="Choose model"
+      height="50dvh"
+    >
+      <div>
         {AVAILABLE_MODELS.map((m) => {
           const isActive = m.id === currentModel
           return (
-            <button
+            <Row
               key={m.id}
               onClick={() => handleSelect(m)}
-              style={{
-                display: 'flex', flexDirection: 'column', gap: 6,
-                padding: '14px', borderRadius: 12,
-                background: isActive ? 'var(--amber-bg)' : 'var(--bg-2)',
-                border: `1px solid ${isActive ? 'var(--amber)' : 'var(--border-1)'}`,
-                cursor: 'pointer', textAlign: 'left',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)' }}>
-                  {m.name}
-                </span>
-                <span style={{
-                  fontSize: 10, fontWeight: 600, padding: '2px 8px',
-                  borderRadius: 4, textTransform: 'uppercase',
-                  background: `${TIER_COLORS[m.costTier]}20`,
-                  color: TIER_COLORS[m.costTier],
-                }}>
-                  {m.costTier}
-                </span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                {formatTokens(m.contextWindow)} context · {formatTokens(m.maxOutput)} output
-              </div>
-            </button>
+              primary={m.name}
+              caption={`${formatTokens(m.contextWindow)} context · ${formatTokens(m.maxOutput)} output`}
+              right={<Badge tone={TIER_TONE[m.costTier]}>{m.costTier}</Badge>}
+              {...(isActive
+                ? { style: { background: 'var(--amber-surface)' } }
+                : {})}
+              aria-label={isActive ? `${m.name} (current model)` : m.name}
+            />
           )
         })}
       </div>

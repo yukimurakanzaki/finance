@@ -200,17 +200,34 @@ export function MoreScreen() {
         />
       </div>
 
+      {/* M3 fix (PAIN-POINTS.md — "two competing import paths"): the in-app
+          Manager chat already accepts pasted statement screenshots directly
+          via its log_transactions tool, no external round-trip needed. That
+          path can't be trusted to cover *every* case yet, though — a
+          multi-month bulk statement import is still easiest as one big
+          JSON paste, and the chat tool takes at most 4 images per message
+          (ChatScreen.tsx's MAX_IMAGES) — so option (b) was taken: keep both,
+          but demote the external prompt-copy path. It moves below "Import
+          Transactions" (the step that actually writes data), is relabeled
+          "Advanced / bulk import" instead of the more-discoverable-looking
+          "Get Claude Prompt", and a new row above both points at the
+          in-app path first. */}
       <SectionHeader>Data</SectionHeader>
       <div>
         <Row
-          onClick={() => setSheet('import_prompt')}
-          primary="Get Claude Prompt"
-          caption="Copy ready-made prompt to paste into Claude"
+          onClick={() => setTab('chat')}
+          primary="Log via AI Manager"
+          caption="Paste a statement screenshot in chat — no copy/paste round trip"
         />
         <Row
           onClick={handleReconcile}
           primary="Import Transactions"
-          caption="Paste Claude's JSON output"
+          caption="Paste JSON output into Reconcile"
+        />
+        <Row
+          onClick={() => setSheet('import_prompt')}
+          primary="Advanced / bulk import"
+          caption="Copy a prompt for a separate Claude session — for large multi-month imports"
         />
         <Row
           onClick={handleExport}
@@ -322,7 +339,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'import_prompt'}
         onClose={() => setSheet(null)}
-        title="Claude Import Prompt"
+        title="Advanced / Bulk Import"
         height="90dvh"
       >
         <ImportPromptSheet />
