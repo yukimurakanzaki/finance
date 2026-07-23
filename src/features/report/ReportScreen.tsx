@@ -48,11 +48,15 @@ export function ReportScreen() {
       {/* This month — actuals (T1: transfers already excluded above). */}
       <Card>
         <SectionHeader>This month — actuals</SectionHeader>
+        {/* Responsive grid, not a single flex row: on narrow phones three
+            nowrap IDR amounts (e.g. Rp 999,9jt each) overflow the card, so the
+            tiles reflow 3→2→1 columns via auto-fit instead of clipping. */}
         <div
           style={{
-            display: 'flex',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(7.5rem, 1fr))',
             marginTop: 'var(--space-4)',
-            gap: 'var(--space-5)',
+            gap: 'var(--space-4) var(--space-5)',
           }}
         >
           <StatTile
