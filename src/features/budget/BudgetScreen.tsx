@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { useAppStore } from '@stores/appStore'
-import { SafeToSpendScreen } from './weekly/SafeToSpendScreen'
-import { MonthlyScreen } from './monthly/MonthlyScreen'
-import { YearlyScreen } from './yearly/YearlyScreen'
-import { TransactionHistory } from './TransactionHistory'
 import { BottomSheet } from '@components/BottomSheet'
+import { Icon } from '@components/ui'
+import { useAppStore } from '@stores/appStore'
+import { useState } from 'react'
+import { TransactionHistory } from './TransactionHistory'
+import { MonthlyScreen } from './monthly/MonthlyScreen'
+import { SafeToSpendScreen } from './weekly/SafeToSpendScreen'
+import { YearlyScreen } from './yearly/YearlyScreen'
 
 export function BudgetScreen() {
   const { budgetHorizon, setBudgetHorizon } = useAppStore()
@@ -19,20 +20,33 @@ export function BudgetScreen() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Segment control */}
-      <div style={{
-        display: 'flex', gap: 6, padding: '12px 16px',
-        borderBottom: '1px solid var(--border-1)', background: 'var(--bg-1)',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--space-2)',
+          padding: 'var(--space-3) var(--space-4)',
+          borderBottom: '1px solid var(--border-1)',
+          background: 'var(--bg-1)',
+        }}
+      >
         {horizons.map((h) => (
           <button
             key={h.id}
+            type="button"
             onClick={() => setBudgetHorizon(h.id)}
             style={{
-              flex: 1, padding: '7px 0', border: 'none', borderRadius: 8, cursor: 'pointer',
-              fontSize: 12, fontWeight: budgetHorizon === h.id ? 600 : 400,
+              flex: 1,
+              padding: 'var(--space-2) 0',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 'var(--text-caption)',
+              fontWeight: budgetHorizon === h.id ? 600 : 400,
               fontFamily: 'var(--font-ui)',
-              background: budgetHorizon === h.id ? 'var(--amber)' : 'var(--bg-2)',
-              color: budgetHorizon === h.id ? 'var(--on-accent)' : 'var(--ink-2)',
+              background:
+                budgetHorizon === h.id ? 'var(--amber)' : 'var(--bg-2)',
+              color:
+                budgetHorizon === h.id ? 'var(--on-accent)' : 'var(--ink-2)',
               transition: 'background .15s, color .15s',
             }}
           >
@@ -48,22 +62,41 @@ export function BudgetScreen() {
       </div>
 
       {/* Transactions link */}
-      <div style={{
-        borderTop: '1px solid var(--border-1)', background: 'var(--bg-1)',
-        padding: '10px 16px', flexShrink: 0,
-      }}>
+      <div
+        style={{
+          borderTop: '1px solid var(--border-1)',
+          background: 'var(--bg-1)',
+          padding: 'var(--space-3) var(--space-4)',
+          flexShrink: 0,
+        }}
+      >
         <button
+          type="button"
           onClick={() => setHistoryOpen(true)}
           style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-            fontSize: 12, color: 'var(--amber-text)', fontFamily: 'var(--font-ui)', fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-1)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            fontSize: 'var(--text-caption)',
+            color: 'var(--amber-text)',
+            fontFamily: 'var(--font-ui)',
+            fontWeight: 600,
           }}
         >
-          View all transactions →
+          View all transactions <Icon name="chevron-right" size={14} />
         </button>
       </div>
 
-      <BottomSheet open={historyOpen} onClose={() => setHistoryOpen(false)} title="Transaction history" height="92dvh">
+      <BottomSheet
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="Transaction history"
+        height="92dvh"
+      >
         <TransactionHistory />
       </BottomSheet>
     </div>

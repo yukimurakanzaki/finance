@@ -1,4 +1,4 @@
 {
-  "count": 465,
-  "note": "Legacy raw fontSize/padding/borderRadius literals under src/features. Phase 2 baseline was 507; Phase 3 (Today screen rebuild) migrated TodayScreen/SpeedDialFAB onto src/components/ui/* primitives, lowering it to 499. Phase 4/B1 (Assets screen migration) migrated AssetsScreen/AccountForm/AssetForm onto src/components/ui/* primitives (Row, StatTile, Amount, SectionHeader, and a new shared Badge for AUTO/PRICE STALE), lowering it to 465. This count should only go down. See scripts/check-style-tokens.mjs."
+  "count": 389,
+  "note": "Legacy raw fontSize/padding/borderRadius literals under src/features. Phase 2 baseline was 507; Phase 3 (Today screen rebuild) migrated TodayScreen/SpeedDialFAB onto src/components/ui/* primitives, lowering it to 499. Phase 4/B1 (Assets screen migration) migrated AssetsScreen/AccountForm/AssetForm onto src/components/ui/* primitives (Row, StatTile, Amount, SectionHeader, and a new shared Badge for AUTO/PRICE STALE), lowering it to 465. Phase 4/B2 (Budget screen migration) migrated BudgetScreen, weekly/SafeToSpendScreen, weekly/GaugeCard, weekly/Waterfall, weekly/DayDots, monthly/MonthlyScreen, and yearly/YearlyScreen onto src/components/ui/* primitives, lowering it to 389. This count should only go down. See scripts/check-style-tokens.mjs."
 }
