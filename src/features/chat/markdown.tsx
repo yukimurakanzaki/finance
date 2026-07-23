@@ -38,7 +38,13 @@ export type InlineToken =
 // (node) environment, which this repo has no jsdom setup for.
 export function parseInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = []
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(_[^_]+_)/g
+  // Underscore emphasis is restricted to word boundaries (CommonMark rule): the
+  // opening `_` may not follow, and the closing `_` may not precede, an
+  // alphanumeric char — so identifiers like `take_home_net` / `account_id` /
+  // `monthly_amount` (common in finance/tool replies) stay literal instead of
+  // italicizing their middle segment. Asterisk emphasis keeps its looser rule.
+  const re =
+    /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|((?<![A-Za-z0-9])_[^_]+_(?![A-Za-z0-9]))/g
   let last = 0
   let m: RegExpExecArray | null
   // biome-ignore lint/suspicious/noAssignInExpressions: standard regex-exec loop

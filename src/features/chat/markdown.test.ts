@@ -14,8 +14,24 @@ describe('parseInline — inline emphasis tokens (M1)', () => {
     ])
   })
 
-  it('supports underscore italics', () => {
+  it('supports underscore italics at word boundaries', () => {
     expect(parseInline('_hi_')).toEqual([{ type: 'italic', value: 'hi' }])
+    expect(parseInline('say _hi_ now')).toEqual([
+      { type: 'text', value: 'say ' },
+      { type: 'italic', value: 'hi' },
+      { type: 'text', value: ' now' },
+    ])
+  })
+
+  it('leaves intraword underscores literal (identifiers are not italicized)', () => {
+    // Finance/tool replies routinely contain snake_case identifiers; these must
+    // survive verbatim, not lose their underscores to italics.
+    for (const id of ['take_home_net', 'account_id', 'monthly_amount']) {
+      expect(parseInline(id)).toEqual([{ type: 'text', value: id }])
+    }
+    expect(parseInline('the take_home_net field')).toEqual([
+      { type: 'text', value: 'the take_home_net field' },
+    ])
   })
 
   it('returns a single text token for plain text with no markdown', () => {
