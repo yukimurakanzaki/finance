@@ -225,11 +225,18 @@ function Conversation() {
   // entry points validate and attach images identically.
   async function addImageFiles(files: File[]) {
     setFileNote(null)
+    const accepted: { media_type: string; data: string }[] = []
+    // Reserve slots against a LOCAL counter, not `images.length`: setImages is
+    // async, so reading state per iteration stays at its call-start value and a
+    // single multi-file selection/paste (e.g. 5 files from empty) would let
+    // every file pass the cap. `remaining` decrements as we accept, and the
+    // functional update below clamps once more against the authoritative
+    // `prev.length` in case two handlers ever race.
+    let remaining = MAX_IMAGES - images.length
+    let hitCap = false
     for (const file of files) {
-      if (images.length >= MAX_IMAGES) {
-        setFileNote(
-          `Up to ${MAX_IMAGES} images per message — extra files were skipped.`,
-        )
+      if (remaining <= 0) {
+        hitCap = true
         break
       }
       if (!API_IMAGE_TYPES.has(file.type)) {
@@ -248,10 +255,16 @@ function Conversation() {
       let binary = ''
       const bytes = new Uint8Array(buf)
       for (const byte of bytes) binary += String.fromCharCode(byte)
-      setImages((prev) => [
-        ...prev,
-        { media_type: file.type, data: btoa(binary) },
-      ])
+      accepted.push({ media_type: file.type, data: btoa(binary) })
+      remaining--
+    }
+    if (hitCap) {
+      setFileNote(
+        `Up to ${MAX_IMAGES} images per message — extra files were skipped.`,
+      )
+    }
+    if (accepted.length > 0) {
+      setImages((prev) => [...prev, ...accepted].slice(0, MAX_IMAGES))
     }
   }
 
