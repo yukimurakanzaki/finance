@@ -425,11 +425,14 @@ function SafeToSpendHero({
     )
   }
   if (result.remainingWorkdays === 0) {
+    // O3 fix: the weekend allocation is a real configured number — surface
+    // it instead of the bare word "Weekend" (mirrored into GaugeCard.tsx so
+    // Today and Budget don't diverge on this branch).
     return (
       <StatTile
         label="Safe to spend today"
-        value="Weekend"
-        sub="Your weekend allocation is pre-carved. Resets Monday."
+        value={<Amount value={result.weekendAllocation} full />}
+        sub="Weekend allowance, pre-carved. Resets Monday."
       />
     )
   }
