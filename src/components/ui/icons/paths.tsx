@@ -17,6 +17,7 @@ export type IconName =
   | 'close'
   | 'chevron-left'
   | 'chevron-right'
+  | 'lens'
 
 export const ICON_PATHS: Record<IconName, React.ReactNode> = {
   // Tab bar
@@ -72,4 +73,12 @@ export const ICON_PATHS: Record<IconName, React.ReactNode> = {
   close: <path d="M6 6l12 12M18 6 6 18" />,
   'chevron-left': <path d="m15 18-6-6 6-6" />,
   'chevron-right': <path d="m9 18 6-6-6-6" />,
+  // Spending Lens affordance (B3, PAIN-POINTS.md): a magnifying glass over a
+  // currency mark — "what does this really cost me?".
+  lens: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M15 15 21 21M8 10h4M10 7.5v5" />
+    </>
+  ),
 }

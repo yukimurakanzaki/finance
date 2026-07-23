@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { Btn } from '@components/FormField'
+import { Badge, Row, SectionHeader } from '@components/ui'
 import { supabase } from '@lib/supabaseClient'
 import { useAuthStore } from '@stores/authStore'
-import { Btn } from '@components/FormField'
+import { useEffect, useState } from 'react'
 
 interface Member {
   user_id: string
@@ -39,7 +40,12 @@ export function HouseholdSheet() {
         .from('profiles')
         .select('id, display_name')
         .in('id', ids)
-      const nameById = new Map((ps ?? []).map((p) => [p.id as string, p.display_name as string | null]))
+      const nameById = new Map(
+        (ps ?? []).map((p) => [
+          p.id as string,
+          p.display_name as string | null,
+        ]),
+      )
       setMembers(
         (ms ?? []).map((m) => ({
           user_id: m.user_id as string,
@@ -54,7 +60,9 @@ export function HouseholdSheet() {
     if (!householdId) return
     setBusy(true)
     setError(null)
-    const { data, error: err } = await supabase.rpc('create_invite', { p_household: householdId })
+    const { data, error: err } = await supabase.rpc('create_invite', {
+      p_household: householdId,
+    })
     setBusy(false)
     if (err) setError(err.message)
     else setInviteCode(data as string)
@@ -90,80 +98,128 @@ export function HouseholdSheet() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '4px 2px' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-5)',
+        padding: 'var(--space-1) 2px',
+      }}
+    >
       <div>
-        <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 8 }}>
-          Members
-        </div>
+        <SectionHeader>Members</SectionHeader>
         {members === null && !error && (
-          <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Loading…</div>
-        )}
-        {members?.map((m) => (
           <div
-            key={m.user_id}
             style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '10px 12px', background: 'var(--bg-1)', border: '1px solid var(--border-1)',
-              borderRadius: 10, marginBottom: 6,
+              fontSize: 'var(--text-caption)',
+              color: 'var(--ink-3)',
+              marginTop: 'var(--space-2)',
             }}
           >
-            <div>
-              <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>
-                {m.display_name ?? 'Member'}
-                {m.user_id === user?.id ? ' (you)' : ''}
-              </div>
-              <div style={{ fontSize: 11, color: m.role === 'admin' ? 'var(--amber-text)' : 'var(--ink-3)', marginTop: 2 }}>
-                {m.role}
-              </div>
-            </div>
-            {isAdmin && m.user_id !== user?.id && m.role !== 'admin' && (
-              <button
-                onClick={() => transferAdmin(m.user_id)}
-                disabled={busy}
-                style={{
-                  background: 'none', border: '1px solid var(--border-2)', borderRadius: 8,
-                  color: 'var(--ink-2)', fontSize: 11, padding: '6px 10px', cursor: 'pointer',
-                  fontFamily: 'var(--font-ui)',
-                }}
-              >
-                Make admin
-              </button>
-            )}
+            Loading…
           </div>
-        ))}
+        )}
+        <div style={{ marginTop: 'var(--space-2)' }}>
+          {members?.map((m) => (
+            <Row
+              key={m.user_id}
+              primary={`${m.display_name ?? 'Member'}${m.user_id === user?.id ? ' (you)' : ''}`}
+              caption={
+                <Badge tone={m.role === 'admin' ? 'warning' : 'default'}>
+                  {m.role}
+                </Badge>
+              }
+              right={
+                isAdmin && m.user_id !== user?.id && m.role !== 'admin' ? (
+                  <button
+                    type="button"
+                    onClick={() => transferAdmin(m.user_id)}
+                    disabled={busy}
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--border-2)',
+                      borderRadius: 8,
+                      color: 'var(--ink-2)',
+                      fontSize: 'var(--text-caption)',
+                      padding: 'var(--space-2) var(--space-2)',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-ui)',
+                    }}
+                  >
+                    Make admin
+                  </button>
+                ) : undefined
+              }
+            />
+          ))}
+        </div>
       </div>
 
       {isAdmin && (
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 8 }}>
-            Invite a member
-          </div>
+          <SectionHeader>Invite a member</SectionHeader>
           {inviteCode ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'var(--bg-1)', border: '1px solid var(--amber)', borderRadius: 10,
-              padding: '12px 14px',
-            }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, letterSpacing: '3px', color: 'var(--ink-1)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'var(--bg-1)',
+                border: '1px solid var(--amber)',
+                borderRadius: 10,
+                padding: 'var(--space-3) var(--space-4)',
+                marginTop: 'var(--space-2)',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-title)',
+                  letterSpacing: '3px',
+                  color: 'var(--ink-1)',
+                }}
+              >
                 {inviteCode}
               </span>
-              <Btn variant="secondary" onClick={copyCode} style={{ padding: '8px 14px' }}>
+              <Btn
+                variant="secondary"
+                onClick={copyCode}
+                style={{ padding: 'var(--space-2) var(--space-4)' }}
+              >
                 {copied ? 'Copied' : 'Copy'}
               </Btn>
             </div>
           ) : (
-            <Btn fullWidth disabled={busy} onClick={generateInvite}>
-              {busy ? 'Generating…' : 'Generate invite code'}
-            </Btn>
+            <div style={{ marginTop: 'var(--space-2)' }}>
+              <Btn fullWidth disabled={busy} onClick={generateInvite}>
+                {busy ? 'Generating…' : 'Generate invite code'}
+              </Btn>
+            </div>
           )}
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, lineHeight: 1.5 }}>
-            Codes expire after 7 days and admit one member. Your partner enters it after signing
-            up, via "Join a household".
+          <div
+            style={{
+              fontSize: 'var(--text-caption)',
+              color: 'var(--ink-3)',
+              marginTop: 'var(--space-2)',
+              lineHeight: 1.5,
+            }}
+          >
+            Codes expire after 7 days and admit one member. Your partner enters
+            it after signing up, via "Join a household".
           </div>
         </div>
       )}
 
-      {error && <div style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>}
+      {error && (
+        <div
+          style={{
+            fontSize: 'var(--text-caption)',
+            color: 'var(--amber-text)',
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   )
 }

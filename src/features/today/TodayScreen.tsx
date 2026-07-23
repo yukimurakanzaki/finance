@@ -1,3 +1,4 @@
+import { BottomSheet } from '@components/BottomSheet'
 import {
   Amount,
   Card,
@@ -10,6 +11,7 @@ import {
 import { db } from '@db/db'
 import type { Transaction } from '@db/types'
 import { isWeekDraw } from '@engine/safeToSpend'
+import { SpendingLens } from '@features/decide/SpendingLens'
 import { isoWeekEnd, isoWeekStart, todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
@@ -77,6 +79,12 @@ export function TodayScreen() {
     mode: 'out' | 'in' | 'transfer'
     editing?: Transaction
   } | null>(null)
+  // B3 fix (PAIN-POINTS.md): Spending Lens previously only lived in the
+  // Decide sheet, disconnected from the moment someone's actually looking at
+  // the gauge and wondering "should I buy this?". This opens the exact same
+  // <SpendingLens> component the Decide sheet uses — no logic duplicated,
+  // just a second door into it, right next to the standing strip.
+  const [lensOpen, setLensOpen] = useState(false)
 
   const isToday = day === todayISO()
   const bounds = scopeBounds(scope, day)
@@ -176,14 +184,56 @@ export function TodayScreen() {
     <Screen>
       {/* ① Standing strip — replaces the three DayChips (F1, T4) */}
       <Card>
-        <SafeToSpendHero result={safeToSpend} isLoading={safeToSpendLoading} />
         <div
           style={{
             display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 'var(--space-3)',
+          }}
+        >
+          <SafeToSpendHero
+            result={safeToSpend}
+            isLoading={safeToSpendLoading}
+          />
+          {/* B3 — "what does this cost me?" affordance, opens SpendingLens
+              in-context instead of requiring More → Decide → Spending Lens. */}
+          <button
+            type="button"
+            onClick={() => setLensOpen(true)}
+            style={{
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1)',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border-2)',
+              borderRadius: 999,
+              padding: 'var(--space-1) var(--space-3)',
+              fontSize: 'var(--text-caption)',
+              fontWeight: 600,
+              color: 'var(--ink-2)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+            }}
+          >
+            <Icon name="lens" size={14} />
+            Cost me?
+          </button>
+        </div>
+        {/* Carryover fix (#26, P2): same responsive-grid pattern as Report's
+            "This month — actuals" grid. Three nowrap StatTiles in a single
+            flex row overflow on narrow phones — worse here than on Report
+            since these use un-abbreviated `full` amounts — so this reflows
+            3→2→1 columns via auto-fit instead of clipping. */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(7.5rem, 1fr))',
             marginTop: 'var(--space-4)',
             paddingTop: 'var(--space-3)',
             borderTop: '1px solid var(--border-1)',
-            gap: 'var(--space-5)',
+            gap: 'var(--space-4) var(--space-5)',
           }}
         >
           <StatTile
@@ -389,6 +439,15 @@ export function TodayScreen() {
           {...(form.editing ? { editing: form.editing } : {})}
         />
       )}
+
+      <BottomSheet
+        open={lensOpen}
+        onClose={() => setLensOpen(false)}
+        title="What does this cost me?"
+        height="85dvh"
+      >
+        <SpendingLens />
+      </BottomSheet>
     </Screen>
   )
 }

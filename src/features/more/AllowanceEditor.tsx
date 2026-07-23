@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { Btn, Field, Input } from '@components/FormField'
 import { db } from '@db/db'
 import { allowanceRepo } from '@db/repositories/allowance.repo'
-import { Field, Input, Btn } from '@components/FormField'
 import { formatRpFull } from '@lib/currency'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { useState } from 'react'
 
 export function AllowanceEditor() {
   const allowance = useLiveQuery(() => db.allowance.get('local'))
@@ -27,16 +27,37 @@ export function AllowanceEditor() {
   }
 
   return (
-    <div style={{ padding: '16px 0 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div
+      style={{
+        padding: 'var(--space-4) 0 var(--space-6)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-4)',
+      }}
+    >
       {allowance && (
-        <div style={{ background: 'var(--bg-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Current: {formatRpFull(allowance.monthly_amount)} / month · {formatRpFull(allowance.weekend_allocation)} weekend</div>
+        <div
+          style={{
+            background: 'var(--bg-2)',
+            borderRadius: 8,
+            padding: 'var(--space-2) var(--space-3)',
+            marginBottom: 4,
+          }}
+        >
+          <div
+            style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}
+          >
+            Current: {formatRpFull(allowance.monthly_amount)} / month ·{' '}
+            {formatRpFull(allowance.weekend_allocation)} weekend
+          </div>
         </div>
       )}
 
       <Field label="Monthly personal pool (Rp)">
         <Input
-          type="text" inputMode="numeric" mono
+          type="text"
+          inputMode="numeric"
+          mono
           value={monthly || (allowance ? String(allowance.monthly_amount) : '')}
           onChange={(e) => setMonthly(e.target.value)}
           onFocus={initForm}
@@ -45,15 +66,26 @@ export function AllowanceEditor() {
       </Field>
       <Field label="Weekend allocation (Rp, carved monthly)">
         <Input
-          type="text" inputMode="numeric" mono
-          value={weekend || (allowance ? String(allowance.weekend_allocation) : '')}
+          type="text"
+          inputMode="numeric"
+          mono
+          value={
+            weekend || (allowance ? String(allowance.weekend_allocation) : '')
+          }
           onChange={(e) => setWeekend(e.target.value)}
           onFocus={initForm}
           placeholder="800.000"
         />
       </Field>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-        Weekend is pre-carved before workweek pool is calculated. The daily ceiling = (pool − subs − weekend) ÷ workweeks ÷ days left.
+      <div
+        style={{
+          fontSize: 'var(--text-caption)',
+          color: 'var(--ink-3)',
+          lineHeight: 1.5,
+        }}
+      >
+        Weekend is pre-carved before workweek pool is calculated. The daily
+        ceiling = (pool − subs − weekend) ÷ workweeks ÷ days left.
       </div>
       <Btn onClick={handleSave} disabled={!monthly} fullWidth>
         {saved ? '✓ Saved' : 'Save allowance'}
