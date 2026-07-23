@@ -221,8 +221,9 @@ function Conversation() {
   ])
   const [fileNote, setFileNote] = useState<string | null>(null)
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
+  // Shared by the paperclip file-input and the textarea paste handler so both
+  // entry points validate and attach images identically.
+  async function addImageFiles(files: File[]) {
     setFileNote(null)
     for (const file of files) {
       if (images.length >= MAX_IMAGES) {
@@ -252,7 +253,23 @@ function Conversation() {
         { media_type: file.type, data: btoa(binary) },
       ])
     }
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    await addImageFiles(Array.from(e.target.files ?? []))
     e.target.value = ''
+  }
+
+  // Statement screenshots pasted straight into the composer (the primary import
+  // path More → Log via AI Manager promotes). A paste that carries image files
+  // is consumed here; a plain-text paste is left untouched so typing is normal.
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData.files).filter((f) =>
+      f.type.startsWith('image/'),
+    )
+    if (files.length === 0) return
+    e.preventDefault()
+    void addImageFiles(files)
   }
 
   const busy = status !== 'idle'
@@ -564,6 +581,7 @@ function Conversation() {
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onPaste={handlePaste}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
