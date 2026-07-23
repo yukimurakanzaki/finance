@@ -5,6 +5,7 @@ import { formatRp, parseRpInput } from '@lib/currency'
 import { useReconcileStore } from '@stores/reconcileStore'
 import { useState } from 'react'
 import type { ValidImportRow } from '../../import/schema'
+import { exclusionGroup } from './transferExclusion'
 
 export function ReconcileConfirmScreen() {
   const { parseResult, flaggedRows, complete, cancel, setStep } =
@@ -27,10 +28,17 @@ export function ReconcileConfirmScreen() {
   const regular = flaggedRows.filter((r) => !r.is_transfer)
 
   function toggleExcluded(rowIndex: number) {
+    // Exclude/include always covers the whole transfer pair, never a single leg
+    // (see transferExclusion.ts — a lone leg would import a balance-breaking
+    // orphan).
+    const groupIndices = exclusionGroup(flaggedRows, rowIndex)
     setExcluded((prev) => {
       const next = new Set(prev)
-      if (next.has(rowIndex)) next.delete(rowIndex)
-      else next.add(rowIndex)
+      const willExclude = !next.has(rowIndex)
+      for (const i of groupIndices) {
+        if (willExclude) next.add(i)
+        else next.delete(i)
+      }
       return next
     })
   }
