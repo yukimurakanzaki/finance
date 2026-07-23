@@ -402,6 +402,7 @@ function ReconcileRow({
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         {editing ? (
           <input
+            // biome-ignore lint/a11y/noAutofocus: this input renders only in response to an explicit tap-to-edit, so focusing it immediately is the intended behavior
             autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
