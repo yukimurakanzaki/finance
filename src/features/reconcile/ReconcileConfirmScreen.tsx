@@ -44,7 +44,12 @@ export function ReconcileConfirmScreen() {
     ) ?? []
 
   function suggestedRecurringFor(row: ValidImportRow): RecurringItem | null {
-    if (row.direction !== 'out') return null
+    // Only outgoing, non-transfer rows can pay a recurring item. Transfers are
+    // rendered in a separate section with no dismiss badge, so a transfer whose
+    // note happened to contain a recurring item's name would otherwise get
+    // silently tagged (inert — is_transfer already excludes it from the pool —
+    // but a transfer row carrying a recurring_item_id is semantically wrong).
+    if (row.direction !== 'out' || row.is_transfer) return null
     return matchRecurringItemByText(row.note || row.category, activeRecurring)
   }
 
