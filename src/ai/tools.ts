@@ -1,13 +1,23 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
-import { transactionsRepo, matchRecurringItem } from '@db/repositories/transactions.repo'
-import type { Lane, Cadence, RecurringKind } from '@db/types'
+import {
+  matchRecurringItem,
+  transactionsRepo,
+} from '@db/repositories/transactions.repo'
+import type { Cadence, Lane, RecurringKind } from '@db/types'
 import { formatRpFull } from '@lib/currency'
 import { todayISO } from '@lib/dates'
+import { resolveRecurringItemId } from '@lib/recurringMatch'
 
 const now = () => new Date().toISOString()
 
-const LANE_ENUM = ['income_producing', 'store_of_value', 'debt_liability', 'protected_living', 'pass_through']
+const LANE_ENUM = [
+  'income_producing',
+  'store_of_value',
+  'debt_liability',
+  'protected_living',
+  'pass_through',
+]
 
 // Write tools mutate the DB and require user confirmation before executing.
 export const WRITE_TOOLS = new Set([
@@ -33,12 +43,28 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     input_schema: {
       type: 'object',
       properties: {
-        from_date: { type: 'string', description: 'Start date (inclusive), YYYY-MM-DD' },
-        to_date: { type: 'string', description: 'End date (inclusive), YYYY-MM-DD' },
-        direction: { type: 'string', enum: ['in', 'out'], description: 'Filter by money in or out' },
+        from_date: {
+          type: 'string',
+          description: 'Start date (inclusive), YYYY-MM-DD',
+        },
+        to_date: {
+          type: 'string',
+          description: 'End date (inclusive), YYYY-MM-DD',
+        },
+        direction: {
+          type: 'string',
+          enum: ['in', 'out'],
+          description: 'Filter by money in or out',
+        },
         account_id: { type: 'string', description: 'Filter by account id' },
-        search_note: { type: 'string', description: 'Case-insensitive substring match on the note field' },
-        limit: { type: 'number', description: 'Max rows to return, default 50' },
+        search_note: {
+          type: 'string',
+          description: 'Case-insensitive substring match on the note field',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max rows to return, default 50',
+        },
       },
       required: ['from_date', 'to_date'],
     },
@@ -50,10 +76,23 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Display name, e.g. "blu by BCA Digital"' },
-        institution: { type: 'string', description: 'Bank/provider name, e.g. "BCA Digital"' },
-        account_type: { type: 'string', enum: ['bank', 'digital_wallet', 'cash'] },
-        lane: { type: 'string', enum: LANE_ENUM, description: 'protected_living for day-to-day spending accounts' },
+        name: {
+          type: 'string',
+          description: 'Display name, e.g. "blu by BCA Digital"',
+        },
+        institution: {
+          type: 'string',
+          description: 'Bank/provider name, e.g. "BCA Digital"',
+        },
+        account_type: {
+          type: 'string',
+          enum: ['bank', 'digital_wallet', 'cash'],
+        },
+        lane: {
+          type: 'string',
+          enum: LANE_ENUM,
+          description: 'protected_living for day-to-day spending accounts',
+        },
       },
       required: ['name', 'institution', 'account_type', 'lane'],
     },
@@ -71,20 +110,59 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
             type: 'object',
             properties: {
               date: { type: 'string', description: 'YYYY-MM-DD' },
-              amount: { type: 'number', description: 'Positive amount in IDR, no separators' },
+              amount: {
+                type: 'number',
+                description: 'Positive amount in IDR, no separators',
+              },
               direction: { type: 'string', enum: ['in', 'out'] },
-              title: { type: 'string', description: 'Short user-facing title, e.g. "Kopi pagi". Merchant detail goes in note.' },
-              account_id: { type: 'string', description: 'Account id from the context or snapshot' },
-              category_name: { type: 'string', description: 'Category name from the user’s category list, or omit if none matches' },
-              lane: { type: 'string', enum: LANE_ENUM, description: 'protected_living for day-to-day spending unless clearly otherwise' },
-              note: { type: 'string', description: 'Short description, e.g. merchant name' },
-              is_transfer: { type: 'boolean', description: 'true for internal moves between the user’s own accounts' },
-              transfer_pair_key: { type: 'string', description: 'Same arbitrary key on both legs of one transfer so they are paired, e.g. "tf-2026-05-09-blu-bca"' },
+              title: {
+                type: 'string',
+                description:
+                  'Short user-facing title, e.g. "Kopi pagi". Merchant detail goes in note.',
+              },
+              account_id: {
+                type: 'string',
+                description: 'Account id from the context or snapshot',
+              },
+              category_name: {
+                type: 'string',
+                description:
+                  'Category name from the user’s category list, or omit if none matches',
+              },
+              lane: {
+                type: 'string',
+                enum: LANE_ENUM,
+                description:
+                  'protected_living for day-to-day spending unless clearly otherwise',
+              },
+              note: {
+                type: 'string',
+                description: 'Short description, e.g. merchant name',
+              },
+              is_transfer: {
+                type: 'boolean',
+                description:
+                  'true for internal moves between the user’s own accounts',
+              },
+              transfer_pair_key: {
+                type: 'string',
+                description:
+                  'Same arbitrary key on both legs of one transfer so they are paired, e.g. "tf-2026-05-09-blu-bca"',
+              },
+              recurring_item_id: {
+                type: 'string',
+                description:
+                  'id of an active recurring item (from the ACTIVE RECURRING section in context) this expense pays, e.g. a Netflix subscription payment or a household bill. Only set this when the transaction plausibly IS that committed payment — tagging it excludes the amount from the personal safe-to-spend pool. Omit if unsure or if none match; the app also auto-matches by description as a fallback, but an explicit id from you takes precedence.',
+              },
             },
             required: ['date', 'amount', 'direction', 'account_id', 'lane'],
           },
         },
-        allow_duplicates: { type: 'boolean', description: 'Set true ONLY after the user confirmed flagged rows are genuinely new, to save them anyway.' },
+        allow_duplicates: {
+          type: 'boolean',
+          description:
+            'Set true ONLY after the user confirmed flagged rows are genuinely new, to save them anyway.',
+        },
       },
       required: ['transactions'],
     },
@@ -97,7 +175,10 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
       type: 'object',
       properties: {
         date: { type: 'string', description: 'YYYY-MM-DD' },
-        gross: { type: 'number', description: 'Gross salary in IDR if known, else omit' },
+        gross: {
+          type: 'number',
+          description: 'Gross salary in IDR if known, else omit',
+        },
         take_home_net: { type: 'number', description: 'Take-home net in IDR' },
         note: { type: 'string' },
       },
@@ -112,9 +193,23 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
       type: 'object',
       properties: {
         name: { type: 'string' },
-        amount: { type: 'number', description: 'Amount in IDR per cadence period' },
-        cadence: { type: 'string', enum: ['monthly', 'weekly', 'yearly', 'one_off'] },
-        kind: { type: 'string', enum: ['pay_yourself_first', 'household_bill', 'personal_sub', 'other'] },
+        amount: {
+          type: 'number',
+          description: 'Amount in IDR per cadence period',
+        },
+        cadence: {
+          type: 'string',
+          enum: ['monthly', 'weekly', 'yearly', 'one_off'],
+        },
+        kind: {
+          type: 'string',
+          enum: [
+            'pay_yourself_first',
+            'household_bill',
+            'personal_sub',
+            'other',
+          ],
+        },
         lane: { type: 'string', enum: LANE_ENUM },
         note: { type: 'string' },
       },
@@ -154,7 +249,11 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     input_schema: {
       type: 'object',
       properties: {
-        content: { type: 'string', description: 'The fact to remember, e.g. "Gets paid on the 25th of each month"' },
+        content: {
+          type: 'string',
+          description:
+            'The fact to remember, e.g. "Gets paid on the 25th of each month"',
+        },
       },
       required: ['content'],
     },
@@ -166,7 +265,11 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     input_schema: {
       type: 'object',
       properties: {
-        memory_id: { type: 'string', description: 'ID of the memory to remove (from the MEMORY section in context)' },
+        memory_id: {
+          type: 'string',
+          description:
+            'ID of the memory to remove (from the MEMORY section in context)',
+        },
       },
       required: ['memory_id'],
     },
@@ -178,10 +281,20 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Short name, e.g. "End of Month BCA Reconcile"' },
-        description: { type: 'string', description: 'One-line description for the skill picker' },
+        name: {
+          type: 'string',
+          description: 'Short name, e.g. "End of Month BCA Reconcile"',
+        },
+        description: {
+          type: 'string',
+          description: 'One-line description for the skill picker',
+        },
         icon: { type: 'string', description: 'Single emoji icon' },
-        prompt_injection: { type: 'string', description: 'The instruction text injected into the system prompt when this skill is active. Describe the workflow steps.' },
+        prompt_injection: {
+          type: 'string',
+          description:
+            'The instruction text injected into the system prompt when this skill is active. Describe the workflow steps.',
+        },
       },
       required: ['name', 'description', 'prompt_injection'],
     },
@@ -192,23 +305,39 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
 
 type ToolInput = Record<string, unknown>
 
-export async function executeReadTool(name: string, input: ToolInput): Promise<string> {
+export async function executeReadTool(
+  name: string,
+  input: ToolInput,
+): Promise<string> {
   if (name === 'query_transactions') return queryTransactions(input)
   return JSON.stringify({ error: `Unknown read tool: ${name}` })
 }
 
-export async function executeWriteTool(name: string, input: ToolInput): Promise<string> {
+export async function executeWriteTool(
+  name: string,
+  input: ToolInput,
+): Promise<string> {
   switch (name) {
-    case 'create_account': return createAccount(input)
-    case 'log_transactions': return logTransactions(input)
-    case 'log_income': return logIncome(input)
-    case 'add_recurring_item': return addRecurringItem(input)
-    case 'update_asset_value': return updateAssetValue(input)
-    case 'update_account_balance': return updateAccountBalance(input)
-    case 'save_memory': return saveMemory(input)
-    case 'delete_memory': return deleteMemory(input)
-    case 'create_skill': return createCustomSkill(input)
-    default: return JSON.stringify({ error: `Unknown write tool: ${name}` })
+    case 'create_account':
+      return createAccount(input)
+    case 'log_transactions':
+      return logTransactions(input)
+    case 'log_income':
+      return logIncome(input)
+    case 'add_recurring_item':
+      return addRecurringItem(input)
+    case 'update_asset_value':
+      return updateAssetValue(input)
+    case 'update_account_balance':
+      return updateAccountBalance(input)
+    case 'save_memory':
+      return saveMemory(input)
+    case 'delete_memory':
+      return deleteMemory(input)
+    case 'create_skill':
+      return createCustomSkill(input)
+    default:
+      return JSON.stringify({ error: `Unknown write tool: ${name}` })
   }
 }
 
@@ -217,21 +346,33 @@ async function queryTransactions(input: ToolInput): Promise<string> {
   const to = String(input['to_date'])
   const limit = typeof input['limit'] === 'number' ? input['limit'] : 50
 
-  let rows = await db.transactions.where('date').between(from, to, true, true).toArray()
+  let rows = await db.transactions
+    .where('date')
+    .between(from, to, true, true)
+    .toArray()
 
-  if (input['direction']) rows = rows.filter((t) => t.direction === input['direction'])
-  if (typeof input['account_id'] === 'string' && input['account_id']) rows = rows.filter((t) => t.account_id === input['account_id'])
+  if (input['direction'])
+    rows = rows.filter((t) => t.direction === input['direction'])
+  if (typeof input['account_id'] === 'string' && input['account_id'])
+    rows = rows.filter((t) => t.account_id === input['account_id'])
   if (typeof input['search_note'] === 'string') {
     const q = (input['search_note'] as string).toLowerCase()
     rows = rows.filter((t) => t.note?.toLowerCase().includes(q))
   }
 
-  const [accounts, categories] = await Promise.all([db.accounts.toArray(), db.categories.toArray()])
+  const [accounts, categories] = await Promise.all([
+    db.accounts.toArray(),
+    db.categories.toArray(),
+  ])
   const accName = new Map(accounts.map((a) => [a.id, a.name]))
   const catName = new Map(categories.map((c) => [c.id, c.name]))
 
-  const totalIn = rows.filter((t) => t.direction === 'in' && !t.is_transfer).reduce((s, t) => s + t.amount, 0)
-  const totalOut = rows.filter((t) => t.direction === 'out' && !t.is_transfer).reduce((s, t) => s + t.amount, 0)
+  const totalIn = rows
+    .filter((t) => t.direction === 'in' && !t.is_transfer)
+    .reduce((s, t) => s + t.amount, 0)
+  const totalOut = rows
+    .filter((t) => t.direction === 'out' && !t.is_transfer)
+    .reduce((s, t) => s + t.amount, 0)
 
   rows.sort((a, b) => b.date.localeCompare(a.date))
   const trimmed = rows.slice(0, limit).map((t) => ({
@@ -265,6 +406,7 @@ interface TxnRow {
   note?: string
   is_transfer?: boolean
   transfer_pair_key?: string
+  recurring_item_id?: string
 }
 
 async function createAccount(input: ToolInput): Promise<string> {
@@ -308,18 +450,32 @@ async function logTransactions(input: ToolInput): Promise<string> {
   const duplicates: Record<string, unknown>[] = []
   for (const t of txns) {
     if (!accountIds.has(t.account_id)) {
-      errors.push(`No active account with id ${t.account_id} (note: "${t.note ?? ''}")`)
+      errors.push(
+        `No active account with id ${t.account_id} (note: "${t.note ?? ''}")`,
+      )
       continue
     }
     if (input['allow_duplicates'] !== true) {
-      const dup = await transactionsRepo.getDuplicateCandidate(t.date, t.amount, t.direction, t.account_id)
+      const dup = await transactionsRepo.getDuplicateCandidate(
+        t.date,
+        t.amount,
+        t.direction,
+        t.account_id,
+      )
       if (dup) {
-        duplicates.push({ date: t.date, amount: t.amount, note: t.note ?? null, existing_id: dup.id })
+        duplicates.push({
+          date: t.date,
+          amount: t.amount,
+          note: t.note ?? null,
+          existing_id: dup.id,
+        })
         continue
       }
     }
     const category = t.category_name
-      ? (categories.find((c) => c.name.toLowerCase() === t.category_name!.toLowerCase()) ?? null)
+      ? (categories.find(
+          (c) => c.name.toLowerCase() === t.category_name!.toLowerCase(),
+        ) ?? null)
       : null
     const isTransfer = t.is_transfer === true
     await db.transactions.add({
@@ -337,13 +493,27 @@ async function logTransactions(input: ToolInput): Promise<string> {
       override_note: null,
       overridden_at: null,
       is_transfer: isTransfer,
-      transfer_pair_id: isTransfer && t.transfer_pair_key ? pairIdFor(t.transfer_pair_key) : null,
-      recurring_item_id: matchRecurringItem(t, activeRecurring)?.id ?? null,
+      transfer_pair_id:
+        isTransfer && t.transfer_pair_key
+          ? pairIdFor(t.transfer_pair_key)
+          : null,
+      // An explicit, validated id from the model wins; never trust an
+      // unvalidated id (resolveRecurringItemId rejects unknown/inactive ids).
+      // Fall back to the existing description-based auto-match so untagged
+      // rows (or older prompt versions) still link automatically.
+      recurring_item_id:
+        resolveRecurringItemId(t.recurring_item_id, activeRecurring) ??
+        matchRecurringItem(t, activeRecurring)?.id ??
+        null,
       created_at: now(),
     })
     saved++
   }
-  return JSON.stringify({ saved_count: saved, errors, possible_duplicates: duplicates })
+  return JSON.stringify({
+    saved_count: saved,
+    errors,
+    possible_duplicates: duplicates,
+  })
 }
 
 async function logIncome(input: ToolInput): Promise<string> {
@@ -384,8 +554,15 @@ async function updateAssetValue(input: ToolInput): Promise<string> {
   const id = String(input['asset_id'])
   const asset = await db.assets.get(id)
   if (!asset) return JSON.stringify({ error: `No asset with id ${id}` })
-  await db.assets.update(id, { value: Number(input['new_value']), last_valued_at: todayISO() })
-  return JSON.stringify({ saved: true, asset: asset.name, new_value: input['new_value'] })
+  await db.assets.update(id, {
+    value: Number(input['new_value']),
+    last_valued_at: todayISO(),
+  })
+  return JSON.stringify({
+    saved: true,
+    asset: asset.name,
+    new_value: input['new_value'],
+  })
 }
 
 async function updateAccountBalance(input: ToolInput): Promise<string> {
@@ -394,14 +571,19 @@ async function updateAccountBalance(input: ToolInput): Promise<string> {
   if (!account) return JSON.stringify({ error: `No account with id ${id}` })
   if (account.account_type === 'bank') {
     return JSON.stringify({
-      error: 'Bank balances derive from transactions. Log a correcting transaction instead.',
+      error:
+        'Bank balances derive from transactions. Log a correcting transaction instead.',
     })
   }
   await db.accounts.update(id, {
     manual_balance_override: Number(input['new_balance']),
     last_balance_updated_at: now(),
   })
-  return JSON.stringify({ saved: true, account: account.name, new_balance: input['new_balance'] })
+  return JSON.stringify({
+    saved: true,
+    account: account.name,
+    new_balance: input['new_balance'],
+  })
 }
 
 async function saveMemory(input: ToolInput): Promise<string> {
@@ -444,23 +626,38 @@ async function createCustomSkill(input: ToolInput): Promise<string> {
 export function describeWrite(name: string, input: ToolInput): string[] {
   switch (name) {
     case 'create_account':
-      return [`New account: ${input['name']} (${input['institution']}, ${input['account_type']})`]
+      return [
+        `New account: ${input['name']} (${input['institution']}, ${input['account_type']})`,
+      ]
     case 'log_transactions': {
       const txns = (input['transactions'] ?? []) as TxnRow[]
       return txns.map(
         (t) =>
           `${t.is_transfer ? '⇄' : t.direction === 'out' ? '−' : '+'} ${formatRpFull(t.amount)} · ${t.date}` +
-          `${t.note ? ` · ${t.note}` : ''}${t.category_name ? ` (${t.category_name})` : ''}`,
+          `${t.note ? ` · ${t.note}` : ''}${t.category_name ? ` (${t.category_name})` : ''}` +
+          // Visible indicator when the model explicitly tagged this row as a
+          // recurring payment, so the user sees it before confirming (the
+          // description-based auto-match fallback resolves later at save
+          // time and isn't previewable here without a DB round trip).
+          `${t.recurring_item_id ? ' 🔁 recurring' : ''}`,
       )
     }
     case 'log_income':
-      return [`Income: ${formatRpFull(Number(input['take_home_net']))} take-home on ${input['date']}`]
+      return [
+        `Income: ${formatRpFull(Number(input['take_home_net']))} take-home on ${input['date']}`,
+      ]
     case 'add_recurring_item':
-      return [`Recurring: ${input['name']} — ${formatRpFull(Number(input['amount']))} / ${input['cadence']}`]
+      return [
+        `Recurring: ${input['name']} — ${formatRpFull(Number(input['amount']))} / ${input['cadence']}`,
+      ]
     case 'update_asset_value':
-      return [`Asset #${input['asset_id']} → ${formatRpFull(Number(input['new_value']))}`]
+      return [
+        `Asset #${input['asset_id']} → ${formatRpFull(Number(input['new_value']))}`,
+      ]
     case 'update_account_balance':
-      return [`Account #${input['account_id']} balance → ${formatRpFull(Number(input['new_balance']))}`]
+      return [
+        `Account #${input['account_id']} balance → ${formatRpFull(Number(input['new_balance']))}`,
+      ]
     case 'save_memory':
       return [`💾 Remember: "${input['content']}"`]
     case 'delete_memory':
