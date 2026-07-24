@@ -138,10 +138,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     loaded,
   ])
 
-  // Shared by both the full and quick finish paths: validates every non-empty
-  // money field BEFORE writing anything — a silent `?? 0` here corrupts the
-  // income/allowance figures that drive savings rate, FI projection, and the
-  // safe-to-spend gauge (PAIN-POINTS T5).
+  // Quick path only: its single money field is the optional starting balance.
+  // Validate it BEFORE writing anything so a malformed amount surfaces an error
+  // instead of being silently coerced to a wrong opening balance. (The full path
+  // does its own, broader validation of the income/allowance/pipe fields inline
+  // in handleFinish — same PAIN-POINTS T5 rationale, more fields.)
   function validateMoney():
     | { openingBalance: number | null; ok: true }
     | { ok: false } {
