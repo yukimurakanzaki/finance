@@ -40,19 +40,18 @@ export function TabBar() {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 'var(--space-1)',
+              gap: 3,
               border: 'none',
               background: 'none',
               cursor: 'pointer',
               color: active ? 'var(--accent-text)' : 'var(--ink-3)',
-              fontSize: 'var(--text-caption)',
-              lineHeight: 'var(--leading-caption)',
+              fontSize: 11,
               fontFamily: 'var(--font-ui)',
-              fontWeight: active ? 600 : 400,
+              fontWeight: active ? 600 : 500,
               transition: 'color .15s',
             }}
           >
-            <Icon name={t.icon} size={20} />
+            <Icon name={t.icon} size={21} />
             {t.label}
           </button>
         )
