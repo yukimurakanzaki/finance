@@ -9,12 +9,14 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY")
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")
+const MINIMAX_API_KEY = Deno.env.get("MINIMAX_API_KEY")
 
 // Model routing table — model id → { provider, apiModel }
-const MODEL_ROUTES: Record<string, { provider: "google" | "anthropic"; apiModel: string }> = {
+const MODEL_ROUTES: Record<string, { provider: "google" | "anthropic" | "minimax"; apiModel: string }> = {
   "gemini-2.5-flash": { provider: "google", apiModel: "gemini-2.5-flash" },
   "gemini-2.5-pro": { provider: "google", apiModel: "gemini-2.5-pro" },
   "claude-sonnet-4-20250514": { provider: "anthropic", apiModel: "claude-sonnet-4-20250514" },
+  "minimax-m3": { provider: "minimax", apiModel: "minimax-m3" },
 }
 
 const MAX_TOKENS_CAP = 8000
@@ -281,6 +283,40 @@ async function callAnthropic(
   return data
 }
 
+async function callMinimax(
+  apiModel: string,
+  maxTokens: number,
+  system: string | undefined,
+  tools: unknown[] | undefined,
+  messages: any[],
+): Promise<any> {
+  if (!MINIMAX_API_KEY) throw new Error("Server missing MINIMAX_API_KEY secret")
+
+  const body: Record<string, unknown> = {
+    model: apiModel,
+    max_tokens: maxTokens,
+    messages,
+  }
+  if (system) body.system = system
+  if (tools && tools.length > 0) body.tools = tools
+
+  const res = await fetch("https://api.minimax.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "Authorization": `Bearer ${MINIMAX_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error?.message || `Minimax API error (${res.status})`)
+  }
+
+  return data
+}
+
 // ===== HANDLER =====
 
 Deno.serve(async (req: Request) => {
@@ -341,6 +377,8 @@ Deno.serve(async (req: Request) => {
   try {
     result = route.provider === "google"
       ? await callGemini(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
+      : route.provider === "minimax"
+      ? await callMinimax(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
       : await callAnthropic(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
   } catch (err) {
     result = { error: `Proxy error: ${String(err)}` }

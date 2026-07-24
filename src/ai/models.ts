@@ -5,24 +5,28 @@
 export interface ModelConfig {
   id: string
   name: string
-  provider: 'google' | 'anthropic'
+  provider: 'google' | 'anthropic' | 'minimax'
   contextWindow: number
   maxOutput: number
   costTier: 'free' | 'standard' | 'premium'
 }
 
+// Ponytail: client model id MUST match the deployed proxy's allowlist. The
+// proxy now routes `minimax-m3` to MiniMax's Anthropic-compatible /v1/messages
+// endpoint (Bearer auth, no version header). Swap DEFAULT_MODEL when proxy
+// allowlist changes.
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {
-    id: 'claude-sonnet-4-20250514',
-    name: 'Claude Sonnet',
-    provider: 'anthropic',
+    id: 'minimax-m3',
+    name: 'Minimax M3',
+    provider: 'minimax',
     contextWindow: 200_000,
-    maxOutput: 16_384,
-    costTier: 'premium',
+    maxOutput: 8_000,
+    costTier: 'standard',
   },
 ]
 
-export const DEFAULT_MODEL = 'claude-sonnet-4-20250514'
+export const DEFAULT_MODEL = 'minimax-m3'
 
 export function getModelConfig(id: string): ModelConfig | undefined {
   return AVAILABLE_MODELS.find((m) => m.id === id)

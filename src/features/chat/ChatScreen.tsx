@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { useChatStore, type ApiMessage } from '@stores/chatStore'
 import { supabase, supabaseConfigured } from '@lib/supabaseClient'
 import { describeWrite } from '../../ai/tools'
+import { DEFAULT_MODEL } from '../../ai/models'
 import { Btn, Input } from '@components/FormField'
 import { SessionList } from './SessionList'
 import { ModelPicker } from './ModelPicker'
@@ -97,8 +98,8 @@ function SignIn() {
         onKeyDown={(e) => { if (e.key === 'Enter') handleSignIn() }}
       />
       {error && (
-        <div style={{ fontSize: 12, color: '#ef4444' }}>{error}</div>
-      )}
+              <div style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>
+            )}
       <Btn onClick={handleSignIn} disabled={!email.trim() || !password || busy} fullWidth>
         Sign in
       </Btn>
@@ -111,8 +112,9 @@ function SignIn() {
 function Conversation() {
   const {
     hydrated, messages, status, error, pendingWrites,
-    hydrate, sendMessage, resolvePending, clearSession,
+    hydrate, sendMessage, resolvePending, clearSession, stopTurn,
     sessions, activeSessionId, setSessionModel, setSessionSkills,
+    discardedPendingNotice, clearDiscardedNotice,
   } = useChatStore()
   const [input, setInput] = useState('')
   const [images, setImages] = useState<{ media_type: string; data: string }[]>([])
@@ -121,9 +123,12 @@ function Conversation() {
   const [showSessions, setShowSessions] = useState(false)
   const [showModel, setShowModel] = useState(false)
   const [showSkills, setShowSkills] = useState(false)
+  // Audit C7: two-step inline confirm instead of window.confirm (which uses
+  // the OS-native dialog and is off-design-system).
+  const [clearArmed, setClearArmed] = useState(false)
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null
-  const currentModel = activeSession?.model || 'claude-sonnet-4-20250514'
+  const currentModel = activeSession?.model || DEFAULT_MODEL
   const currentSkills = activeSession?.skills || []
 
   useEffect(() => { hydrate() }, [hydrate])
@@ -251,10 +256,49 @@ function Conversation() {
         {messages.map((m, i) => <MessageBubble key={i} msg={m} />)}
 
         {status === 'thinking' && (
-          <div aria-live="polite" style={{ alignSelf: 'flex-start', color: 'var(--ink-3)', fontSize: 12, padding: '8px 12px' }}>
-            Thinking…
-          </div>
-        )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start' }}>
+                    <div aria-live="polite" style={{ color: 'var(--ink-3)', fontSize: 12, padding: '8px 12px' }}>
+                      Thinking…
+                    </div>
+                    {/* Audit C2: Stop button. Visible only during a turn; aborts the
+                        active loop via AbortController. */}
+                    <button
+                      onClick={stopTurn}
+                      aria-label="Stop the AI"
+                      style={{
+                        background: 'var(--bg-2)', border: '1px solid var(--border-2)',
+                        borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                        color: 'var(--ink-2)', cursor: 'pointer',
+                      }}
+                    >
+                      ■ Stop
+                    </button>
+                  </div>
+                )}
+
+                {/* Audit B1: surface a notice when the previous session ended on a
+                    dangling tool_use and we (correctly) dropped it. The user saw a
+                    confirmation card before the app closed; tell them nothing was saved. */}
+                {discardedPendingNotice && (
+                  <div role="status" style={{
+                    alignSelf: 'stretch', background: 'var(--amber-bg)',
+                    border: '1px solid var(--amber)', borderRadius: 10,
+                    padding: '10px 12px', fontSize: 12, color: 'var(--amber-text)',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <span style={{ flex: 1 }}>{discardedPendingNotice}</span>
+                    <button
+                      onClick={clearDiscardedNotice}
+                      aria-label="Dismiss notice"
+                      style={{
+                        background: 'none', border: 'none', color: 'var(--amber-text)',
+                        cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
 
         {status === 'awaiting_confirm' && pendingWrites.length > 0 && (
           <ConfirmCard
@@ -265,13 +309,17 @@ function Conversation() {
         )}
 
         {error && (
-          <div role="alert" style={{
-            alignSelf: 'stretch', background: 'rgba(239,68,68,.08)', border: '1px solid #7f1d1d',
-            borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#ef4444',
-          }}>
-            {error}
-          </div>
-        )}
+                  <div role="alert" style={{
+                    // Audit A3: error states use the amber token family, not red.
+                    // Red is reserved for money numbers and destructive actions on
+                    // amounts; system errors are calm info, not alarms.
+                    alignSelf: 'stretch', background: 'var(--amber-bg)',
+                    border: '1px solid var(--amber)', borderRadius: 10,
+                    padding: '10px 12px', fontSize: 12, color: 'var(--amber-text)',
+                  }}>
+                    {error}
+                  </div>
+                )}
         <div ref={bottomRef} />
       </div>
 
@@ -356,19 +404,48 @@ function Conversation() {
         </button>
       </div>
 
-      {/* Footer: clear chat */}
-      {messages.length > 0 && (
-        <button
-          onClick={() => { if (window.confirm('Clear this conversation?')) clearSession() }}
-          style={{
-            background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 10,
-            padding: '4px 0 8px', cursor: 'pointer', fontFamily: 'var(--font-ui)',
-            textTransform: 'uppercase', letterSpacing: '.5px',
-          }}
-        >
-          Clear conversation
-        </button>
-      )}
+      {/* Footer: clear chat — Audit C7 inline two-step confirm */}
+            {messages.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, padding: '4px 0 8px' }}>
+                {!clearArmed ? (
+                  <button
+                    onClick={() => setClearArmed(true)}
+                    style={{
+                      background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 10,
+                      padding: 0, cursor: 'pointer', fontFamily: 'var(--font-ui)',
+                      textTransform: 'uppercase', letterSpacing: '.5px',
+                    }}
+                  >
+                    Clear conversation
+                  </button>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 11, color: 'var(--ink-2)', alignSelf: 'center' }}>
+                      Clear this conversation?
+                    </span>
+                    <button
+                      onClick={() => { setClearArmed(false); clearSession() }}
+                      style={{
+                        background: 'var(--bg-2)', border: '1px solid var(--amber)',
+                        borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 600,
+                        color: 'var(--amber-text)', cursor: 'pointer',
+                      }}
+                    >
+                      Yes, clear
+                    </button>
+                    <button
+                      onClick={() => setClearArmed(false)}
+                      style={{
+                        background: 'none', border: 'none', fontSize: 11,
+                        color: 'var(--ink-3)', cursor: 'pointer', padding: 0,
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
       {/* Pickers */}
       <SessionList open={showSessions} onClose={() => setShowSessions(false)} />
