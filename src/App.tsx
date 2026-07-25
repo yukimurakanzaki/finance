@@ -58,7 +58,7 @@ function AppShell() {
         <div
           style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
         >
-          <AppBar title="Reconcile" subtitle="Review & approve" />
+          <AppBar title="Reconcile" />
           <main style={{ flex: 1, overflowY: 'auto' }}>
             <ReconcileConfirmScreen />
           </main>
@@ -68,7 +68,7 @@ function AppShell() {
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <AppBar title="Reconcile" subtitle="Import transactions" />
+        <AppBar title="Reconcile" />
         <main style={{ flex: 1, overflowY: 'auto' }}>
           <ReconcileEntryScreen />
         </main>
@@ -77,33 +77,14 @@ function AppShell() {
     )
   }
 
+  // Slim AppBar (PAIN-POINTS.md D9): title only, no subtitle line.
   const SCREENS = {
-    today: {
-      title: 'Today',
-      subtitle: 'Daily transaction log',
-      component: <TodayScreen />,
-    },
-    budget: {
-      title: 'Budget',
-      subtitle: 'This workweek',
-      component: <BudgetScreen />,
-    },
-    chat: {
-      title: 'Manager',
-      subtitle: 'Your AI finance partner',
-      component: <ChatScreen />,
-    },
-    assets: {
-      title: 'Assets',
-      subtitle: 'Accounts & assets',
-      component: <AssetsScreen />,
-    },
-    report: {
-      title: 'Report',
-      subtitle: 'The Scoreboard',
-      component: <ReportScreen />,
-    },
-    more: { title: 'More', subtitle: '', component: <MoreScreen /> },
+    today: { title: 'Today', component: <TodayScreen /> },
+    budget: { title: 'Budget', component: <BudgetScreen /> },
+    chat: { title: 'Manager', component: <ChatScreen /> },
+    assets: { title: 'Assets', component: <AssetsScreen /> },
+    report: { title: 'Report', component: <ReportScreen /> },
+    more: { title: 'More', component: <MoreScreen /> },
   }
 
   const screen = SCREENS[activeTab]
@@ -112,7 +93,7 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <AppBar title={screen.title} subtitle={screen.subtitle} />
+      <AppBar title={screen.title} />
       <main style={{ flex: 1, overflowY: isChat ? 'hidden' : 'auto' }}>
         {screen.component}
       </main>
@@ -121,18 +102,20 @@ function AppShell() {
   )
 }
 
-function AppBar({ title }: { title: string; subtitle: string }) {
+// Slim, single-row app bar (PAIN-POINTS.md D9): ~44-48px tall, title only —
+// down from the old ~64px title+subtitle bar. Reclaimed space goes to each
+// screen's own hero number (Calm Ledger v2 §8).
+function AppBar({ title }: { title: string }) {
   return (
     <div
       style={{
-        minHeight: '44px',
-        padding: '0 var(--space-4)',
-        paddingTop: 'env(safe-area-inset-top)',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '12px 16px',
+        paddingTop: 'calc(12px + env(safe-area-inset-top))',
         borderBottom: '1px solid var(--border-1)',
         background: 'var(--bg-1)',
         flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
       }}
     >
       <h1

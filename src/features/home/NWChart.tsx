@@ -1,9 +1,12 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { Card } from '@components/ui'
 import { db } from '@db/db'
 import { formatRp } from '@lib/currency'
+import { useLiveQuery } from 'dexie-react-hooks'
 
 export function NWChart() {
-  const snapshots = useLiveQuery(() => db.netWorthSnapshots.orderBy('year_month').toArray()) ?? []
+  const snapshots =
+    useLiveQuery(() => db.netWorthSnapshots.orderBy('year_month').toArray()) ??
+    []
 
   if (snapshots.length < 2) return null
 
@@ -16,11 +19,13 @@ export function NWChart() {
   const H = 72
   const PAD = 6
 
-  const points = snapshots.map((s, i) => {
-    const x = PAD + (i / (snapshots.length - 1)) * (W - PAD * 2)
-    const y = H - PAD - ((s.total - min) / range) * (H - PAD * 2)
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  }).join(' ')
+  const points = snapshots
+    .map((s, i) => {
+      const x = PAD + (i / (snapshots.length - 1)) * (W - PAD * 2)
+      const y = H - PAD - ((s.total - min) / range) * (H - PAD * 2)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
 
   const last = snapshots[snapshots.length - 1]
   const prev = snapshots[snapshots.length - 2]
@@ -28,24 +33,56 @@ export function NWChart() {
   const positive = delta !== null && delta >= 0
 
   return (
-    <div style={{
-      background: 'var(--bg-1)', borderRadius: 14,
-      border: '1px solid var(--border-1)', padding: '14px 18px',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+    <Card>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: 'var(--space-3)',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 'var(--text-caption)',
+            lineHeight: 'var(--leading-caption)',
+            fontWeight: 600,
+            letterSpacing: '.5px',
+            textTransform: 'uppercase',
+            color: 'var(--ink-3)',
+          }}
+        >
           Net Worth Trend
         </div>
         {delta !== null && (
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: positive ? 'var(--engine)' : '#ef4444' }}>
-            {positive ? '+' : '−'}{formatRp(Math.abs(delta))} vs last mo
+          <div
+            style={{
+              fontSize: 'var(--text-caption)',
+              lineHeight: 'var(--leading-caption)',
+              fontFamily: 'var(--font-mono)',
+              // Kept as the pre-migration hex literal on purpose — the "one
+              // accent" rule (D8) governs new stray accents, not preserving an
+              // existing bespoke negative-delta red during a rendering-only
+              // migration (AssetsScreen.tsx's refreshError follows the same
+              // precedent).
+              color: positive ? 'var(--engine)' : '#ef4444',
+            }}
+          >
+            {positive ? '+' : '−'}
+            {formatRp(Math.abs(delta))} vs last mo
           </div>
         )}
       </div>
 
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: H, display: 'block', overflow: 'visible' }}
+        style={{
+          width: '100%',
+          height: H,
+          display: 'block',
+          overflow: 'visible',
+        }}
+        aria-hidden="true"
       >
         {/* Fill area */}
         <defs>
@@ -56,26 +93,54 @@ export function NWChart() {
         </defs>
         <polyline
           points={`${PAD},${H - PAD} ${points} ${W - PAD},${H - PAD}`}
-          fill="url(#nw-grad)" stroke="none"
+          fill="url(#nw-grad)"
+          stroke="none"
         />
         <polyline
           points={points}
-          fill="none" stroke="var(--amber)" strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round"
+          fill="none"
+          stroke="var(--amber)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
         {/* Last point dot */}
-        {snapshots.length > 0 && (() => {
-          const lastIdx = snapshots.length - 1
-          const x = PAD + (lastIdx / (snapshots.length - 1)) * (W - PAD * 2)
-          const y = H - PAD - ((last!.total - min) / range) * (H - PAD * 2)
-          return <circle cx={x} cy={y} r={3.5} fill="var(--amber)" />
-        })()}
+        {snapshots.length > 0 &&
+          (() => {
+            const lastIdx = snapshots.length - 1
+            const x = PAD + (lastIdx / (snapshots.length - 1)) * (W - PAD * 2)
+            const y =
+              H - PAD - (((last?.total ?? 0) - min) / range) * (H - PAD * 2)
+            return <circle cx={x} cy={y} r={3.5} fill="var(--amber)" />
+          })()}
       </svg>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-        <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{snapshots[0]?.year_month}</div>
-        <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{snapshots[snapshots.length - 1]?.year_month}</div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: 'var(--space-1)',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 'var(--text-caption)',
+            lineHeight: 'var(--leading-caption)',
+            color: 'var(--ink-3)',
+          }}
+        >
+          {snapshots[0]?.year_month}
+        </div>
+        <div
+          style={{
+            fontSize: 'var(--text-caption)',
+            lineHeight: 'var(--leading-caption)',
+            color: 'var(--ink-3)',
+          }}
+        >
+          {snapshots[snapshots.length - 1]?.year_month}
+        </div>
       </div>
-    </div>
+    </Card>
   )
 }

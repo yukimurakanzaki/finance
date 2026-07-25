@@ -1763,6 +1763,348 @@ This is a structural change, not a UI fix. Update:
 
 ---
 
+## 22. Field / Input Primitive Audit
+
+*Pre-implementation audit for M3-003 Auth/Household. Conducted before the screen audit because every form in the app composes `Field` + `Input` from `@components/FormField`. If the primitives don't satisfy Auth/Household's needs, screen migration will invent wrappers — exactly the problem the Calm Ledger primitive layer is supposed to prevent.*
+
+### 22.1 Scope
+
+| File | LOC | Role |
+|---|---:|---|
+| `src/components/FormField.tsx` | 84 | Defines `Field`, `Input`, `Select`, `Btn` (composite primitives) |
+
+`Field`, `Input`, and `Select` are NOT in `@components/ui` (the design-token primitive layer). They live in `@components/FormField` as a separate, behavior-focused primitive set. `Btn` lives here too but follows the visual primitive pattern.
+
+### 22.2 Standardized audit metrics
+
+| Metric | Result |
+|---|---:|
+| Primitive adoption (auth/onboarding use) | **100%** (every form uses `Field` + `Input` from FormField) |
+| Token debt contribution | **4 raw literals** (Field label `fontSize: 11`, `letterSpacing: '.4px'`; Input `borderRadius: 8`, `padding: '10px 12px'`, `fontSize: 14`) |
+| Boundary ownership | **PASS** (no feature imports; only `@components/FormField`) |
+| Accessibility | **PARTIAL** — structural, but missing label-input association and invalid-state propagation |
+| Responsive | **PASS** (full-width default) |
+| Calm Ledger compliance | **5/10** — uses tokens but has no semantic primitives (no `required`, `hint`, `error-as-aria-describedby`) |
+| Migration Gate (§13) | **PASS** |
+| Estimated token reduction | **0** (composite primitives don't get migrated; they get enhanced) |
+| Recommendation | **Enhance Field + Input; do NOT rewrite** |
+
+### 22.3 Field checklist
+
+| Concern | Current State | Verdict |
+|---|---|---|
+| **Label** | `<label>` element with `fontSize: 11`, `fontWeight: 600`, `textTransform: 'uppercase'` | ✅ Renders correctly |
+| **Label → input association (`htmlFor` + `id`)** | **MISSING.** The `<label>` inside Field is not linked to any input via `htmlFor` or `id`. | ❌ Screen readers may not associate the label with the input. |
+| **Required indicator** | **Hand-rolled in label string** (`"Email *"`, `"Household name *"`). Field has no `required` prop. | ❌ Inconsistent. Field can't render the asterisk consistently. |
+| **Optional indicator** | **Hand-rolled** (`"Display name (optional)"`). | ❌ Inconsistent. |
+| **Helper text (`hint`)** | **Hand-rolled sibling div** outside Field. Pattern repeated in 8+ forms. | ❌ Not composable with Field. |
+| **Error text** | Field accepts `error` prop but most forms put errors **outside** Field as a `role="alert"` div (TransactionForm:239, AllowanceEditor:55, AssumptionsEditor:149, HouseholdSheet:166, AuthScreen:83/153, ImportPromptSheet:124, OnboardingWizard:376). | ❌ Error rendering is inconsistent and Field's `error` prop is mostly unused. |
+| **Disabled state** | N/A — Field itself is just a layout wrapper. Input handles `disabled`. | ✅ |
+| **Spacing via tokens** | `gap: 6` between label/children/error (line 9) — `6` is not a token. | ⚠️ Should be `var(--space-2)`. |
+
+### 22.4 Input checklist
+
+| Concern | Current State | Verdict |
+|---|---|---|
+| **Default state** | `background: 'var(--bg-2)'`, `border: '1px solid var(--border-2)'`, `padding: '10px 12px'`, `fontSize: 14`, `borderRadius: 8` | ✅ All tokens except `padding` and `borderRadius` |
+| **Focused state** | **MISSING.** No `:focus` or `:focus-visible` style defined. Browser default outline only (`outline: 'none'` actually REMOVES the default). | ❌ Keyboard users get no visual focus indication. |
+| **Disabled state** | Inherited from native `disabled` attribute (browser grey-out). | ✅ |
+| **Error state** | **MISSING.** No `aria-invalid`, no error border. | ❌ |
+| **Read-only state** | Inherited from native `readonly` attribute (browser). | ✅ |
+| **Type variants** | Inherits all native types (`text`, `email`, `password`, `date`, `number`, etc.) via `InputHTMLAttributes<HTMLInputElement>` spread. | ✅ |
+| **`mono` variant** | Custom prop: `fontFamily: 'var(--font-mono)'` | ✅ |
+| **`autoComplete`** | Spread from props; consumers pass `email`, `current-password`, `new-password`, `off`, etc. | ✅ |
+| **`inputMode`** | Spread from props; consumers pass `numeric`, `email`, etc. | ✅ |
+| **Password visibility toggle** | **MISSING.** PIN and password fields have no show/hide. AuthScreen.password line 73-80 has no toggle. | ❌ Not blocking but expected for password UX. |
+| **Submit on Enter** | **MISSING.** AuthScreen.SignInUp.submit() only fires on button click. No `onKeyDown` on inputs. | ❌ Standard UX expectation. |
+| **Currency / number formatting** | Consumers pass `type="text" inputMode="numeric"` and use `parseRpInput` (TransactionForm, OnboardingWizard). No built-in currency formatting. | ✅ Sufficient — text+mono+parseRp is the established pattern. |
+| **`textarea` support** | **MISSING.** No `Textarea` primitive. Only `<input>` (single line). | ⚠️ Not needed for Auth/Household (no multi-line inputs there). Out of scope for M3-003. |
+| **`type="file"` support** | **MISSING.** TodayScreen, ChatScreen, RestoreBackup use raw `<input type="file">` outside FormField. | ❌ Out of scope for M3-003. |
+| **Padding** | `padding: '10px 12px'` — raw literals, should be `var(--space-2)' 'var(--space-3)'`. | ❌ Caught by lint script. |
+| **`borderRadius`** | `borderRadius: 8` — raw, should be `var(--space-2)`. | ❌ Caught by lint script. |
+| **`fontSize`** | `fontSize: 14` — raw, should be `var(--text-body)`. | ❌ Caught by lint script. |
+
+### 22.5 Select checklist
+
+| Concern | Current State | Verdict |
+|---|---|---|
+| Default state | Similar to Input (uses `var(--bg-2)`, `var(--border-2)`, raw `fontSize: 14`, `borderRadius: 8`) | ⚠️ Tokens for color/border, raw for font/radius |
+| Custom dropdown arrow | SVG data URL with hardcoded stroke color `#8892a8` | ⚠️ Should use a token color. SVG format is fine. |
+| Disabled, error states | Not handled | ❌ |
+| Grouping with Field | Works via `Field` wrapper | ✅ |
+
+### 22.6 Btn checklist
+
+| Concern | Current State | Verdict |
+|---|---|---|
+| Variants | `primary`, `secondary`, `danger` | ✅ |
+| **Danger color** | `color: '#ef4444'`, `border: '1px solid #7f1d1d'` — hardcoded hex | ❌ Same `--danger`/`--warning` token gap as Settings audit |
+| Touch target | `padding: '12px 0'` — vertical only. Horizontal padding depends on parent or `fullWidth`. Default height ≈ 44px (fontSize 14 + lineHeight + padding) ✅ but not guaranteed. | ⚠️ Should add explicit `minHeight: 'var(--space-5)'` (24px) + check rendered height |
+| Disabled state | `opacity: .5` + `cursor: default` | ✅ |
+| Loading state | **MISSING.** AuthScreen.SignInUp has manual `busy ? 'Working…' : 'Sign in'` text but no visual indicator. | ⚠️ Acceptable for now (button text change). |
+
+### 22.7 Real-world usage gaps
+
+Surveyed all 8 forms using `Field`/`Input`:
+
+| Form | Required indicator | Hint text | Error display | Submit on Enter |
+|---|---|---|---|---|
+| `AuthScreen.SignInUp` | Hand-rolled `*` | None | Outside Field, `role="alert"` | ❌ |
+| `AuthScreen.HouseholdSetup` | Hand-rolled `*` | None | Outside Field, `role="alert"` | ❌ |
+| `OnboardingWizard` | Hand-rolled `*` | Custom `<div>` outside Field | Outside Field, `role="alert"` | ❌ |
+| `PinSetup` | Hand-rolled `*` | None | Inline `<div>` with `role="alert"` | ❌ |
+| `AllowanceEditor` | None | None | Outside Field | ❌ |
+| `AssumptionsEditor` | None | None | Inline `<div>` outside Field | ❌ |
+| `CategoryManager` (CategoryForm) | `*` | None | n/a (uses BottomSheet close) | ❌ |
+| `AccountForm` / `AssetForm` | `*` | None | Inline `<div>` outside Field | ❌ |
+| `TransactionForm` | `*` | None | Inline `<div>` outside Field | ❌ |
+| `RecurringRegister` | `*` | None | n/a | ❌ |
+| `IncomeLog` | `*` | None | n/a | ❌ |
+| `RestoreBackup` | n/a | None | n/a | ❌ |
+
+**Pattern:** Every form hand-rolls `*` in the label string. Every form puts `role="alert"` error text outside Field. No form supports submit-on-Enter.
+
+### 22.8 Auth-specific needs
+
+`AuthScreen` and `OnboardingWizard` together exercise the most demanding form patterns in the app. They need:
+
+| Need | Current Support | Gap |
+|---|---|---|
+| Email input with autocomplete | ✅ Native | — |
+| Password input | ✅ Native | No visibility toggle (acceptable) |
+| Invite-code uppercase input | Custom (`toUpperCase()` + `letterSpacing: '2px'` in consumer) | Should be a primitive concern or explicit hint |
+| Money input (gross, take-home, pipes, allowance, weekend) | `type="text" inputMode="numeric" mono` (OnboardingWizard, AllowanceEditor) | Pattern is established but not encapsulated |
+| Date input | ✅ Native (`type="date"`) | — |
+| 4-step wizard with progress | Custom progress bar (line 222-228 of OnboardingWizard) | Should be a primitive if reused |
+| Draft persistence across reloads | ✅ `onboarding_draft` appSetting | — |
+| Error on submit (not per-field) | Pattern uses inline alert | Should be lifted to Field error state |
+| Submit on Enter | ❌ Not supported | Need `Field` wrapper with `<form onSubmit>` |
+| `busy` state on submit | ✅ Button text changes | Could use `<Btn loading>` for visual indicator |
+
+### 22.9 Recommendation: Enhance, don't rewrite
+
+`Field` and `Input` are **close to production-ready** but have three concrete gaps that must be closed before Auth/Household migration:
+
+#### Gap 1: Label-input association (a11y correctness)
+
+Add `htmlFor`/`id` linking. Use a `useId()`-based id, or require it via prop:
+
+```tsx
+<Field label="Email" id="auth-email">
+  <Input id="auth-email" type="email" ... />
+</Field>
+```
+
+The `useId()` approach (React 18+) is cleaner: Field generates an id, passes it to the label via `htmlFor`, consumers render `<Input id={id}>` via a clone pattern. Or simpler: `Field` accepts `children` and clones `id`/`aria-describedby` into the single React element child.
+
+#### Gap 2: Required + optional indicators
+
+Add `required?: boolean` to `Field`. Render `*` automatically when true. Drop hand-rolled asterisks from all 12 forms.
+
+#### Gap 3: Hint text + error state integration
+
+Add `hint?: string` and `error?: string` to `Field` (already has `error`). Make `error` propagate `aria-invalid="true"` and `aria-describedby` to the input. Add visible error styling on Input.
+
+#### Gap 4: Submit on Enter (form wrapper)
+
+Add `<Form onSubmit>` primitive that wraps fields + a submit button, handles Enter-to-submit, sets `aria-busy` on inputs while submitting. This is a small but high-impact addition.
+
+#### Gap 5: Focus styling
+
+Add `:focus-visible` style to Input (and Select) — 2px `var(--amber)` outline + 1px offset. Without this, keyboard users can't see which field they're on.
+
+### 22.10 Estimated work
+
+| Enhancement | LOC | Risk | Block M3-003? |
+|---|---|---|---|
+| Field `htmlFor` + `id` linking | ~15 | Low | Yes |
+| Field `required` prop + asterisk | ~5 | Low | Yes |
+| Field `hint` prop + composition | ~15 | Low | Yes |
+| Field `error` → `aria-invalid` + `aria-describedby` on input | ~20 | Low | Yes |
+| Input `:focus-visible` style | ~10 | Low | Yes |
+| `<Form>` primitive with submit-on-Enter | ~40 | Medium | **No** — fallback to manual `onKeyDown` |
+| Token replacements (`fontSize: 14`, `borderRadius: 8`, `padding: '10px 12px'`, `letterSpacing: '.4px'`) | ~6 | Low | Yes |
+| Total | **~110 LOC** | Low-Medium | — |
+
+### 22.11 Verdict
+
+| Primitive | Status |
+|---|---|
+| `Field` | **Needs Enhancement** — add `htmlFor` linking, `required`, `hint`, integrate `error` into input via `aria-describedby` + `aria-invalid` |
+| `Input` | **Needs Enhancement** — add `:focus-visible` style, error border, token replacements |
+| `Select` | **Needs Enhancement** — token replacements + error state |
+| `Btn` | **Needs Enhancement** — danger color tokens, explicit touch target |
+
+After these enhancements, every Auth/Household form becomes a composition of existing primitives, no wrappers required.
+
+### 22.12 Migration Gate (§13) check
+
+| Gate condition | Status |
+|---|---|
+| Product Integrity = Pass | **Pass** — primitives are static UI; no engine. |
+| IA ownership decided | **Pass** — primitive layer owned by `@components/FormField`. |
+| Decision Register items resolved | **Pass** — none pending. |
+| Primitive migration plan identified | **Pass** — this audit identifies the gaps. |
+
+**Migration Gate: SATISFIED** — once the gaps above are closed.
+
+---
+
+## 23. M3-003 Auth/Household Migration Audit
+
+*Pre-implementation audit. Conducted after §22 primitive audit because Auth/Household is the heaviest consumer of form primitives. v0.4.0 tagged at the start of this milestone.*
+
+### 23.1 Scope
+
+| File | LOC | Role |
+|---|---:|---|
+| `src/features/auth/AuthScreen.tsx` | 190 | Sign in / sign up + household create / join |
+| `src/features/onboarding/OnboardingWizard.tsx` | 416 | 4-step setup wizard for new admins |
+| `src/stores/authStore.ts` | 151 | Auth + household lifecycle state machine |
+| `src/components/PinLockScreen.tsx` | 117 | Local PIN gate after auth |
+
+(Plus `HouseholdSheet.tsx` already audited under M3-002 Settings — at 0 raw literals after that migration.)
+
+### 23.2 Track A — UX / Journey state matrix
+
+The runtime state machine for an Auth/Household user:
+
+| State | Expected screen | Actual behavior | Verdict |
+|---|---|---|---|
+| **No session, fresh install** | `AuthScreen` → `SignInUp` form | `App.tsx:161-167`: status=`signed_out` → `<AuthScreen />` → `<SignInUp>` | ✅ |
+| **No session, returning user** | `AuthScreen` → `SignInUp` form | Same — pre-fills `autoComplete="email"` | ✅ |
+| **Sign-up with email confirmation required** | "Check your email" notice in form | `authStore.signUp:118` sets notice on `!data.session` | ✅ |
+| **Sign-in success, existing household** | `AppShell` immediately | `onAuthStateChange:74-79` resolves household → `status='ready'` → `<AuthedApp>` → `<AppShell>` | ✅ |
+| **Sign-in success, no household** | `AuthScreen` → `HouseholdSetup` form | `resolveHousehold:36-44` returns `status='no_household'` → `<AuthScreen />` → `<HouseholdSetup>` | ✅ |
+| **Sign-in success, household but not configured** | `AppShell` if `setup_complete === 'true'`; else `OnboardingWizard` | `App.tsx:51-53` checks `setup_complete` flag | ❌ **§17.5 Bug 3** — per-device flag; an invited member on a fresh device sees the wizard even if admin configured everything |
+| **Create household (first admin)** | `AppShell` → `OnboardingWizard` if `setup_complete !== 'true'` | `authStore.createHousehold:136` sets `status='ready'` but does NOT mark `setup_complete` → wizard appears | ✅ (intended) |
+| **Join household (invited member) on new device** | `AppShell` (inherits admin's setup) | `authStore.joinHousehold:148` sets `status='ready'` → `AppShell` renders → `setup_complete === null` on this device → `OnboardingWizard` appears | ❌ **§17.5 Bug 1+2** — invited member is forced through admin wizard, re-entering income/pipes/allowance |
+| **Transfer admin to another member** | Current admin becomes member; new admin can invite/remove/transfer | `transfer_admin` RPC (SQL) → `memberships.role='admin'` for new admin, `'member'` for previous | ✅ |
+| **Sign out** | `AuthScreen` → `SignInUp` | `authStore.signOut:125` sets `status='signed_out'` | ✅ |
+| **PIN lock on app switch** | `PinLockScreen` | `App.tsx:177-178` | ✅ |
+| **No PIN configured, returning user** | `AppShell` directly | `App.tsx:177` skipped when `!pinConfigured` | ✅ |
+| **Household removed (last admin transfers then leaves)** | Recovery / rejoin flow | **MISSING** — no UI handles this | ⚠️ Low priority (rare scenario) |
+| **Session expired while in AppShell** | Show sign-in | `onAuthStateChange:69` sets `status='signed_out'` → `<AuthScreen />` | ✅ |
+
+### 23.3 §17.5 carryover implementation gaps
+
+From §17.5 (M2 close-out audit), three concrete M3-003 implementation gaps:
+
+| # | Gap | Evidence in current code |
+|---|---|---|
+| 1 | **Invited members bypass the admin `OnboardingWizard`** | `App.tsx:24-30` `useSetupComplete()` reads `setup_complete` from Dexie `appSettings` (per-device). An invited member on a fresh phone has no `setup_complete`, so the wizard fires. |
+| 2 | **Invited members land directly in `AppShell` with inherited household configuration** | Same root cause. Need to check household-side state (e.g. `assumptions` table has a row for this household) rather than device-side `setup_complete` flag. |
+| 3 | **`setup_complete` becomes household-aware rather than device-only** | Same root cause. The flag should be derived from household state (e.g. `assumptions` row exists for this `household_id`) or set server-side via an RPC during household creation. |
+
+All three are the **same underlying issue**: `setup_complete` lives in the wrong place.
+
+### 23.4 Standardized audit metrics
+
+| Metric | Result |
+|---|---:|
+| Primitive adoption | **0%** of `@components/ui` (Screen, Card, Row, SectionHeader, Icon all unused) |
+| Primitive adoption (FormField) | **100%** of form primitives (`Field` + `Input` + `Select` + `Btn`) |
+| Token debt contribution | **26 / 398 (6.5%)** — 13 in `AuthScreen`, 13 in `OnboardingWizard`, 0 in `PinLockScreen`, 0 in `authStore` (logic only) |
+| Boundary ownership | **PASS** — no cross-feature imports; only `@db/*`, `@lib/*`, `@stores/authStore`, `@stores/reconcileStore`, `@components/FormField`, `@components/BottomSheet`, `@components/PinSetup` |
+| Accessibility | **FAIL** — no `aria-label` on form inputs, no `aria-busy` on busy state, no submit-on-Enter, no `useId`-based label association |
+| Responsive | **PASS** — `max-width: 420`, `width: '100%'` for form containers |
+| Calm Ledger compliance | **4/10** — typography/spacing/colors use tokens, but custom layout and no primitive reuse |
+| Migration Gate (§13) | **PARTIAL** — blocked on §22 primitive gaps |
+| Estimated token reduction | **~26** (after primitive gaps fixed) |
+| Recommendation | **Enhance primitives first, then moderate migration** |
+
+### 23.5 Token debt per file
+
+| File | Raw literals | Action |
+|---|---:|---|
+| `AuthScreen.tsx` | 13 | Token migration after Field/Input enhanced |
+| `OnboardingWizard.tsx` | 13 | Token migration after Field/Input enhanced; also rewrite 4-step progress |
+| `authStore.ts` | 0 | Logic only — no migration needed |
+| `PinLockScreen.tsx` | 0 | Already token-clean |
+| **Total** | **26** | |
+
+### 23.6 Accessibility audit
+
+| Element | Issue |
+|---|---|
+| Email input (line 65-71) | No `aria-label`, no `aria-describedby` (no error/hint link). `autoComplete="email"` set correctly. |
+| Password input (line 75-80) | No `aria-label`. |
+| Display name input (line 60) | No `aria-label` ("Display name (optional)" in label is not linked via `htmlFor`). |
+| Mode-toggle button (line 90-104) | No `aria-label`, just visual text "Don't have an account? Sign up". |
+| Sign-out button (line 172-186) | No `aria-label`. |
+| OnboardingWizard inputs | Same pattern, no aria labels/links. |
+| OnboardingWizard error (line 376) | `role="alert"` ✅ |
+| Submit button | Text-only (no `aria-label`). |
+| PIN entry (`PinSetup`) | No show/hide, no numeric `inputMode` for PIN (uses generic `type="password"`). |
+| Loading state | `busy ? 'Working…' : 'Sign in'` text-only. No `aria-busy`. |
+
+### 23.7 Migration Gate (§13) check
+
+| Gate condition | Status |
+|---|---|
+| Product Integrity = Pass for that screen's core calculations | **Pass** — Auth/Household is logic/UX, no calculation engine. Supabase RLS + RPCs verified (M1). |
+| IA ownership decided for that screen | **Pass** — Decision Register §17 (Household onboarding → Dual-flow). M2 close-out. |
+| Decision Register items affecting that screen are resolved or explicitly deferred | **Pass** — Spending Lens Deferred, doesn't affect Auth/Household. |
+| Primitive migration plan identified | **Partial** — §22 Field/Input gaps must close first. |
+
+**Migration Gate: BLOCKED on §22.** Cannot start Auth/Household migration until Field + Input enhancements are complete.
+
+### 23.8 Migration recommendation
+
+**Two-phase approach:**
+
+**Phase A — Enhance Field + Input (prerequisite).** Add `htmlFor` linking, `required`/`optional` props, `hint` prop, error-state propagation via `aria-invalid` + `aria-describedby`, focus styling, token replacements. ~110 LOC, low risk.
+
+**Phase B — Migrate Auth/Household.** Replace bespoke layout in `AuthScreen` and `OnboardingWizard` with composed primitives. Implement the §17.5 carryover gaps:
+
+- Replace per-device `setup_complete` Dexie flag with **household-side check**: `appSettings.get('setup_complete')` should be replaced by a query against the household's `assumptions` row (created during admin onboarding via `OnboardingWizard`).
+- Add **invited-member detection**: `authStore.joinHousehold` should set a flag distinguishing "first device of admin" vs "joining member on existing device". On join, check if household has `assumptions` row → skip wizard if yes, show "Welcome to <household>" splash.
+- Add `aria-label` to all form inputs (mostly automatic once Field has `htmlFor`).
+- Add submit-on-Enter via a `<Form>` wrapper primitive (or explicit `onKeyDown` if Form primitive is deferred).
+- Add `useId()`-based stable label-input IDs.
+
+**Estimated outcome:**
+- Token debt: 398 → 372 (-26)
+- Calm Ledger compliance: 4/10 → 8/10 (estimated)
+- §17.5 implementation gaps: **all three closed**
+- a11y: FAIL → PASS
+- Primitive adoption: 0% → 100% (AuthScreen + OnboardingWizard now compose Screen + Card + SectionHeader + Icon)
+
+### 23.9 Risks and open questions
+
+- **Risk 1 — `setup_complete` flag migration.** Moving from per-device to household-side requires reading from `assumptions` table. If the household has no `assumptions` row yet (rare, but possible if an admin starts the wizard then abandons it), the fallback should be to run the wizard. Need a server-side check or a sync-time derivation.
+- **Risk 2 — Invited member UX.** §17.5 bug 2 is "land directly in `AppShell` with inherited household configuration". This means invited members should NOT see a wizard. But the household's `assumptions` table was set up by the admin — invited members get the admin's defaults. This is the intended behavior per M2 §17 ("Allowance is per-member, Assumptions is per-household"). No UX work needed for assumptions; just need to skip the wizard.
+- **Risk 3 — PIN setup in onboarding.** Currently `OnboardingWizard` does not configure PIN. PIN is set up later in Settings. Should this be part of the wizard? **Deferred** — M3-002 Settings already handles PIN via `PinSetup` sheet.
+- **Risk 4 — Form primitive enhancement scope.** §22 Field/Input enhancements touch a primitive used by 12 forms across 7 features. Risk is broad. Mitigation: write integration tests for each form's behavior before/after (Field renders the same label/input/error structure). Current test count: 178; expect 5-10 new form-behavior tests.
+- **Risk 5 — `useId()` requires React 18+.** Already on React 19 per `package.json`. No blocker.
+- **Risk 6 — `transfers_admin` after joinHousehold.** If an invited member is the only member (e.g. admin removed themselves), what happens? Currently `joinHousehold` makes the joining user a `member` (per SQL), not `admin`. If they're the only member, they have no admin powers. **Low priority** — rare scenario, can be handled in M5 commercial readiness.
+
+### 23.10 Auth/Household scope decision
+
+Should Auth/Household migration include the §17.5 implementation gaps, or scope them out?
+
+**Recommendation: Include them.** They're documented as M3-003 Exit Gate items, not as separate work. Doing them now avoids reopening Auth/Household later. The total scope is still bounded:
+
+- 1 server-side RPC change (drop `setup_complete` from `appSettings`, derive from `assumptions` table)
+- 1 client-side change (don't gate `OnboardingWizard` on device flag; gate on household state)
+- 1 UX change (invited-member splash screen — small component)
+
+Estimated additional work: 1 day. Acceptable within M3-003.
+
+### 23.11 Migration Completion dashboard
+
+| Screen | Audit | Migration | Exit Gate |
+|---|---|---|---|
+| Today | ✅ | ✅ | ✅ |
+| Settings | ✅ | ✅ | ✅ |
+| Auth/Household | ✅ | ⏳ (gated on §22) | ⏳ |
+| Budget | ⏳ | ⏳ | ⏳ |
+| Report | ⏳ | ⏳ | ⏳ |
+| Assets | ⏳ | ⏳ | ⏳ |
+| Manager | ⏳ | ⏳ | ⏳ |
+
+---
+
 ## Appendix A — Source Evidence
 
 | Source | Relevant evidence |

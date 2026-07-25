@@ -10,17 +10,26 @@
 // but stores recurring_item_id=null, so imported recurring executions are not yet
 // linked for safe-to-spend exclusion.
 import 'fake-indexeddb/auto'
-import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '@db/db'
 import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
+import type {
+  Account,
+  Allowance,
+  Category,
+  RecurringItem,
+  Transaction,
+} from '@db/types'
 import { computeSafeToSpend, isWeekDraw } from '@engine/safeToSpend'
-import type { Account, Allowance, Category, RecurringItem, Transaction } from '@db/types'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 const TUE = new Date(2026, 6, 7)
 
 const allowance: Allowance = {
-  id: 'local', monthly_amount: 3_000_000, weekend_allocation: 400_000, updated_at: '',
+  id: 'local',
+  monthly_amount: 3_000_000,
+  weekend_allocation: 400_000,
+  updated_at: '',
 }
 
 const recurring = (over: Partial<RecurringItem>): RecurringItem => ({
@@ -60,14 +69,25 @@ const txn = (over: Partial<Transaction>): Transaction => ({
 })
 
 const account: Account = {
-  id: 'acc-bca', name: 'BCA', institution: 'BCA', account_type: 'bank',
-  lane: 'protected_living', currency: 'IDR', is_protected: false, is_active: true,
-  manual_balance_override: null, last_balance_updated_at: null, created_at: '',
+  id: 'acc-bca',
+  name: 'BCA',
+  institution: 'BCA',
+  account_type: 'bank',
+  lane: 'protected_living',
+  currency: 'IDR',
+  is_protected: false,
+  is_active: true,
+  manual_balance_override: null,
+  last_balance_updated_at: null,
+  created_at: '',
 }
 
 const category: Category = {
-  id: 'cat-sub', name: 'Subscriptions', lane: 'protected_living',
-  is_protected: false, envelope_id: null,
+  id: 'cat-sub',
+  name: 'Subscriptions',
+  lane: 'protected_living',
+  is_protected: false,
+  envelope_id: null,
 }
 
 async function activeRecurring() {
@@ -90,13 +110,27 @@ beforeEach(async () => {
 
 describe('Recurring semantics: configuration vs execution', () => {
   it('active recurring items are surfaced for display but do not shrink the discretionary pool again', async () => {
-    const id = await recurringRepo.create(recurring({
-      kind: 'personal_sub', amount: 500_000, name: 'Claude Pro',
-    }) as Omit<RecurringItem, 'id' | 'created_at'>)
+    const id = await recurringRepo.create(
+      recurring({
+        kind: 'personal_sub',
+        amount: 500_000,
+        name: 'Claude Pro',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )
 
     const active = await activeRecurring()
-    const withoutRecurring = computeSafeToSpend({ allowance, activeRecurringItems: [], spendThisWeek: 0, today: TUE })!
-    const withRecurring = computeSafeToSpend({ allowance, activeRecurringItems: active, spendThisWeek: 0, today: TUE })!
+    const withoutRecurring = computeSafeToSpend({
+      allowance,
+      activeRecurringItems: [],
+      spendThisWeek: 0,
+      today: TUE,
+    })!
+    const withRecurring = computeSafeToSpend({
+      allowance,
+      activeRecurringItems: active,
+      spendThisWeek: 0,
+      today: TUE,
+    })!
 
     expect(active).toHaveLength(1)
     expect(active[0]!.id).toBe(id)
@@ -106,34 +140,60 @@ describe('Recurring semantics: configuration vs execution', () => {
   })
 
   it('inactive recurring items are excluded from active commitment totals', async () => {
-    const id = await recurringRepo.create(recurring({
-      kind: 'personal_sub', amount: 500_000, name: 'Netflix',
-    }) as Omit<RecurringItem, 'id' | 'created_at'>)
+    const id = await recurringRepo.create(
+      recurring({
+        kind: 'personal_sub',
+        amount: 500_000,
+        name: 'Netflix',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )
     await recurringRepo.deactivate(id as string)
 
     const active = await activeRecurring()
-    const r = computeSafeToSpend({ allowance, activeRecurringItems: active, spendThisWeek: 0, today: TUE })!
+    const r = computeSafeToSpend({
+      allowance,
+      activeRecurringItems: active,
+      spendThisWeek: 0,
+      today: TUE,
+    })!
 
     expect(active).toHaveLength(0)
     expect(r.personalSubTotal).toBe(0)
   })
 
   it('linked recurring execution transaction does not draw safe-to-spend', () => {
-    const linkedPayment = txn({ recurring_item_id: 'rec-netflix', amount: 150_000 })
+    const linkedPayment = txn({
+      recurring_item_id: 'rec-netflix',
+      amount: 150_000,
+    })
     expect(isWeekDraw(linkedPayment)).toBe(false)
   })
 
   it('unlinked transaction with same merchant/amount does draw safe-to-spend', () => {
-    const unlinkedPayment = txn({ recurring_item_id: null, amount: 150_000, title: 'Netflix' })
+    const unlinkedPayment = txn({
+      recurring_item_id: null,
+      amount: 150_000,
+      title: 'Netflix',
+    })
     expect(isWeekDraw(unlinkedPayment)).toBe(true)
   })
 
   it('linked recurring payment prevents double counting: displayed recurring total plus zero draw', () => {
-    const active = [recurring({ id: 'rec-netflix', amount: 150_000, kind: 'personal_sub' })]
-    const linkedPayment = txn({ recurring_item_id: 'rec-netflix', amount: 150_000 })
+    const active = [
+      recurring({ id: 'rec-netflix', amount: 150_000, kind: 'personal_sub' }),
+    ]
+    const linkedPayment = txn({
+      recurring_item_id: 'rec-netflix',
+      amount: 150_000,
+    })
     const spendThisWeek = isWeekDraw(linkedPayment) ? linkedPayment.amount : 0
 
-    const r = computeSafeToSpend({ allowance, activeRecurringItems: active, spendThisWeek, today: TUE })!
+    const r = computeSafeToSpend({
+      allowance,
+      activeRecurringItems: active,
+      spendThisWeek,
+      today: TUE,
+    })!
 
     expect(r.personalSubTotal).toBe(150_000)
     expect(r.spentThisWeek).toBe(0)
@@ -141,23 +201,42 @@ describe('Recurring semantics: configuration vs execution', () => {
   })
 
   it('deleted linked recurring payment restores zero draw', async () => {
-    await db.transactions.put(txn({ id: 't-netflix', recurring_item_id: 'rec-netflix', amount: 150_000 }))
-    const before = (await db.transactions.toArray()).filter(isWeekDraw).reduce((s, t) => s + t.amount, 0)
+    await db.transactions.put(
+      txn({
+        id: 't-netflix',
+        recurring_item_id: 'rec-netflix',
+        amount: 150_000,
+      }),
+    )
+    const before = (await db.transactions.toArray())
+      .filter(isWeekDraw)
+      .reduce((s, t) => s + t.amount, 0)
     expect(before).toBe(0)
 
     await db.transactions.delete('t-netflix')
-    const after = (await db.transactions.toArray()).filter(isWeekDraw).reduce((s, t) => s + t.amount, 0)
+    const after = (await db.transactions.toArray())
+      .filter(isWeekDraw)
+      .reduce((s, t) => s + t.amount, 0)
     expect(after).toBe(0)
   })
 
   it('editing recurring amount changes displayed commitment total, not week pool', async () => {
-    const id = await recurringRepo.create(recurring({
-      kind: 'personal_sub', amount: 150_000, name: 'Netflix',
-    }) as Omit<RecurringItem, 'id' | 'created_at'>)
+    const id = await recurringRepo.create(
+      recurring({
+        kind: 'personal_sub',
+        amount: 150_000,
+        name: 'Netflix',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )
 
     await recurringRepo.update(id as string, { amount: 200_000 })
     const active = await activeRecurring()
-    const r = computeSafeToSpend({ allowance, activeRecurringItems: active, spendThisWeek: 0, today: TUE })!
+    const r = computeSafeToSpend({
+      allowance,
+      activeRecurringItems: active,
+      spendThisWeek: 0,
+      today: TUE,
+    })!
 
     expect(r.personalSubTotal).toBe(200_000)
     expect(r.weekPool).toBe(650_000) // (3,000,000 - 400,000) / 4 weeks
@@ -166,24 +245,40 @@ describe('Recurring semantics: configuration vs execution', () => {
 
 describe('Recurring semantics: import contract', () => {
   it('imported recurring payment links transaction, advances next_due, and does not draw safe-to-spend', async () => {
-    const recId = await recurringRepo.create(recurring({
-      name: 'Netflix', amount: 150_000, cadence: 'monthly', next_due: '2026-07-01',
-    }) as Omit<RecurringItem, 'id' | 'created_at'>) as string
-
-    await transactionsRepo.importBatch([
-      {
-        _row_index: 0,
-        date: '2026-07-07',
+    const recId = (await recurringRepo.create(
+      recurring({
+        name: 'Netflix',
         amount: 150_000,
-        direction: 'out',
-        account_id: 'acc-bca',
-        category: 'Subscriptions',
-        suggested_lane: 'protected_living',
-        note: 'Netflix monthly subscription',
-        _resolved_account: account,
-        _resolved_category: category,
+        cadence: 'monthly',
+        next_due: '2026-07-01',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )) as string
+
+    await transactionsRepo.importBatch(
+      [
+        {
+          _row_index: 0,
+          date: '2026-07-07',
+          amount: 150_000,
+          direction: 'out',
+          account_id: 'acc-bca',
+          category: 'Subscriptions',
+          suggested_lane: 'protected_living',
+          note: 'Netflix monthly subscription',
+          _resolved_account: account,
+          _resolved_category: category,
+        },
+      ],
+      '2026-07',
+      {
+        income_producing: 0,
+        store_of_value: 0,
+        debt_liability: 0,
+        protected_living: 0,
+        pass_through: 0,
       },
-    ], '2026-07', { income_producing: 0, store_of_value: 0, debt_liability: 0, protected_living: 0, pass_through: 0 }, 0)
+      0,
+    )
 
     const imported = await db.transactions.toCollection().first()
     const updatedRecurring = await db.recurringItems.get(recId)
@@ -194,27 +289,171 @@ describe('Recurring semantics: import contract', () => {
   })
 
   it('imported non-recurring expense remains discretionary', async () => {
-    await recurringRepo.create(recurring({
-      name: 'Netflix', amount: 150_000, cadence: 'monthly', next_due: '2026-07-01',
-    }) as Omit<RecurringItem, 'id' | 'created_at'>)
+    await recurringRepo.create(
+      recurring({
+        name: 'Netflix',
+        amount: 150_000,
+        cadence: 'monthly',
+        next_due: '2026-07-01',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )
 
-    await transactionsRepo.importBatch([
+    await transactionsRepo.importBatch(
+      [
+        {
+          _row_index: 0,
+          date: '2026-07-07',
+          amount: 70_000,
+          direction: 'out',
+          account_id: 'acc-bca',
+          category: 'Subscriptions',
+          suggested_lane: 'protected_living',
+          note: 'Lunch',
+          _resolved_account: account,
+          _resolved_category: category,
+        },
+      ],
+      '2026-07',
       {
-        _row_index: 0,
-        date: '2026-07-07',
-        amount: 70_000,
-        direction: 'out',
-        account_id: 'acc-bca',
-        category: 'Subscriptions',
-        suggested_lane: 'protected_living',
-        note: 'Lunch',
-        _resolved_account: account,
-        _resolved_category: category,
+        income_producing: 0,
+        store_of_value: 0,
+        debt_liability: 0,
+        protected_living: 0,
+        pass_through: 0,
       },
-    ], '2026-07', { income_producing: 0, store_of_value: 0, debt_liability: 0, protected_living: 0, pass_through: 0 }, 0)
+      0,
+    )
 
     const imported = await db.transactions.toCollection().first()
     expect(imported?.recurring_item_id).toBeNull()
     expect(isWeekDraw(imported!)).toBe(true)
+  })
+
+  // C1: the reconcile confirm screen resolves (and lets the user dismiss) a
+  // suggested recurring link per row and passes its decision through
+  // explicitly. importBatch must honor that decision instead of silently
+  // re-deriving its own auto-match.
+  it("explicit recurring_item_id on the row overrides importBatch's own auto-match", async () => {
+    const recId = (await recurringRepo.create(
+      recurring({
+        name: 'Netflix',
+        amount: 150_000,
+        cadence: 'monthly',
+        next_due: '2026-07-01',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )) as string
+    const otherId = (await recurringRepo.create(
+      recurring({
+        name: 'Spotify',
+        amount: 60_000,
+        cadence: 'monthly',
+        next_due: '2026-07-01',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )) as string
+
+    await transactionsRepo.importBatch(
+      [
+        {
+          _row_index: 0,
+          date: '2026-07-07',
+          amount: 150_000,
+          direction: 'out',
+          account_id: 'acc-bca',
+          category: 'Subscriptions',
+          suggested_lane: 'protected_living',
+          note: 'Netflix monthly subscription', // would auto-match Netflix
+          _resolved_account: account,
+          _resolved_category: category,
+          recurring_item_id: otherId, // but the confirm screen decided Spotify
+        },
+      ],
+      '2026-07',
+      {
+        income_producing: 0,
+        store_of_value: 0,
+        debt_liability: 0,
+        protected_living: 0,
+        pass_through: 0,
+      },
+      0,
+    )
+
+    const imported = await db.transactions.toCollection().first()
+    expect(imported?.recurring_item_id).toBe(otherId)
+    expect(imported?.recurring_item_id).not.toBe(recId)
+  })
+
+  it('explicit null recurring_item_id on the row (user dismissed the suggestion) is honored, not re-matched', async () => {
+    await recurringRepo.create(
+      recurring({
+        name: 'Netflix',
+        amount: 150_000,
+        cadence: 'monthly',
+        next_due: '2026-07-01',
+      }) as Omit<RecurringItem, 'id' | 'created_at'>,
+    )
+
+    await transactionsRepo.importBatch(
+      [
+        {
+          _row_index: 0,
+          date: '2026-07-07',
+          amount: 150_000,
+          direction: 'out',
+          account_id: 'acc-bca',
+          category: 'Subscriptions',
+          suggested_lane: 'protected_living',
+          note: 'Netflix monthly subscription', // would auto-match Netflix
+          _resolved_account: account,
+          _resolved_category: category,
+          recurring_item_id: null, // user tapped the badge to dismiss it
+        },
+      ],
+      '2026-07',
+      {
+        income_producing: 0,
+        store_of_value: 0,
+        debt_liability: 0,
+        protected_living: 0,
+        pass_through: 0,
+      },
+      0,
+    )
+
+    const imported = await db.transactions.toCollection().first()
+    expect(imported?.recurring_item_id).toBeNull()
+    expect(isWeekDraw(imported!)).toBe(true)
+  })
+
+  it('rejects an unknown/inactive recurring_item_id passed on the row rather than linking it', async () => {
+    await transactionsRepo.importBatch(
+      [
+        {
+          _row_index: 0,
+          date: '2026-07-07',
+          amount: 150_000,
+          direction: 'out',
+          account_id: 'acc-bca',
+          category: 'Subscriptions',
+          suggested_lane: 'protected_living',
+          note: 'Something',
+          _resolved_account: account,
+          _resolved_category: category,
+          recurring_item_id: 'rec-does-not-exist',
+        },
+      ],
+      '2026-07',
+      {
+        income_producing: 0,
+        store_of_value: 0,
+        debt_liability: 0,
+        protected_living: 0,
+        pass_through: 0,
+      },
+      0,
+    )
+
+    const imported = await db.transactions.toCollection().first()
+    expect(imported?.recurring_item_id).toBeNull()
   })
 })

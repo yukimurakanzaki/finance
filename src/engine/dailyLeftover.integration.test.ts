@@ -97,14 +97,20 @@ describe('Daily Leftover: inherits Safe-to-Spend invariants', () => {
     expect(r!.leftover).toBe(3_000_000)
   })
 
-  it('income adds back to leftover (allowance top-up)', async () => {
+  it('income does NOT affect leftover (isWeekDraw is out-only)', async () => {
+    // Reconciliation note (Phase 2–4 line): this engine defines the monthly
+    // leftover purely as allowance minus discretionary *draws*, applied via the
+    // shared isWeekDraw predicate — which is direction === 'out' only. Logged
+    // income is not treated as an allowance top-up (see the out-only case in
+    // dailyLeftover.test.ts). So the 'in' row below is ignored, unlike the
+    // earlier parallel implementation that added it back.
     await db.transactions.bulkPut([
       txn({ id: 't-out', date: '2000-07-10', amount: 100_000, direction: 'out' }),
       txn({ id: 't-in', date: '2000-07-12', amount: 200_000, direction: 'in' }),
     ])
     const r = await computeFromDB('2000-07-15')
-    // 3,000,000 - 100,000 + 200,000 = 3,100,000
-    expect(r!.leftover).toBe(3_100_000)
+    // 3,000,000 - 100,000 = 2,900,000 (the 200,000 income is not added back)
+    expect(r!.leftover).toBe(2_900_000)
   })
 })
 

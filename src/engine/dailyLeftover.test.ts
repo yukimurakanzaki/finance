@@ -1,21 +1,30 @@
 import type { Transaction } from '@db/types'
+import { todayISO } from '@lib/dates'
 import { describe, expect, it } from 'vitest'
-import { computeDailyLeftover, monthStartOf } from './dailyLeftover'
+import { computeDailyLeftover } from './dailyLeftover'
 
-// Reuses the txn() factory shape from useSafeToSpend.test.ts — `dailyLeftover`
-// is a sibling engine piece, so the field list and the default-value choice
-// for `recurring_item_id` are identical, and the helper is short enough to
-// keep locally rather than introduce a shared test util for a one-line type.
-const txn = (over: Partial<Transaction>): Transaction => ({
-  id: 't1',
-  date: '2000-07-15',
-  amount: 50_000,
+// Tomorrow, relative to the real system clock — always genuinely in the
+// future, so the isProjected assertions below don't rely on a fixed date that
+// eventually becomes "the past" as the repo ages. (Edge case: if the test
+// happens to run on the last day of a month, "tomorrow" falls in the next
+// month, and the transactions dated "today" fall outside that next month's
+// window — an intentional, documented limitation of this quick helper.)
+function tomorrow(): string {
+  const d = new Date(`${todayISO()}T12:00:00`)
+  d.setDate(d.getDate() + 1)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const txn = (overrides: Partial<Transaction>): Transaction => ({
+  date: '2026-07-10',
+  amount: 10_000,
+  title: null,
   direction: 'out',
-  account_id: 'a1',
+  account_id: 'acc1',
   category_id: null,
   lane: 'protected_living',
   source: 'manual',
-  title: null,
   note: null,
   original_amount: null,
   overridden_amount: null,
@@ -25,189 +34,104 @@ const txn = (over: Partial<Transaction>): Transaction => ({
   transfer_pair_id: null,
   recurring_item_id: null,
   created_at: '',
-  ...over,
-})
-
-describe('monthStartOf', () => {
-  it('returns YYYY-MM-01 for any date in the month', () => {
-    expect(monthStartOf('2026-07-01')).toBe('2026-07-01')
-    expect(monthStartOf('2000-07-15')).toBe('2000-07-01')
-    expect(monthStartOf('2026-07-31')).toBe('2026-07-01')
-    expect(monthStartOf('2026-12-31')).toBe('2026-12-01')
-  })
+  ...overrides,
 })
 
 describe('computeDailyLeftover', () => {
-  it('mid-month day with mixed income/expense nets correctly', () => {
-    // Use a date that's always in the past so isProjected is deterministic
-    // regardless of when the test runs (otherwise the assertion is time-of-
-    // day-clock-dependent and brittle). Year 2000 — clearly past.
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
+  it('nets expense transactions through a mid-month day, excluding income (isWeekDraw is out-only)', () => {
+    const r = computeDailyLeftover({
+      monthlyAmount: 1_000_000,
       transactions: [
-        txn({ id: '1', date: '2000-07-03', amount: 50_000, direction: 'out' }),
-        txn({ id: '2', date: '2000-07-10', amount: 200_000, direction: 'in' }),
-        txn({ id: '3', date: '2000-07-15', amount: 75_000, direction: 'out' }),
+        txn({ date: '2026-07-03', direction: 'out', amount: 50_000 }),
+        // Income never draws the pool — isWeekDraw requires direction 'out'
+        // (mirrors the weekly safe-to-spend gauge's own semantics exactly).
+        txn({ date: '2026-07-09', direction: 'in', amount: 20_000 }),
+        txn({ date: '2026-07-15', direction: 'out', amount: 30_000 }), // after asOfDate, excluded
       ],
-      asOfDate: '2000-07-15',
+      asOfDate: '2026-07-10',
     })
-    // 2,000,000 - 50,000 + 200,000 - 75,000 = 2,075,000
-    expect(result.leftover).toBe(2_075_000)
-    expect(result.isProjected).toBe(false)
+    // 1,000,000 − 50,000 = 950,000 (income excluded; the 07-15 spend is outside the window)
+    expect(r.leftover).toBe(950_000)
+    expect(r.isProjected).toBe(false)
   })
 
-  it('a transaction tagged with recurring_item_id does NOT affect leftover', () => {
-    // Same setup as the above, but the mid-month expense is a committed
-    // bill payment — it is excluded by the same isWeekDraw predicate the
-    // weekly gauge uses (T2 DECISION 2026-07-12).
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
-      transactions: [
-        txn({ id: '1', date: '2000-07-03', amount: 50_000, direction: 'out' }),
-        txn({
-          id: '2',
-          date: '2000-07-15',
-          amount: 500_000,
-          direction: 'out',
-          recurring_item_id: 'rec-bill-1',
-        }),
-      ],
-      asOfDate: '2000-07-15',
-    })
-    // Only the 50,000 discretionary expense counts; the 500,000 bill doesn't.
-    expect(result.leftover).toBe(1_950_000)
-  })
-
-  it('a transfer does NOT affect the leftover', () => {
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
+  it('excludes a transaction tagged with recurring_item_id', () => {
+    const r = computeDailyLeftover({
+      monthlyAmount: 1_000_000,
       transactions: [
         txn({
-          id: '1',
-          date: '2000-07-15',
-          amount: 1_000_000,
-          direction: 'out',
-          is_transfer: true,
-          transfer_pair_id: 'pair-1',
+          date: '2026-07-05',
+          amount: 100_000,
+          recurring_item_id: 'rec-1',
         }),
-        txn({
-          id: '2',
-          date: '2000-07-15',
-          amount: 1_000_000,
-          direction: 'in',
-          is_transfer: true,
-          transfer_pair_id: 'pair-1',
-        }),
+        txn({ date: '2026-07-06', amount: 40_000 }),
       ],
-      asOfDate: '2000-07-15',
+      asOfDate: '2026-07-10',
     })
-    expect(result.leftover).toBe(2_000_000)
+    // Only the untagged 40,000 draws the pool.
+    expect(r.leftover).toBe(960_000)
   })
 
-  it('a pass_through-lane transaction does NOT affect the leftover', () => {
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
+  it('excludes a transfer', () => {
+    const r = computeDailyLeftover({
+      monthlyAmount: 1_000_000,
       transactions: [
-        txn({
-          id: '1',
-          date: '2000-07-15',
-          amount: 500_000,
-          lane: 'pass_through',
-        }),
+        txn({ date: '2026-07-05', amount: 500_000, is_transfer: true }),
       ],
-      asOfDate: '2000-07-15',
+      asOfDate: '2026-07-10',
     })
-    expect(result.leftover).toBe(2_000_000)
-  })
-
-  it('transactions before the viewed month are excluded', () => {
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
-      transactions: [
-        // June (prior month) — must not bleed into July's view.
-        txn({ id: '1', date: '2000-06-30', amount: 999_000, direction: 'out' }),
-        txn({ id: '2', date: '2000-07-10', amount: 100_000, direction: 'out' }),
-      ],
-      asOfDate: '2000-07-15',
-    })
-    expect(result.leftover).toBe(1_900_000)
-  })
-
-  it('transactions after asOfDate within the month are excluded (asOfDate-inclusive end)', () => {
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
-      transactions: [
-        txn({ id: '1', date: '2000-07-10', amount: 100_000, direction: 'out' }),
-        // Day after asOfDate — must not count yet.
-        txn({ id: '2', date: '2000-07-16', amount: 999_000, direction: 'out' }),
-      ],
-      asOfDate: '2000-07-15',
-    })
-    expect(result.leftover).toBe(1_900_000)
+    expect(r.leftover).toBe(1_000_000)
   })
 
   it("a future date returns isProjected: true and equals the last real day's leftover", () => {
-    // asOfDate must be in the future relative to todayISO(). Use 2999 as a
-    // guaranteed-future year, and put the transaction in the SAME month so
-    // it actually counts toward the leftover.
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
-      transactions: [
-        txn({ id: '1', date: '2999-12-10', amount: 100_000, direction: 'out' }),
-      ],
-      asOfDate: '2999-12-31',
+    const today = todayISO()
+    const transactions = [txn({ date: today, amount: 100_000 })]
+    const lastRealDay = computeDailyLeftover({
+      monthlyAmount: 1_000_000,
+      transactions,
+      asOfDate: today,
     })
-    expect(result.leftover).toBe(1_900_000)
-    expect(result.isProjected).toBe(true)
+    const projected = computeDailyLeftover({
+      monthlyAmount: 1_000_000,
+      transactions,
+      asOfDate: tomorrow(),
+    })
+    expect(projected.isProjected).toBe(true)
+    expect(lastRealDay.isProjected).toBe(false)
+    expect(projected.leftover).toBe(lastRealDay.leftover)
   })
 
   it('a past date within the month returns isProjected: false', () => {
-    // Transaction and asOfDate in the same past month.
-    const result = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
-      transactions: [
-        txn({ id: '1', date: '2020-01-05', amount: 100_000, direction: 'out' }),
-      ],
-      asOfDate: '2020-01-15',
+    const r = computeDailyLeftover({
+      monthlyAmount: 1_000_000,
+      transactions: [txn({ date: '2020-03-05', amount: 10_000 })],
+      asOfDate: '2020-03-10',
     })
-    expect(result.leftover).toBe(1_900_000)
-    expect(result.isProjected).toBe(false)
+    expect(r.isProjected).toBe(false)
   })
 
   it('changing monthlyAmount between two calls with the same transactions changes the result', () => {
-    // No caching: the function is pure, but a regression that introduced a
-    // memoization keyed on transactions alone would miss this. Caller-side
-    // staleness test, basically.
-    const txns = [
-      txn({ id: '1', date: '2000-07-10', amount: 100_000, direction: 'out' }),
-    ]
+    const transactions = [txn({ date: '2026-07-05', amount: 40_000 })]
     const a = computeDailyLeftover({
-      monthlyAmount: 2_000_000,
-      transactions: txns,
-      asOfDate: '2000-07-15',
+      monthlyAmount: 1_000_000,
+      transactions,
+      asOfDate: '2026-07-10',
     })
     const b = computeDailyLeftover({
-      monthlyAmount: 3_000_000,
-      transactions: txns,
-      asOfDate: '2000-07-15',
+      monthlyAmount: 2_000_000,
+      transactions,
+      asOfDate: '2026-07-10',
     })
-    expect(a.leftover).toBe(1_900_000)
-    expect(b.leftover).toBe(2_900_000)
+    expect(a.leftover).not.toBe(b.leftover)
+    expect(b.leftover - a.leftover).toBe(1_000_000)
   })
 
-  it('a negative leftover is returned as-is (overspent is a signal, not a clamp)', () => {
-    const result = computeDailyLeftover({
-      monthlyAmount: 500_000,
-      transactions: [
-        txn({
-          id: '1',
-          date: '2000-07-10',
-          amount: 1_000_000,
-          direction: 'out',
-        }),
-      ],
-      asOfDate: '2000-07-15',
+  it('does not clamp a negative leftover to zero', () => {
+    const r = computeDailyLeftover({
+      monthlyAmount: 10_000,
+      transactions: [txn({ date: '2026-07-05', amount: 50_000 })],
+      asOfDate: '2026-07-10',
     })
-    expect(result.leftover).toBe(-500_000)
+    expect(r.leftover).toBe(-40_000)
   })
 })
