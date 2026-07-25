@@ -312,6 +312,7 @@ async function callMinimax(
 
   const data = await res.json()
   if (!res.ok) {
+    console.error("Minimax API error", res.status, JSON.stringify(data))
     throw new Error(data.error?.message || `Minimax API error (${res.status})`)
   }
 
@@ -382,6 +383,7 @@ Deno.serve(async (req: Request) => {
       ? await callMinimax(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
       : await callAnthropic(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
   } catch (err) {
+    console.error("Proxy error", modelId, String(err))
     result = { error: `Proxy error: ${String(err)}` }
     status = "api_error"
     httpStatus = 502
