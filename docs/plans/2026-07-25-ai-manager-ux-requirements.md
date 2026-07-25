@@ -1,7 +1,8 @@
 # AI Manager — UX Feedback Requirements & Build Plan
 
-**Date:** 2026-07-25 · **Revision:** 2 (open questions resolved; prioritised by decision-engine lens)
-**Source:** 10 UX feedback tickets + product-vision reprioritisation
+**Date:** 2026-07-25 · **Revision:** 3 (Part II added from PM review — user intent, lifecycle, conversation, trust, failure, metrics)
+**Source:** 10 UX feedback tickets + product-vision reprioritisation + PM/Staff-Engineer review
+**Structure:** Part I (§0–19) — what the system does. Part II (§20–33) — why someone opened the app.
 **Target implementer:** Hermes AI agents, model `minimax-m3` via `anthropic-proxy`
 **Grounded against:** `src/ai/context.ts`, `src/ai/tools.ts`, `src/stores/chatStore.ts`, `src/engine/safeToSpend.ts`, `src/lib/balances.ts`, `src/db/types.ts` (Dexie v11), `AI-MANAGER-UX-AUDIT.md` v1.2
 
@@ -15,7 +16,7 @@ Every ticket is judged against one question:
 
 Ordering follows from it: data must be *present* (T1), then *trusted* (Explain My Number), then *reliable* (T10), then *useful on the day they look* (T5), then *actionable* (Health Check). Polish last.
 
-**One decision is outstanding and blocks the Health Check ticket's content — see D-1 in §4.** It is a product-principle decision, deliberately not resolved here.
+**One decision is outstanding — see D-1 in §4.** It is a product-principle decision, deliberately not resolved here. As of revision 3 it blocks **two** things: the Health Check ticket's content, and layer 1 of the progressive-disclosure hierarchy in §23. It is now the most consequential open item in the document.
 
 ---
 
@@ -461,3 +462,279 @@ User-facing, cause-and-consequence, no blame, Indonesian + English.
 **T9** — EN: "Stable facts like pay date get re-asked every session because nothing remembers them. Save them once, and let people see and delete what was saved." · ID: "Fakta tetap seperti tanggal gajian ditanya ulang terus karena tidak tersimpan. Simpan sekali, dan biarkan pengguna melihat serta menghapusnya."
 
 **T10** — EN: "Pasting a statement from an untracked account dead-ends. Offer to create the account and continue in the same step." · ID: "Menempel mutasi dari rekening yang belum terdaftar berujung buntu. Tawarkan membuat rekening lalu lanjutkan di langkah yang sama."
+
+---
+---
+
+# Part II — Product specification
+
+Added in response to PM review. Part I answers *what the system does*; Part II answers *why someone opened the app*. Where a review item presumes infrastructure this codebase does not have, it is marked **[NO INFRA]** and scoped honestly rather than specified as if it were free.
+
+---
+
+## 20. Primary user intent
+
+Nobody opens this app to see a dashboard. They arrive with a question. Every surface maps to one of these or it does not ship.
+
+| # | Intent | Arrives asking | Success | Primary surface |
+|---|---|---|---|---|
+| **I-1** | Permission | "Can I buy this?" | Answer in < 15s, without leaving chat | Chat + safe-to-spend |
+| **I-2** | Accounting | "Where did my salary go?" | Top spending categories visible without a query | Health Check + category view |
+| **I-3** | Attention | "Is anything wrong?" | Top issue visible without scrolling | Health Check row 1 |
+| **I-4** | Timing | "Did my salary arrive?" | Last income event visible on open | Today screen |
+| **I-5** | Horizon | "Can I afford a holiday?" | Trade-off stated in FI-date delta and weeks of pool | Chat, scenario framing |
+| **I-6** | Weekend | "What can I spend this weekend?" | Weekend allocation distinct from workweek pool | T5 card |
+
+**Mapping rule.** Every ticket in Part I names the intent it serves. T5 serves I-6. Explain My Number serves I-1 as a trust precondition. Health Check serves I-2 and I-3. T10 serves I-2 through data completeness. T1 is a precondition for all of them.
+
+**T2, T7, and T9 serve no intent directly** — they are hygiene. That is the honest reason they sit in Sprint 3, and it is a better reason than "polish".
+
+**I-1 is the product.** If "can I buy this?" takes more than 15 seconds or more than two turns, nothing else in this document matters.
+
+---
+
+## 21. Lifecycle — the assistant's job changes by phase
+
+Onboarding is specified (T1). Steady state is not. The same numbers mean different things depending on where the household sits in the month.
+
+| Phase | Household's question | Assistant's job | Emphasis |
+|---|---|---|---|
+| **First day** | "Is this worth setting up?" | Reach one true number fast | One step, not three |
+| **Week 1** | "Does this reflect reality?" | Confirm and correct | Corrections over insights |
+| **Payday** | "What do I do with this?" | Allocate: pipe, bills, pool | Savings pipe first |
+| **Mid-month** | "Am I on track?" | Surface drift early enough to act on | Pace against pool |
+| **Weekend** | "What is safe today?" | Separate weekend from workweek | T5's `kind: weekend` |
+| **Month end** | "What happened?" | Reflect; feed next month's allowance | Category totals |
+| **Year end** | "Did we get closer?" | FI progress, not monthly noise | FI-date delta |
+
+**Phase derivation is deterministic** — it follows from `todayISO()`, the allowance row, and the last income event. Computed in `context.ts`, emitted as one line, never inferred by the model (NFR-X4).
+
+**Scope note.** Phase-aware *emphasis* is a Sprint 3 concern. Sprints 1–2 need only the phase line in context. Behaviour differentiation follows once the deterministic surfaces are proven.
+
+---
+
+## 22. Conversation patterns
+
+Part I specified screens. The AI Manager is mostly not screens. Each pattern is a turn-shape contract, not a script.
+
+### CP-1 — Purchase advice (serves I-1)
+
+```
+intent received
+  -> missing info?  ONE clarifying question, never a form
+  -> compute        engine, never the model (NFR-X3)
+  -> present        decision layer, then reason layer (see section 23)
+  -> offer action   log it / remind me / nothing
+```
+
+**Turn budget: 2.** One clarification maximum. If two facts are missing, ask for the more decision-relevant one and state an assumption on the other. A third turn means the pattern failed.
+
+### CP-2 — Income received
+Detect from statement or user statement, propose an allocation across pipe / bills / pool, confirm, log. Never allocate without confirmation.
+
+### CP-3 — Bill or recurring payment
+Match against ACTIVE RECURRING (already in the persona). Matched, tag `recurring_item_id`. Unmatched, ask before creating a recurring item. Never silently create a commitment.
+
+### CP-4 — Transfer
+Both legs, one `transfer_pair_key`, `is_transfer=true` — already specified in the persona. Confirm direction when ambiguous; this is the highest-frequency misclassification.
+
+### CP-5 — Goal or horizon (serves I-5)
+Translate the amount into two units the household already understands: weeks of pool, and FI-date delta. Never a third unit — extra precision here reads as evasion.
+
+**Common rule.** Every pattern ends with an offered action or an explicit "nothing to do". A turn ending in prose with no exit is a dead end.
+
+---
+
+## 23. Progressive disclosure — resolving the analytical-overload risk
+
+The review's sharpest point: the product risks answering "here are twelve variables" when asked "can I afford this?". Correct. The fix is layering, not less rigour.
+
+```
+Layer 1  Decision       one line
+Layer 2  Reason         the one number that drove it
+Layer 3  Explanation    "How we calculated this" (section 5)
+Layer 4  Breakdown      full formula and assumptions
+```
+
+Layers 2–4 are already specified and buildable. **Layer 1 is not currently permitted.**
+
+> **Layer 1 is the D-1 decision.** "Yes, you can comfortably afford this" is exactly the affordability verdict that audit finding **A1 (P1)** removed, and that [context.ts:17](../../src/ai/context.ts) forbids: *"Never issue a confident verdict on whether the user should or shouldn't spend."*
+>
+> The review's hierarchy therefore **presumes D-1 resolves to option (b): amend principle #4.** That is a legitimate product choice, but it cannot arrive through a copy revision. Adopting it requires, in one PR: the persona rule rewritten, `AI-MANAGER-UX-AUDIT.md` section 2 capability boundary updated, finding A1 marked superseded, and `PROMPT_VERSION` bumped.
+>
+> **Until D-1 is signed off explicitly, build layers 2–4 and leave layer 1 out.** Layers 2–4 alone answer I-1 in a single turn: *"You would have Rp 850.000 left this week"* is not a verdict, and for most users it is the entire answer.
+
+**If D-1 resolves to (b), these constraints still survive:** verdicts remain forbidden on investments (no sell tooling exists — principle #2) and on protected items (principle #5). Only discretionary-purchase affordability opens up.
+
+---
+
+## 24. Zero-data experience
+
+T7 specifies CTAs. That is UI. The first ten minutes decide retention.
+
+| State | Path | Notes |
+|---|---|---|
+| No accounts | Manual account creation | **[NO INFRA]** "Connect account" implies bank aggregation. No open-banking integration exists and none is planned here. Do not show a Connect affordance that leads nowhere. |
+| No transactions | Paste or upload a statement, into the T10 flow | Already the strongest path in the product. Make it the primary CTA. |
+| No categories | Generate a starter set on first import, user-editable | Never require category setup before first value |
+| No recurring items | Derive suggestions from an import — `seedRecurringFromLog.ts` already exists on this branch | Propose, confirm, never auto-create |
+| No goals | Suggest an emergency-fund target sized from declared bills | Suggestion only; goals are not a modelled entity yet |
+
+**Ordering principle.** The shortest path to one true number is one account, then one statement paste. Everything else can stay empty. T1's three steps must not block that path.
+
+---
+
+## 25. Trust journey
+
+Trust is the actual product in personal finance. It develops in stages, and each stage has a design job.
+
+| Stage | User believes | Design job | Ticket |
+|---|---|---|---|
+| 1 | "I don't believe this number." | Show provenance on demand | Explain My Number |
+| 2 | "So that is where it came from." | Distinguish declared from derived | FR-4.4 |
+| 3 | "That is actually correct." | Agree with the user's own screens | `deriveBalance` parity, already true |
+| 4 | "I will rely on this." | Never contradict itself between chat and app | NFR-X3 |
+| 5 | "I will decide using it." | Consistency over time; no silent recalculation | TR-5.2 |
+
+**Trust is lost fastest by:** a number changing with no visible cause; chat disagreeing with a screen; a confident answer that turns out wrong. In that order.
+
+Every one of those is already a Part I invariant. Section 17's assertions are the trust mechanism, not merely test hygiene.
+
+---
+
+## 26. Failure and recovery journeys
+
+Part I is happy-path heavy. Each failure below needs a defined state, not a generic error.
+
+| Failure | Today | Required |
+|---|---|---|
+| Salary not received when expected | Silent | Notice: "no income logged since <date>" — fact, no alarm |
+| Recurring item deleted by accident | Tombstone exists (`deleted_at`, this branch) | Undo affordance within the session |
+| Duplicate import | `possible_duplicates` returned | Already correct; surface per row, not per batch |
+| Sync conflict | LWW, silent | Out of scope here — **O-2** |
+| Model unavailable or quota exceeded | Generic error | Distinct copy for quota vs outage vs offline (audit E8) |
+| Offline | Dexie works, chat fails | State plainly that logging works and the assistant is unavailable |
+| Timezone or clock change | Undefined | `todayISO()` is device-local; a traveller crossing midnight sees the pool reset. **Define, then assert** — extends NFR-5.2 |
+| Negative weekend allocation | `isNegativePool` handled | Ensure copy explains the cause |
+
+**Rule.** Every failure state names what was *not* lost. In a money app, "nothing was saved" is the reassurance that matters — and it is already the state machine's guarantee for reads (audit section 3.1).
+
+---
+
+## 27. Health Check priority taxonomy
+
+"3–5 insights" is underspecified: it permits "Nice job!" above a negative balance. Rank by class first, magnitude second.
+
+| Rank | Class | Example |
+|---|---|---|
+| **P1** | Immediate financial risk | Account below zero; pool exhausted with 9 days left |
+| **P2** | Cashflow risk | Bill due before the next income event |
+| **P3** | Overspending | Category materially above its own trailing norm |
+| **P4** | Opportunity | Pipe underfunded against declared target |
+| **P5** | Achievement | Milestone reached |
+
+**Hard rules.** A P5 never displaces a P1–P3. If any P1 exists it occupies row 1. A household with an unresolved P1 sees **no P5 at all** — congratulating someone who is overdrawn is the fastest way to lose stage-4 trust (section 25).
+
+Ranking is computed in code (FR-11.2). The model may phrase; it may never order.
+
+---
+
+## 28. Notification strategy — [NO INFRA]
+
+The review asks for morning, payday, bill-due, inactivity, weekly, monthly, and yearly notifications.
+
+**None of it is deliverable today.** There is no PWA manifest, no service worker, and no `web-push` dependency in `package.json`. The app cannot reach a user who has not opened it.
+
+Scoped honestly, in two parts:
+
+- **In-app, buildable now.** Every trigger the review lists already maps to a Notice (section 15 / T6) or a Health Check insight (section 27). Ship them there. The taxonomy in section 27 *is* the notification priority model.
+- **Out-of-app, a project of its own.** PWA install, service worker, push subscription storage, a server-side scheduler, and permission UX. That is not a ticket, it is a milestone. It also converts a device-local product into one needing server-side knowledge of when to wake someone, which interacts directly with the E4 privacy policy.
+
+**Recommendation:** ship the in-app half, and write no copy implying notifications will arrive.
+
+---
+
+## 29. Action state model
+
+The review is right that actions lack completion criteria. One model, applied to every write.
+
+| Phase | Requirement |
+|---|---|
+| **Before** | State what will change, in the confirm card. Already true. |
+| **During** | Status reflects the actual step, not a spinner (audit E8) |
+| **After — success** | Say what changed and where it landed; offer the next step from the same pattern (section 22); return to the surface the user started from |
+| **After — partial** | Name exactly which rows saved and which did not — section 2.1 makes this knowable |
+| **After — failure** | Name what was *not* saved, and offer retry |
+
+Applies uniformly to `create_account`, `log_transactions`, memory save, nickname edit, and onboarding completion.
+
+**Concretely for `create_account` (T10):** confirm, create, thread the id, re-attempt, report rows saved, stay in chat. No navigation, no toast, no animation.
+
+---
+
+## 30. Metrics — [NO INFRA]
+
+The review asks for per-feature KPIs. There is **no analytics client** in `package.json` — no PostHog, Mixpanel, Amplitude, Sentry, or Plausible. Nothing client-side is measurable today.
+
+What does exist: the `ai_usage` ledger (`supabase/migrations/20260707000009_a_ai_usage.sql`) recording turns, tokens, and `prompt_version` server-side.
+
+| Measurable now (server-side) | Needs an analytics client |
+|---|---|
+| Turns per household, tokens, model, prompt version | Onboarding completion rate and drop-off |
+| Turn error rate | Explain My Number open and dismiss rate |
+| Quota trips | Health Check click-through, dismissal, helpfulness |
+| | Weekend card open rate |
+
+**The proposed trust KPI — "95% of users understand why Safe To Spend changed" — is not observable at all.** Understanding is not an event. The closest honest proxies are Explain-My-Number open rate and repeat-opens on the same value. State it that way, or it becomes a target nobody can compute.
+
+**Decision required.** Adding an analytics client to a product whose stated policy is device-local and never-synced (audit E4) is a privacy-policy change, not a dependency addition. Logged as **O-11**.
+
+---
+
+## 31. Accessibility
+
+Part I specified accessible buttons only. Full baseline, all deliverable without new infrastructure:
+
+- **Dynamic type** — no fixed pixel font sizes on money figures; the largest OS text setting must not clip a Rupiah amount (`Rp 1.500.000` is long)
+- **Screen-reader order** — the decision layer (section 23) is read first; the breakdown is reachable, not interruptive
+- **Money semantics** — amounts announce as currency, not digit strings; negative announces as "minus", never a bare hyphen
+- **Colour independence** — amber and red states carry text or an icon, never colour alone; interacts with NFR-3.1 and `isAmber`
+- **Contrast** — WCAG AA on every money figure, including amber on dark
+- **Reduced motion** — honour `prefers-reduced-motion`; no essential state conveyed by animation alone
+- **Keyboard** — the confirm card fully operable, including per-row toggles when B2 lands (audit review pt. 15)
+
+**Assertion:** the axe ruleset passes on the Today screen, the confirm card, and the Explain My Number sheet.
+
+---
+
+## 32. Copy revision
+
+The review is right that current copy is system-oriented. Adopted, with one exception.
+
+| Current | Revised (EN) | Revised (ID) |
+|---|---|---|
+| Safe to Spend | **Available today** | Tersedia hari ini |
+| Monthly allowance | **Your monthly spending plan** | Rencana belanja bulanan |
+| Overdrawn | **Below zero** | Di bawah nol |
+| Financial Health Check | **This week's highlights** | Sorotan minggu ini |
+| Explain My Number | **How we calculated this** | Cara kami menghitungnya |
+| Monthly personal pool | **Your spending money this month** | Uang belanja bulan ini |
+
+**Not adopted: "Protected Categories" to "Essential Spending".**
+
+`is_protected` is a user-set flag meaning *"never suggest cutting this"*, enforced in the persona and in the tool surface. It is **not** a synonym for essential. A household may protect a hobby fund, and may leave a genuine essential unprotected. Renaming it "Essential" makes the label lie about the flag's semantics, and invites the model to reason about essentialness instead of the declared flag.
+
+**Counter-proposal: "Off-limits" / "Tidak diutak-atik"** — plain language, and it says what the flag actually does.
+
+**Constraint on every copy change:** the persona's internal marker stays `[PROTECTED]`. UI labels may change; the prompt vocabulary and the DB flag must not drift apart (audit E2 — DB flags are authoritative).
+
+---
+
+## 33. Additional open items from Part II
+
+| id | Item | Blocks |
+|---|---|---|
+| **D-1** | Principle #4, verdicts. Now blocks section 23 layer 1 as well as Health Check content. **Most consequential open item in the document.** | Section 23, FR-11.3 |
+| **O-11** | Analytics client vs the device-local privacy policy (E4) | Section 30, all product KPIs |
+| **O-12** | Timezone and clock-change behaviour for `todayISO()` and pool reset | Section 26 |
+| **O-13** | Push notification milestone — is it on the roadmap at all? | Section 28 |
