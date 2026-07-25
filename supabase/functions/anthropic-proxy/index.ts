@@ -16,7 +16,7 @@ const MODEL_ROUTES: Record<string, { provider: "google" | "anthropic" | "minimax
   "gemini-2.5-flash": { provider: "google", apiModel: "gemini-2.5-flash" },
   "gemini-2.5-pro": { provider: "google", apiModel: "gemini-2.5-pro" },
   "claude-sonnet-4-20250514": { provider: "anthropic", apiModel: "claude-sonnet-4-20250514" },
-  "minimax-m3": { provider: "minimax", apiModel: "minimax-m3" },
+  "minimax-m3": { provider: "minimax", apiModel: "MiniMax-M3" },
 }
 
 const MAX_TOKENS_CAP = 8000
@@ -300,11 +300,12 @@ async function callMinimax(
   if (system) body.system = system
   if (tools && tools.length > 0) body.tools = tools
 
-  const res = await fetch("https://api.minimax.com/v1/messages", {
+  const res = await fetch("https://api.minimax.io/anthropic/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "Authorization": `Bearer ${MINIMAX_API_KEY}`,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
   })
