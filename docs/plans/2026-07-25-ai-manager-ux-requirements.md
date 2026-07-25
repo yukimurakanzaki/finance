@@ -1,6 +1,6 @@
 # AI Manager — UX Feedback Requirements & Build Plan
 
-**Date:** 2026-07-25 · **Revision:** 6 (computeAffordability implemented and tested; two deviations from the D-1c sketch recorded)
+**Date:** 2026-07-25 · **Revision:** 7 (D-1c wired end to end: engine, check_affordability tool, persona v5, audit amendment)
 **Source:** 10 UX feedback tickets + product-vision reprioritisation + PM/Staff-Engineer review
 **Structure:** Part I (§0–19) — what the system does. Part II (§20–33) — why someone opened the app.
 **Target implementer:** Hermes AI agents, model `minimax-m3` via `anthropic-proxy`
@@ -152,9 +152,9 @@ computeAffordability(amount: number, sts: SafeToSpendResult | null)
 
 **Transition requirements for (c):**
 
-- **TR-D1c.1** Persona rule rewritten from *"never issue a confident verdict"* to *"never **form** a verdict; state the computed one with its driver number"*. `PROMPT_VERSION` bumped in the same commit (NFR-X2).
-- **TR-D1c.2** `AI-MANAGER-UX-AUDIT.md` §2 capability boundary gains one line: the AI may state a **computed** affordability verdict with its driver; it may not form one. A1 is **not** marked superseded — its safety property is preserved, not discarded.
-- **TR-D1c.3** ~~Ships in Sprint 2 with Health Check.~~ **`computeAffordability` is built** (see above). The remaining Sprint 2 work is TR-D1c.1 (persona rewrite + `PROMPT_VERSION`), TR-D1c.2 (audit boundary line), and wiring the result into §23 layer 1 and FR-11.3.
+- **TR-D1c.1** ✅ **Done.** Persona rewritten to *"Never FORM a verdict yourself... call check_affordability and state the verdict it returns"*; the old affordability paragraph was **replaced**, not supplemented, to hold NFR-X1. `PROMPT_VERSION` 4 → 5.
+- **TR-D1c.2** ✅ **Done.** `AI-MANAGER-UX-AUDIT.md` §2 now reads "may not **form** an affordability verdict", with a dated D-1c amendment recording that A1 is not superseded.
+- **TR-D1c.3** ✅ **Wired.** `check_affordability` is a read tool (`src/ai/tools.ts`) — the amount is only known mid-turn, so a prompt section could not carry it. Both the tool and the AI context now derive from one shared `safeToSpendFromLedger`, so a verdict cannot contradict the numbers quoted in the same turn. Remaining: §23 layer 1 in the UI, and Health Check (FR-11.3).
 
 ---
 
@@ -433,7 +433,7 @@ T1a · Explain My Number · T10 · **T3** *(added: no schema, and it removes a w
 Dexie `version(12)`.
 
 ### Sprint 2 — Decision engine
-~~`computeAffordability`~~ **(done)** · T5 · Health Check · §23 layer 1 · T8 · T1b
+~~`computeAffordability` + `check_affordability` + persona v5~~ **(done)** · T5 · Health Check · §23 layer 1 (UI) · T8 · T1b
 Dexie `version(13)`.
 
 ### Sprint 3 — Polish
@@ -466,7 +466,7 @@ This is load-bearing, not ceremony. With `minimax-m3` and no prompt regression s
 | **T9** | Memory screen renders an entry's content escaped. | NFR-9.3. |
 | **Health Check** | Never returns more than 5; ordering is deterministic for a fixed fixture; no insight names a `[PROTECTED]` item as reducible; a fixture with a P1 present yields no P5 row. | FR-11.4/11.7, §27 hard rule. |
 | **`computeAffordability`** | ✅ **Done** — `src/engine/affordability.test.ts`, 15 assertions: each verdict, all four threshold boundaries, the committed-payment flip, unknown states, driver-always-present, and purity. | FR-D1c.1 — the verdict drifts from the arithmetic. |
-| **Layer 1 + 2 coupling** | A rendered verdict always carries its driver number; a verdict without one fails. | FR-D1c.3 — the bare-verdict failure mode A1 was written about. |
+| **Layer 1 + 2 coupling** | ✅ **Tool half done** — `src/ai/checkAffordability.test.ts` (6 assertions) asserts the verdict always ships with its number, moves with the ledger, and returns `unknown` (never `over`) for an unconfigured household. UI half pending §23 layer 1. | FR-D1c.3 — the bare-verdict failure mode A1 was written about. |
 | **T7** | CTA renders at zero entries, absent at one. | FR-7.3. |
 
 **Not assertable by test, verify by review:** NFR-3.3 and NFR-11.2 (copy register — no moralising), NFR-9.2 (the device-local disclosure is present and accurate), NFR-X1 (persona token budget — check the diff).

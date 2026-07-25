@@ -5,6 +5,8 @@ import {
   transactionsRepo,
 } from '@db/repositories/transactions.repo'
 import type { Cadence, Lane, RecurringKind } from '@db/types'
+import { computeAffordability } from '@engine/affordability'
+import { safeToSpendFromLedger } from '@engine/safeToSpend'
 import { formatRpFull } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { resolveRecurringItemId } from '@lib/recurringMatch'
@@ -67,6 +69,21 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
         },
       },
       required: ['from_date', 'to_date'],
+    },
+  },
+  {
+    name: 'check_affordability',
+    description:
+      'Answer "can I afford X?" for a discretionary purchase. Returns a verdict (comfortable / tight / over) computed from this week\'s remaining personal pool, plus the driving number. Always call this instead of judging affordability yourself, and always quote the number it returns alongside the verdict. Not for investments or protected commitments.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        amount: {
+          type: 'number',
+          description: 'Purchase amount in whole rupiah, e.g. 450000',
+        },
+      },
+      required: ['amount'],
     },
   },
   {
@@ -310,7 +327,47 @@ export async function executeReadTool(
   input: ToolInput,
 ): Promise<string> {
   if (name === 'query_transactions') return queryTransactions(input)
+  if (name === 'check_affordability') return checkAffordability(input)
   return JSON.stringify({ error: `Unknown read tool: ${name}` })
+}
+
+// D-1c: the verdict is computed here, never by the model. The tool hands back
+// the verdict AND the number behind it, so the reply can satisfy FR-D1c.3
+// (a verdict is never rendered alone) without the model doing arithmetic.
+async function checkAffordability(input: ToolInput): Promise<string> {
+  const amount = typeof input['amount'] === 'number' ? input['amount'] : Number.NaN
+
+  const today = new Date()
+  const [allowance, recurring, allTxns] = await Promise.all([
+    db.allowance.get('local'),
+    db.recurringItems.filter((r) => r.is_active).toArray(),
+    db.transactions.toArray(),
+  ])
+
+  const sts = safeToSpendFromLedger(allowance, recurring, allTxns, today)
+  const { verdict, driver, margin } = computeAffordability(amount, sts)
+
+  if (verdict === 'unknown') {
+    return JSON.stringify({
+      verdict,
+      reason:
+        sts === null
+          ? 'No monthly allowance is set yet, so there is no pool to check against.'
+          : 'Amount must be a whole number of rupiah greater than zero.',
+    })
+  }
+
+  return JSON.stringify({
+    verdict,
+    // Name the driver explicitly rather than shipping a bare number — the model
+    // has to be able to say what it is.
+    remaining_pool_this_week: driver,
+    remaining_after_purchase: margin,
+    formatted: {
+      remaining_pool_this_week: formatRpFull(driver as number),
+      remaining_after_purchase: formatRpFull(margin as number),
+    },
+  })
 }
 
 export async function executeWriteTool(
