@@ -9,6 +9,8 @@ import { DEFAULT_MODEL, getModelConfig } from '../ai/models'
 
 const MAX_TOKENS = 8000
 const HISTORY_LIMIT = 40 // messages sent to the API per turn
+const DISCARDED_PENDING_NOTICE =
+  "A change you were asked to confirm wasn't saved — the app closed before you responded."
 
 export interface ApiMessage {
   role: 'user' | 'assistant'
@@ -35,6 +37,11 @@ interface ChatState {
   pendingWrites: PendingWrite[]
   pendingReadResults: Anthropic.ToolResultBlockParam[]
 
+  // Audit B1: set when loading a session finds — and drops — a dangling
+  // tool_use tail (app closed mid-turn), so the UI can tell the user
+  // nothing was saved.
+  discardedPendingNotice: string | null
+
   // Token tracking for current session
   sessionInputTokens: number
   sessionOutputTokens: number
@@ -53,6 +60,8 @@ interface ChatState {
   sendMessage: (text: string, images?: { media_type: string; data: string }[]) => Promise<void>
   resolvePending: (approve: boolean) => Promise<void>
   clearSession: () => Promise<void>
+  stopTurn: () => void
+  clearDiscardedNotice: () => void
 }
 
 const now = () => new Date().toISOString()
@@ -72,7 +81,32 @@ async function persistMessage(sessionId: string, msg: ApiMessage): Promise<strin
   return id
 }
 
-async function loadSessionMessages(sessionId: string): Promise<ApiMessage[]> {
+function isDanglingAssistant(msg: ApiMessage | undefined): boolean {
+  return (
+    msg !== undefined &&
+    msg.role === 'assistant' &&
+    Array.isArray(msg.content) &&
+    msg.content.some((b) => b.type === 'tool_use')
+  )
+}
+
+function isToolResultCarrier(msg: ApiMessage | undefined): boolean {
+  return (
+    msg !== undefined &&
+    msg.role === 'user' &&
+    Array.isArray(msg.content) &&
+    msg.content.length > 0 &&
+    msg.content.every((b) => b.type === 'tool_result')
+  )
+}
+
+// Audit B1: load a session's messages, dropping any dangling tail left by
+// the app closing mid-turn — an unresolved assistant tool_use, and every
+// carrier message feeding it, since the model never saw a resolution and
+// the exchange can't be resumed safely.
+export async function loadSessionMessages(
+  sessionId: string,
+): Promise<{ messages: ApiMessage[]; droppedDangling: boolean }> {
   const rows = await db.chatMessages
     .where('session_id')
     .equals(sessionId)
@@ -81,18 +115,36 @@ async function loadSessionMessages(sessionId: string): Promise<ApiMessage[]> {
     role: r.role,
     content: JSON.parse(r.content),
   }))
-  // Drop dangling tool_use at the end (app closed mid-turn)
+
+  let droppedDangling = false
   while (messages.length > 0) {
     const last = messages[messages.length - 1]
-    const dangling =
-      last !== undefined &&
-      last.role === 'assistant' &&
-      Array.isArray(last.content) &&
-      last.content.some((b) => b.type === 'tool_use')
-    if (!dangling) break
-    messages.pop()
+    if (isDanglingAssistant(last)) {
+      messages.pop()
+      droppedDangling = true
+      continue
+    }
+    if (droppedDangling && isToolResultCarrier(last)) {
+      messages.pop()
+      continue
+    }
+    break
   }
-  return messages
+  return { messages, droppedDangling }
+}
+
+// Audit C3: replace image blocks in older history with a text marker so we
+// don't keep re-sending (and re-billing for) every past attachment on
+// every turn. Returns the same message references when nothing changes.
+export function stripImagesFromHistory(messages: ApiMessage[]): ApiMessage[] {
+  return messages.map((m) => {
+    if (!Array.isArray(m.content) || !m.content.some((b) => b.type === 'image')) return m
+    const content = [
+      ...m.content.filter((b) => b.type !== 'image'),
+      { type: 'text' as const, text: '[image stripped from older message]' },
+    ]
+    return { ...m, content }
+  })
 }
 
 // Auto-generate title from first user message
@@ -124,10 +176,14 @@ function trimForApi(messages: ApiMessage[]): ApiMessage[] {
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
+  // Audit C2: tracks the in-flight request so stopTurn() can abort it.
+  let activeAbort: AbortController | null = null
+
   async function callProxy(
     model: string,
     system: string,
     messages: Anthropic.MessageParam[],
+    signal: AbortSignal,
   ): Promise<Anthropic.Message> {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) throw new Error('NOT_SIGNED_IN')
@@ -140,11 +196,13 @@ export const useChatStore = create<ChatState>((set, get) => {
         model, max_tokens: maxTokens, system, tools: TOOL_DEFINITIONS, messages,
         prompt_version: PROMPT_VERSION,
       },
+      signal,
     })
     if (error) {
+      const context = (error as { context?: { status?: number; name?: string } }).context
+      if (context?.name === 'AbortError') throw new Error('ABORTED')
       // The proxy returns 429 with a budget marker when the daily AI cap is hit.
-      const status = (error as { context?: { status?: number } }).context?.status
-      if (status === 429) throw new Error('BUDGET_EXCEEDED')
+      if (context?.status === 429) throw new Error('BUDGET_EXCEEDED')
       throw new Error(error.message ?? 'Chat request failed')
     }
     return data as Anthropic.Message
@@ -189,11 +247,25 @@ export const useChatStore = create<ChatState>((set, get) => {
     const system = await buildSystemPrompt(session?.skills ?? [])
 
     while (true) {
+      // Audit C3: keep images only on the most recent message — older
+      // turns get a text marker instead so we don't resend every past
+      // attachment on every request.
+      const trimmed = trimForApi(get().messages)
+      const last = trimmed[trimmed.length - 1]
+      const history =
+        trimmed.length > 1 && last !== undefined
+          ? [...stripImagesFromHistory(trimmed.slice(0, -1)), last]
+          : trimmed
+
+      const abort = new AbortController()
+      activeAbort = abort
       const response = await callProxy(
         model,
         system,
-        trimForApi(get().messages) as Anthropic.MessageParam[],
+        history as Anthropic.MessageParam[],
+        abort.signal,
       )
+      if (activeAbort === abort) activeAbort = null
 
       await appendMessage({
         role: 'assistant',
@@ -242,6 +314,12 @@ export const useChatStore = create<ChatState>((set, get) => {
     try {
       await runLoop()
     } catch (err) {
+      activeAbort = null
+      if (err instanceof Error && err.message === 'ABORTED') {
+        // Audit C2: user-initiated stop — quiet, not an error.
+        set({ status: 'idle' })
+        return
+      }
       let msg = 'Something went wrong.'
       if (err instanceof Error && err.message === 'NOT_SIGNED_IN') {
         msg = 'You were signed out. Sign in again to keep chatting.'
@@ -263,6 +341,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     error: null,
     pendingWrites: [],
     pendingReadResults: [],
+    discardedPendingNotice: null,
     sessionInputTokens: 0,
     sessionOutputTokens: 0,
 
@@ -280,8 +359,11 @@ export const useChatStore = create<ChatState>((set, get) => {
       let messages: ApiMessage[] = []
       let inputTokens = 0
       let outputTokens = 0
+      let droppedDangling = false
       if (lastActive) {
-        messages = await loadSessionMessages(lastActive.id)
+        const loaded = await loadSessionMessages(lastActive.id)
+        messages = loaded.messages
+        droppedDangling = loaded.droppedDangling
         inputTokens = lastActive.total_input_tokens
         outputTokens = lastActive.total_output_tokens
       }
@@ -292,6 +374,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         sessionInputTokens: inputTokens,
         sessionOutputTokens: outputTokens,
         hydrated: true,
+        discardedPendingNotice: droppedDangling ? DISCARDED_PENDING_NOTICE : null,
       })
     },
 
@@ -336,7 +419,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     switchSession: async (sessionId: string) => {
       const session = await db.chatSessions.get(sessionId)
       if (!session) return
-      const messages = await loadSessionMessages(sessionId)
+      const { messages, droppedDangling } = await loadSessionMessages(sessionId)
       set({
         activeSessionId: sessionId,
         messages,
@@ -346,6 +429,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         pendingReadResults: [],
         sessionInputTokens: session.total_input_tokens,
         sessionOutputTokens: session.total_output_tokens,
+        discardedPendingNotice: droppedDangling ? DISCARDED_PENDING_NOTICE : null,
       })
     },
 
@@ -364,13 +448,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (activeSessionId === sessionId) {
         const next = sessions.find((s) => !s.archived_at && s.id !== sessionId)
         if (next) {
-          const messages = await loadSessionMessages(next.id)
+          const { messages, droppedDangling } = await loadSessionMessages(next.id)
           set({
             sessions,
             activeSessionId: next.id,
             messages,
             sessionInputTokens: next.total_input_tokens,
             sessionOutputTokens: next.total_output_tokens,
+            discardedPendingNotice: droppedDangling ? DISCARDED_PENDING_NOTICE : null,
           })
         } else {
           set({ sessions, activeSessionId: null, messages: [] })
@@ -394,13 +479,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (activeSessionId === sessionId) {
         const next = sessions.find((s) => !s.archived_at)
         if (next) {
-          const messages = await loadSessionMessages(next.id)
+          const { messages, droppedDangling } = await loadSessionMessages(next.id)
           set({
             sessions,
             activeSessionId: next.id,
             messages,
             sessionInputTokens: next.total_input_tokens,
             sessionOutputTokens: next.total_output_tokens,
+            discardedPendingNotice: droppedDangling ? DISCARDED_PENDING_NOTICE : null,
           })
         } else {
           set({ sessions, activeSessionId: null, messages: [] })
@@ -504,6 +590,14 @@ export const useChatStore = create<ChatState>((set, get) => {
         sessionInputTokens: 0,
         sessionOutputTokens: 0,
       })
+    },
+
+    stopTurn: () => {
+      activeAbort?.abort()
+    },
+
+    clearDiscardedNotice: () => {
+      set({ discardedPendingNotice: null })
     },
   }
 })

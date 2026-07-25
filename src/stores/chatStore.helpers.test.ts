@@ -11,6 +11,12 @@ import { DEFAULT_MODEL } from '../ai/models'
 
 const now = () => new Date().toISOString()
 
+// loadSessionMessages orders rows by the created_at index, so seeded messages
+// need strictly increasing timestamps — real Date.now() calls in a tight loop
+// can tie at millisecond resolution and make the sort (and this test) flaky.
+let seedClock = Date.now()
+const nextTimestamp = () => new Date(seedClock++).toISOString()
+
 async function seedSessionWithMessages(sessionId: string, messages: ApiMessage[]) {
   await db.chatSessions.add({
     id: sessionId, title: 'test', model: DEFAULT_MODEL,
@@ -18,13 +24,14 @@ async function seedSessionWithMessages(sessionId: string, messages: ApiMessage[]
     message_count: messages.length, total_input_tokens: 0, total_output_tokens: 0,
   })
   for (const m of messages) {
+    const ts = nextTimestamp()
     await db.chatMessages.add({
       id: crypto.randomUUID(),
       session_id: sessionId,
       role: m.role,
       content: JSON.stringify(m.content),
       input_tokens: null, output_tokens: null,
-      created_at: now(), updated_at: now(),
+      created_at: ts, updated_at: ts,
     })
   }
 }
