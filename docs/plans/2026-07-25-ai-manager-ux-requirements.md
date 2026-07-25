@@ -1,6 +1,6 @@
 # AI Manager — UX Feedback Requirements & Build Plan
 
-**Date:** 2026-07-25 · **Revision:** 4 (D-1 option (c) — computed verdict — added as the recommended resolution)
+**Date:** 2026-07-25 · **Revision:** 5 (D-1 RESOLVED — option (c), the computed verdict. No product decisions outstanding.)
 **Source:** 10 UX feedback tickets + product-vision reprioritisation + PM/Staff-Engineer review
 **Structure:** Part I (§0–19) — what the system does. Part II (§20–33) — why someone opened the app.
 **Target implementer:** Hermes AI agents, model `minimax-m3` via `anthropic-proxy`
@@ -16,7 +16,7 @@ Every ticket is judged against one question:
 
 Ordering follows from it: data must be *present* (T1), then *trusted* (Explain My Number), then *reliable* (T10), then *useful on the day they look* (T5), then *actionable* (Health Check). Polish last.
 
-**One decision is outstanding — see D-1 in §4.** It is a product-principle decision, deliberately not resolved here. As of revision 3 it blocks **two** things: the Health Check ticket's content, and layer 1 of the progressive-disclosure hierarchy in §23. It is now the most consequential open item in the document.
+**D-1 is resolved: option (c), the computed verdict** (§4). The affordability answer is a threshold over numbers the engine already produces — computed in `src/engine/**`, phrased by the model, never judged by it. This unblocks Health Check content (§6) and layer 1 of the progressive-disclosure hierarchy (§23). **No product decisions remain outstanding.**
 
 ---
 
@@ -100,16 +100,17 @@ Sequential versions across sprints are fine — v12 → v13 → v14 is normal De
 ### TR-X2 — Sync mapper parity
 Every new persisted field lands in `src/lib/syncMappers.ts` **and** the Supabase column **and** the RLS policy in the same change — or it silently fails to sync and the partner device shows stale data (audit D3).
 
-### D-1 — OUTSTANDING PRODUCT DECISION (blocks §6 content and §23 layer 1)
+### D-1 — RESOLVED: option (c), the computed verdict
 The Health Check ticket asks the app to answer *"what should I do next?"* Audit finding **A1 is a P1** whose entire content was removing exactly that, and [context.ts:17](../../src/ai/context.ts) now reads: *"You present facts and trade-offs; the user decides. Never issue a confident verdict."*
 
-**Three options, owner's call:**
+**Decision (2026-07-25): option (c).** Recorded for the next reader, since this reverses a P1 audit finding's surface behaviour while preserving its substance.
 
-- **(a) Principles hold.** Health Check ships as ranked *facts and deltas*. Four of the five proposed insights qualify unchanged. The fifth ("delay this purchase until payday and you'll stay within allowance") ships as a stated trade-off without the conclusion. §23 layer 1 is dropped.
-- **(b) Principle #4 is amended.** The model issues affordability verdicts. Requires `AI-MANAGER-UX-AUDIT.md` §2 safety policy, the persona rule, and the A1 finding all updated in one PR.
-- **(c) Computed verdict — recommended.** See D-1c below.
+Options considered and rejected:
 
-### D-1c — the computed verdict *(recommended resolution)*
+- **(a) Principles hold unchanged.** No layer-1 answer; the user always concludes. Rejected: it answers I-1 ("can I buy this?") with arithmetic when a one-line answer is available deterministically.
+- **(b) Principle #4 amended so the model judges.** Rejected: unbounded model judgement about the user's money, untestable without the unbuilt E6 suite, and non-deterministic on `minimax-m3`.
+
+### D-1c — the computed verdict *(ADOPTED)*
 
 (a) and (b) both assume a verdict is a *judgement*. It does not have to be. The affordability answer is a threshold over numbers the engine already produces — so compute it, and let the model phrase it.
 
@@ -140,7 +141,11 @@ computeAffordability({ amount, safeToSpend, upcomingCommitments, weekendAllocati
 
 **Acceptance assertion (extends §17):** `computeAffordability` is unit-tested across comfortable / tight / over, including the boundary at each threshold, and a fixture where an upcoming committed payment flips `comfortable` to `over`.
 
-**Do not let this be decided implicitly by whoever writes the first insight generator.** §6 and §23 are currently specified against (a). Switching to (c) changes FR-11.3, unblocks §23 layer 1, and adds FR-D1c.1–5.
+**Transition requirements for (c):**
+
+- **TR-D1c.1** Persona rule rewritten from *"never issue a confident verdict"* to *"never **form** a verdict; state the computed one with its driver number"*. `PROMPT_VERSION` bumped in the same commit (NFR-X2).
+- **TR-D1c.2** `AI-MANAGER-UX-AUDIT.md` §2 capability boundary gains one line: the AI may state a **computed** affordability verdict with its driver; it may not form one. A1 is **not** marked superseded — its safety property is preserved, not discarded.
+- **TR-D1c.3** Ships in Sprint 2 with Health Check. `computeAffordability` is Sprint 2's first task, because §23 layer 1 and FR-11.3 both depend on it.
 
 ---
 
@@ -179,14 +184,14 @@ The pattern's risk is exactly its value: ship one wrong decomposition and it is 
 
 ---
 
-## 6. Financial Health Check *(new — specified against D-1 option (a); see D-1c for the recommended resolution)*
+## 6. Financial Health Check *(new — specified against D-1 option (c), adopted)*
 
 After each sync or import, generate 3–5 prioritised insights.
 
 ### Functional
 - **FR-11.1** A deterministic rule set generates the baseline. **AI is optional and additive** — the feature works with the model switched off.
 - **FR-11.2** Insights are ranked by impact; **ranking is computed in code**, not chosen by the model (NFR-X4).
-- **FR-11.3** *(Under (a))* Insights state **facts and deltas**, never recommendations. A trade-off may be stated in full — "buying this today leaves Rp X of this week's pool; waiting until the 25th leaves it untouched" — with the conclusion left to the user. *(Under (b), this constraint is lifted and the audit updates with it.)*
+- **FR-11.3** Insights state facts, deltas, and **computed** verdicts. A verdict may appear only when it comes from a pure function in `src/engine/**` with its driver number alongside (FR-D1c.1–3). The model may never form a conclusion the engine did not compute — "you should cancel this subscription" remains forbidden; "this subscription is Rp X of your Rp Y pool" is a fact, and "over" from `computeAffordability` is a computed verdict.
 - **FR-11.4** Never more than five, ever.
 - **FR-11.5** Each insight deep-links to the screen where it can be acted on.
 - **FR-11.6** Dismissed insights stay hidden until their **generating condition changes** — not for a fixed interval.
@@ -404,7 +409,7 @@ Partly built: [context.ts:171-192](../../src/ai/context.ts) generates two kinds 
 | ★★★★★ | **Explain My Number** | Users must trust the numbers before they'll trust anything built on them. |
 | ★★★★☆ | **T10** Import reliability | Data integrity outranks new surface area. |
 | ★★★★☆ | **T5** Weekend safe-to-spend | The differentiator. "Today" must be useful on the day people look. |
-| ★★★★☆ | **Health Check** | Turns facts into decisions — but only after they're trusted. Blocked on **D-1**. |
+| ★★★★☆ | **Health Check** | Turns facts into decisions — but only after they are trusted. Needs `computeAffordability` first. |
 | ★★★☆☆ | **T1b** Onboarding (model-facing) | Highest model variance; lands once the deterministic half is proven. |
 | ★★★☆☆ | **T3** Overdraft split | Cheap, no schema, removes a false "negative net worth" signal. |
 | ★★★☆☆ | **T2** Nicknames | Removes confusion; doesn't change decisions. |
@@ -419,7 +424,7 @@ T1a · Explain My Number · T10 · **T3** *(added: no schema, and it removes a w
 Dexie `version(12)`.
 
 ### Sprint 2 — Decision engine
-T5 · Health Check *(pending D-1; under (c) also `computeAffordability` + §23 layer 1)* · T8 · T1b
+**`computeAffordability` first** (unblocks both below) · T5 · Health Check · §23 layer 1 · T8 · T1b
 Dexie `version(13)`.
 
 ### Sprint 3 — Polish
@@ -450,7 +455,9 @@ This is load-bearing, not ceremony. With `minimax-m3` and no prompt regression s
 | **T6** | Notices emitted from a fixture arrive in rank order, capped at 3; an empty-state household emits none. | FR-6.3/NFR-6.2 — ranking drifts to model judgement, or empty households get spammed. |
 | **T8** | A reply exceeding 600 characters renders folded. | NFR-8.1 — enforcement quietly relocates to the prompt. |
 | **T9** | Memory screen renders an entry's content escaped. | NFR-9.3. |
-| **Health Check** | Never returns more than 5; ordering is deterministic for a fixed fixture; no insight names a `[PROTECTED]` item as reducible. | FR-11.4/11.7. **Content assertions pending D-1.** |
+| **Health Check** | Never returns more than 5; ordering is deterministic for a fixed fixture; no insight names a `[PROTECTED]` item as reducible; a fixture with a P1 present yields no P5 row. | FR-11.4/11.7, §27 hard rule. |
+| **`computeAffordability`** | Unit test across comfortable / tight / over, asserting **each threshold boundary**, plus a fixture where an upcoming committed payment flips `comfortable` to `over`. | FR-D1c.1 — the verdict drifts from the arithmetic. |
+| **Layer 1 + 2 coupling** | A rendered verdict always carries its driver number; a verdict without one fails. | FR-D1c.3 — the bare-verdict failure mode A1 was written about. |
 | **T7** | CTA renders at zero entries, absent at one. | FR-7.3. |
 
 **Not assertable by test, verify by review:** NFR-3.3 and NFR-11.2 (copy register — no moralising), NFR-9.2 (the device-local disclosure is present and accurate), NFR-X1 (persona token budget — check the diff).
@@ -461,7 +468,7 @@ This is load-bearing, not ceremony. With `minimax-m3` and no prompt regression s
 
 | id | Item | Blocks |
 |---|---|---|
-| **D-1** | Principle #4 (no verdicts): hold (a), amend (b), or **computed verdict (c) — recommended**? | Health Check FR-11.3, §23 layer 1 |
+| ~~**D-1**~~ | ~~Principle #4, verdicts~~ — **RESOLVED: option (c), computed verdict.** See §4. | — |
 | **B3** | Dexie batch write atomicity audit | Nothing — follow-up |
 | **O-2** | Merge under LWW sync conflict | T2 merge only |
 | **O-4** | Derived `monthly_amount` | Future ticket |
@@ -588,17 +595,13 @@ Layer 3  Explanation    "How we calculated this" (section 5)
 Layer 4  Breakdown      full formula and assumptions
 ```
 
-Layers 2–4 are already specified and buildable. **Layer 1 is not currently permitted.**
+All four layers are permitted. **Layer 1 is a computed verdict, not a judgement** — D-1 resolved to option (c) (§4).
 
-> **Layer 1 is the D-1 decision.** "Yes, you can comfortably afford this" is exactly the affordability verdict that audit finding **A1 (P1)** removed, and that [context.ts:17](../../src/ai/context.ts) forbids: *"Never issue a confident verdict on whether the user should or shouldn't spend."*
->
-> The review's hierarchy as written **presumes D-1 resolves to option (b): amend principle #4** so the model may judge. That is a legitimate choice, but it cannot arrive through a copy revision, and it is not the only way to get layer 1.
->
-> **Option (c) — the computed verdict (§4, D-1c) — delivers layer 1 without model judgement.** `computeAffordability` returns `comfortable | tight | over` plus the driving number; the model phrases it and never derives it. Deterministic, unit-testable, and NFR-X3 stays intact. **This is the recommended resolution.**
->
-> **Until D-1 is signed off, build layers 2–4 and leave layer 1 out.** Layers 2–4 alone answer I-1 in a single turn: *"You would have Rp 850.000 left this week"* is not a verdict, and for most users it is the entire answer. Under (c), layer 1 becomes a one-line addition on top of work already done.
+**Layer 1 is `computeAffordability`'s output, phrased.** The engine returns `comfortable | tight | over`; the model turns that into a sentence and never derives it. So the historical objection in audit **A1 (P1)** — unbounded model verdicts about the user's money — does not apply: nothing about the conclusion is left to the model.
 
-**Under (b) or (c), these constraints still survive:** verdicts remain forbidden on investments (no sell tooling exists — principle #2) and on protected items (principle #5). Only discretionary-purchase affordability opens up (FR-D1c.4).
+**Layers 1 and 2 always ship together** (FR-D1c.3). "Comfortably" alone is never displayed; the driving number arrives in the same breath. A bare verdict is the failure mode A1 was written about, whatever computed it.
+
+**Constraints that survive:** verdicts remain forbidden on investments (no sell tooling exists — principle #2) and on protected items (principle #5). Only discretionary-purchase affordability opens up (FR-D1c.4).
 
 ---
 
@@ -768,7 +771,7 @@ The review is right that current copy is system-oriented. Adopted, with one exce
 
 | id | Item | Blocks |
 |---|---|---|
-| **D-1** | Principle #4, verdicts. Blocks section 23 layer 1 and Health Check content. **Most consequential open item in the document.** Recommended resolution: **(c) computed verdict**, section 4 / D-1c. | Section 23, FR-11.3 |
+| ~~**D-1**~~ | ~~Principle #4, verdicts~~ — **RESOLVED: option (c), computed verdict.** Section 4 / D-1c. | — |
 | **O-11** | Analytics client vs the device-local privacy policy (E4) | Section 30, all product KPIs |
 | **O-12** | Timezone and clock-change behaviour for `todayISO()` and pool reset | Section 26 |
 | **O-13** | Push notification milestone — is it on the roadmap at all? | Section 28 |
