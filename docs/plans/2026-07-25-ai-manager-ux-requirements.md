@@ -21,15 +21,16 @@ Ordering follows from it: data must be *present* (T1), then *trusted* (Explain M
 
 ## 1. Corrections to the ticket text — read before building
 
-Three tickets, as written, contradict the code. Building them literally ships bugs.
+Four tickets, as written, contradict the code. Building them literally ships bugs.
 
 | # | Ticket claim | Reality | Consequence |
 |---|---|---|---|
 | **C-1** | T4: pool = `income − pipe − bills − subs − weekend` | `allowance.monthly_amount` is **already net** of every recurring item ([safeToSpend.ts:69-74](../../src/engine/safeToSpend.ts)); only the weekend carve-out is subtracted. It is a **declared input**, not derived. | Implementing the stated formula double-counts subs and bills on every screen. |
 | **C-2** | T1: "no guided path to set them up" | `src/features/onboarding/OnboardingWizard.tsx` exists (~29KB). | Building a second in-chat wizard creates two paths that drift. Build the bridge. |
 | **C-3** | T9 vs audit E11 ("v1 remembers nothing") | `save_memory` is already in the persona ([context.ts:32](../../src/ai/context.ts)), `db.chatMemories` exists, MEMORY block is assembled. | Code shipped past the policy. Ratify it and update E11 in the same PR. |
+| **C-5** | T1: "deep links into the right app screens" | No router exists. Navigation is `activeTab` in the app store; the wizard's step is component-local `useState`. | "Deep link" is unbuildable as stated. Restated as programmatic navigation in FR-1.3, with the wizard's step lifted (FR-1.3a) as in-scope prerequisite work. |
 
-**A fourth correction applies to the "Explain My Number" proposal itself** — see §5.
+**A further correction (C-4) applies to the "Explain My Number" proposal itself** — see §5.
 
 ---
 
@@ -178,16 +179,18 @@ Per C-2: bridge to the existing wizard, do not build a second one.
 ### T1a — Deterministic (Sprint 1)
 - **FR-1.1** When `recurringItems` is empty **and** `chatMemories` is empty **and** `allowance.monthly_amount === 0`, `buildSystemPrompt` emits `=== ONBOARDING STATE ===` naming the outstanding steps.
 - **FR-1.2** Snooze sets `onboarding_snoozed_until` to end-of-day local. While snoozed the section is **omitted from the prompt entirely** — suppression in context assembly, never "ask the model to stay quiet".
-- **FR-1.3** Deep links into existing wizard steps; no new navigation surface.
+- **FR-1.3** **Correction C-5 — "deep links" do not exist in this app and must not be specified as URLs.** There is no router (`package.json` has no routing dependency); navigation is `activeTab` in the app store ([App.tsx:33](../../src/App.tsx)), and the wizard's step is component-local `useState` ([OnboardingWizard.tsx:57](../../src/features/onboarding/OnboardingWizard.tsx)), unaddressable from outside. The requirement is therefore **programmatic navigation**: a jump target sets `activeTab` and the wizard's starting step.
+- **FR-1.3a** Lift the wizard's `step` from local state to an entry prop (or store value) so a caller can open it at a chosen step. This is prerequisite work inside T1a's scope, not a freebie — budget it.
+- **FR-1.3b** The existing persisted draft (`step` is already written to the draft, [OnboardingWizard.tsx:112](../../src/features/onboarding/OnboardingWizard.tsx)) must keep winning over the requested step when a draft is mid-flight, or a jump silently discards in-progress answers.
 - **FR-1.4** Once all three steps have data the section disappears permanently, and safe-to-spend / FI stop rendering null states.
 
 ### T1b — Model-facing (Sprint 2)
 - **FR-1.5** On the first assistant turn in that state, the three steps are offered in one short message.
-- **FR-1.6** Each step is completable in chat (`log_income`, `add_recurring_item`) or via the deep link.
+- **FR-1.6** Each step is completable in chat (`log_income`, `add_recurring_item`) or by the jump target of FR-1.3.
 
 ### Non-functional
 - **NFR-1.1** ≤ 400 characters added to the prompt; zero cost once complete or snoozed.
-- **NFR-1.2** Deep links work on mobile web without losing chat scroll position.
+- **NFR-1.2** Jumping to the wizard and returning must not lose chat scroll position on mobile web.
 
 ### Transition
 - **TR-1.1** `onboarding_snoozed_until: string | null` on the allowance row — Dexie `version(12)`.
@@ -394,7 +397,34 @@ Dexie `version(14)`.
 
 ---
 
-## 17. Remaining open items
+## 17. Acceptance assertions — definition of done
+
+One assertion per ticket: the smallest runnable check that fails if the requirement breaks. **A ticket is not done until its assertion exists and passes.**
+
+This is load-bearing, not ceremony. With `minimax-m3` and no prompt regression suite (O-X), these tests are the only mechanism that detects a behaviour regression. Every assertion below is a pure-function or component test — none requires an API call.
+
+| Ticket | Assertion | Fails when |
+|---|---|---|
+| **T1a** | `buildSystemPrompt` on a fixture household with recurring items **and** memory **and** a non-zero allowance contains no `ONBOARDING STATE` section; the same fixture emptied does. A fixture with `onboarding_snoozed_until` set to today omits it. | Onboarding nags a populated household (TR-1.2), or snooze leaks. |
+| **T1a** | Opening the wizard with a requested step while a persisted draft exists lands on the **draft's** step, not the requested one. | FR-1.3b — a jump discards in-progress answers. |
+| **Explain My Number** | For each explained value, the decomposition rows sum to the displayed figure. Property test over generated allowance/recurring combinations, not one example. | C-1/C-4 recur — a component re-derives a number and drifts from the engine. |
+| **Explain My Number** | An unset allowance renders `—` for every derived row, and no `Rp 0` appears. | FR-4.6 — phantom zeros return. |
+| **T3** | `splitOverdraft` over positive, zero, and negative balances. Plus: net worth for a fixture with one overdrawn account equals `assets − overdraft`, and is unchanged by routing through the split. | The clamp drifts between the three consumers of `deriveBalance`. |
+| **T5** | `computeSafeToSpend` on a Saturday returns `kind: 'weekend'`. Snapshot of the rendered card asserts no `Rp 0` string appears without an adjacent reason. | FR-5.4 — the dead-zero card comes back. |
+| **T5** | Changing `workweek_definition` leaves the previous week's computed pool unchanged. | TR-5.2 — history silently rewrites. |
+| **T10** | Given a batch where some rows reference an unknown `account_id`, `logTransactions` persists exactly the valid rows and reports the rest; re-running with a created account persists each remaining row exactly once. | §2.1's no-double-book guarantee stops holding. |
+| **T2** | Two accounts sharing a `name` render distinct labels in the picker. | FR-2.2 — identical rows return. |
+| **T6** | Notices emitted from a fixture arrive in rank order, capped at 3; an empty-state household emits none. | FR-6.3/NFR-6.2 — ranking drifts to model judgement, or empty households get spammed. |
+| **T8** | A reply exceeding 600 characters renders folded. | NFR-8.1 — enforcement quietly relocates to the prompt. |
+| **T9** | Memory screen renders an entry's content escaped. | NFR-9.3. |
+| **Health Check** | Never returns more than 5; ordering is deterministic for a fixed fixture; no insight names a `[PROTECTED]` item as reducible. | FR-11.4/11.7. **Content assertions pending D-1.** |
+| **T7** | CTA renders at zero entries, absent at one. | FR-7.3. |
+
+**Not assertable by test, verify by review:** NFR-3.3 and NFR-11.2 (copy register — no moralising), NFR-9.2 (the device-local disclosure is present and accurate), NFR-X1 (persona token budget — check the diff).
+
+---
+
+## 18. Remaining open items
 
 | id | Item | Blocks |
 |---|---|---|
@@ -406,7 +436,7 @@ Dexie `version(14)`.
 
 ---
 
-## 18. Rewritten ticket copy
+## 19. Rewritten ticket copy
 
 User-facing, cause-and-consequence, no blame, Indonesian + English.
 
