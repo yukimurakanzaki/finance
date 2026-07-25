@@ -1,6 +1,6 @@
 # AI Manager — UX Feedback Requirements & Build Plan
 
-**Date:** 2026-07-25 · **Revision:** 5 (D-1 RESOLVED — option (c), the computed verdict. No product decisions outstanding.)
+**Date:** 2026-07-25 · **Revision:** 6 (computeAffordability implemented and tested; two deviations from the D-1c sketch recorded)
 **Source:** 10 UX feedback tickets + product-vision reprioritisation + PM/Staff-Engineer review
 **Structure:** Part I (§0–19) — what the system does. Part II (§20–33) — why someone opened the app.
 **Target implementer:** Hermes AI agents, model `minimax-m3` via `anthropic-proxy`
@@ -114,10 +114,19 @@ Options considered and rejected:
 
 (a) and (b) both assume a verdict is a *judgement*. It does not have to be. The affordability answer is a threshold over numbers the engine already produces — so compute it, and let the model phrase it.
 
+**Implemented** — `src/engine/affordability.ts`, `src/engine/affordability.test.ts` (15 assertions).
+
+```ts
+computeAffordability(amount: number, sts: SafeToSpendResult | null)
+  -> { verdict: 'comfortable' | 'tight' | 'over' | 'unknown'
+     , driver: number | null   // remainingPool — always shown with the verdict
+     , margin: number | null } // remainingPool − amount
 ```
-computeAffordability({ amount, safeToSpend, upcomingCommitments, weekendAllocation })
-  -> { verdict: 'comfortable' | 'tight' | 'over', driver: <the one number>, margin: number }
-```
+
+**Two deviations from this section's original sketch, both deliberate:**
+
+1. **`upcomingCommitments` is not an input.** Including it would reintroduce the C-1 double count: `allowance.monthly_amount` is already net of every recurring item, and `isWeekDraw()` excludes recurring-tagged payments from the draw side, so committed bills never touch `remainingPool`. Subtracting them here charges the household twice for the same commitment. The sketch had the same defect the document was written to catch.
+2. **A fourth verdict, `'unknown'`,** for an unconfigured household or a non-integer/non-positive amount. The original three-value enum had no correct answer for a household with no allowance — returning `'over'` would be a judgement about money the app does not know about yet, which is exactly the empty-state failure NFR-11.3 guards against.
 
 **Rules:**
 
@@ -125,7 +134,7 @@ computeAffordability({ amount, safeToSpend, upcomingCommitments, weekendAllocati
 - **FR-D1c.2** The model receives `verdict` and `driver` in the tool/context payload and **phrases** them. It never derives the verdict, and never contradicts it. This keeps NFR-X3 intact — the model still quotes and never computes.
 - **FR-D1c.3** The verdict is always accompanied by its driver number in the same breath. "Comfortable" alone is never shown. This is layer 1 and layer 2 of §23 arriving together.
 - **FR-D1c.4** Scope is **discretionary purchase affordability only**. Investments (principle #2 — no sell tooling exists), protected items (principle #5), and tax/legal remain verdict-free under all three options.
-- **FR-D1c.5** Thresholds are declared in the doc and reviewable — e.g. `comfortable` = amount ≤ remaining pool after upcoming committed spend; `tight` = fits the pool but not the margin; `over` = exceeds it. Tune the numbers, not the mechanism.
+- **FR-D1c.5** Thresholds are declared and reviewable. As implemented: `over` = amount exceeds `remainingPool`; `tight` = within the pool but consuming more than `TIGHT_THRESHOLD` (0.5) of it; `comfortable` = otherwise. Exactly at a boundary resolves to the friendlier side (spending the pool exactly is `tight`, not `over`). A fraction rather than a rupiah floor: any absolute figure would be wrong across households with different pool sizes. **Tune the constant, not the mechanism.**
 
 **Why this is the better answer:**
 
@@ -145,7 +154,7 @@ computeAffordability({ amount, safeToSpend, upcomingCommitments, weekendAllocati
 
 - **TR-D1c.1** Persona rule rewritten from *"never issue a confident verdict"* to *"never **form** a verdict; state the computed one with its driver number"*. `PROMPT_VERSION` bumped in the same commit (NFR-X2).
 - **TR-D1c.2** `AI-MANAGER-UX-AUDIT.md` §2 capability boundary gains one line: the AI may state a **computed** affordability verdict with its driver; it may not form one. A1 is **not** marked superseded — its safety property is preserved, not discarded.
-- **TR-D1c.3** Ships in Sprint 2 with Health Check. `computeAffordability` is Sprint 2's first task, because §23 layer 1 and FR-11.3 both depend on it.
+- **TR-D1c.3** ~~Ships in Sprint 2 with Health Check.~~ **`computeAffordability` is built** (see above). The remaining Sprint 2 work is TR-D1c.1 (persona rewrite + `PROMPT_VERSION`), TR-D1c.2 (audit boundary line), and wiring the result into §23 layer 1 and FR-11.3.
 
 ---
 
@@ -424,7 +433,7 @@ T1a · Explain My Number · T10 · **T3** *(added: no schema, and it removes a w
 Dexie `version(12)`.
 
 ### Sprint 2 — Decision engine
-**`computeAffordability` first** (unblocks both below) · T5 · Health Check · §23 layer 1 · T8 · T1b
+~~`computeAffordability`~~ **(done)** · T5 · Health Check · §23 layer 1 · T8 · T1b
 Dexie `version(13)`.
 
 ### Sprint 3 — Polish
@@ -456,7 +465,7 @@ This is load-bearing, not ceremony. With `minimax-m3` and no prompt regression s
 | **T8** | A reply exceeding 600 characters renders folded. | NFR-8.1 — enforcement quietly relocates to the prompt. |
 | **T9** | Memory screen renders an entry's content escaped. | NFR-9.3. |
 | **Health Check** | Never returns more than 5; ordering is deterministic for a fixed fixture; no insight names a `[PROTECTED]` item as reducible; a fixture with a P1 present yields no P5 row. | FR-11.4/11.7, §27 hard rule. |
-| **`computeAffordability`** | Unit test across comfortable / tight / over, asserting **each threshold boundary**, plus a fixture where an upcoming committed payment flips `comfortable` to `over`. | FR-D1c.1 — the verdict drifts from the arithmetic. |
+| **`computeAffordability`** | ✅ **Done** — `src/engine/affordability.test.ts`, 15 assertions: each verdict, all four threshold boundaries, the committed-payment flip, unknown states, driver-always-present, and purity. | FR-D1c.1 — the verdict drifts from the arithmetic. |
 | **Layer 1 + 2 coupling** | A rendered verdict always carries its driver number; a verdict without one fails. | FR-D1c.3 — the bare-verdict failure mode A1 was written about. |
 | **T7** | CTA renders at zero entries, absent at one. | FR-7.3. |
 
