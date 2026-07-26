@@ -18,6 +18,12 @@ export const recurringRepo = {
   deactivate: (id: string) =>
     db.recurringItems.update(id, { is_active: false }),
 
+  // Tombstone delete: watermark sync has no delete channel, so mark the row
+  // deleted and let the normal push carry it. is_active:false reuses every
+  // existing is_active filter; only the Register's paused list needs !deleted_at.
+  remove: (id: string) =>
+    db.recurringItems.update(id, { deleted_at: now(), is_active: false }),
+
   advanceDue: (id: string, nextDue: string) =>
     db.recurringItems.update(id, { next_due: nextDue }),
 }

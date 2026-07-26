@@ -122,6 +122,7 @@ export interface RecurringItem {
   end_date: string | null
   note: string | null
   created_at: string
+  deleted_at?: string | null
 }
 
 export interface Allowance {
@@ -242,4 +243,22 @@ export interface ChatCustomSkill {
   source_session_id: string | null
   created_at: string
   updated_at: string
+}
+
+// Audit E1: per-device idempotency ledger for AI write confirmations. When
+// the user approves a `ConfirmCard`, the chat store generates an operation_id
+// (UUID), runs the writes, then records the operation here with the final
+// result JSON. A retry of the same id (e.g. double-tap, network blip, app
+// reload before the API acknowledged) reads back this row and returns the
+// stored result without re-executing — making confirm→commit exactly-once
+// client-side today and ready to hand off to a server `operations` table when
+// the Phase B RPC routing lands.
+export interface AiOperation {
+  id: string // operation_id (UUID)
+  session_id: string
+  tool_name: string // e.g. 'log_transactions', 'create_account'
+  // JSON-stringified tool result, identical shape to what executeWriteTool
+  // returns. Stored verbatim so retries see exactly what the user approved.
+  result_json: string
+  created_at: string
 }

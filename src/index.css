@@ -185,3 +185,26 @@ body {
   font-size: 13px;
   padding: 10px 14px;
 }
+
+/* FormField primitives — focus + error visual states.
+   `.ff-input` is the class on every Input/Select rendered via FormField.tsx.
+   The browser default outline is suppressed inline (`outline: none`) so we
+   own the focus ring. `.ff-error` is toggled by Field when error prop is set. */
+.ff-input:focus-visible {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--amber);
+  outline: none;
+}
+.ff-input.ff-error {
+  border-color: var(--amber-text);
+}
+.ff-input.ff-error:focus-visible {
+  border-color: var(--amber-text);
+  box-shadow: 0 0 0 1px var(--amber-text);
+}
+
+/* Btn primitive — same focus treatment as inputs for keyboard consistency. */
+.ff-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}

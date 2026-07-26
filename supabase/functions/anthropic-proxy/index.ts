@@ -30,10 +30,28 @@ const admin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 )
 
+// Audit D2: CORS tightened from "*" to a known-origin allowlist. "Tolerable
+// while verify_jwt gates the call" per the original audit, but with the proxy
+// out of MVP-gated scope the blast radius is real. Local dev origins + the
+// production app origin(s) are sufficient. To allow a new origin, add it here
+// AND in the Vercel env.
+const ALLOWED_ORIGINS = new Set<string>([
+  "http://localhost:5173",           // Vite dev
+  "http://localhost:4173",           // Vite preview
+  "http://127.0.0.1:5173",           // Vite dev (alternate host)
+  "http://127.0.0.1:4173",           // Vite preview (alternate host)
+  "https://fi-dashboard.vercel.app", // production — TODO: confirm real domain
+])
+
 function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? ""
+  // Echo the request origin verbatim only if it's in the allowlist; never
+  // reflect arbitrary origins.
+  const allowOrigin = ALLOWED_ORIGINS.has(origin) ? origin : ""
   const requested = req.headers.get("Access-Control-Request-Headers")
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Vary": "Origin",
     "Access-Control-Allow-Headers":
       requested ?? "authorization, x-client-info, apikey, content-type, x-supabase-api-version",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
