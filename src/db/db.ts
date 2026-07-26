@@ -207,6 +207,20 @@ class FIDatabase extends Dexie {
       chatMessages: 'id, session_id, created_at, updated_at',
     })
 
+    // v12: allowance.onboarding_snoozed_until (T1a / TR-1.1). Schema unchanged
+    // (no new index — readers filter by reading the row); the upgrade just
+    // backfills the field to null so existing rows match the v12 type.
+    this.version(12)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table<Allowance>('allowance')
+          .toCollection()
+          .modify((a) => {
+            if (a.onboarding_snoozed_until === undefined) a.onboarding_snoozed_until = null
+          }),
+      )
+
     // transactions.recurring_item_id (tags a committed recurring payment so it
     // no longer draws the personal pool) needs NO schema version: it is not
     // indexed, and readers treat missing/undefined as untagged (isWeekDraw),

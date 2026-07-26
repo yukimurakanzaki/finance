@@ -55,6 +55,7 @@ export type Database = {
           household_id: string
           member_id: string
           monthly_amount: number
+          onboarding_snoozed_until: string | null
           updated_at: string
           weekend_allocation: number
         }
@@ -62,6 +63,7 @@ export type Database = {
           household_id: string
           member_id: string
           monthly_amount: number
+          onboarding_snoozed_until?: string | null
           updated_at?: string
           weekend_allocation?: number
         }
