@@ -97,39 +97,43 @@ class FIDatabase extends Dexie {
           '++id, date, account_id, lane, direction, is_transfer, transfer_pair_id, [date+account_id], [date+account_id+direction]',
       })
       .upgrade((tx) =>
-        Promise.all([
-          tx
-            .table<RecurringItem>('recurringItems')
-            .toCollection()
-            .modify((item) => {
-              if (item.is_active === undefined) item.is_active = true
-              if (item.end_date === undefined) item.end_date = null
-              if (item.note === undefined) item.note = null
-            }),
-          tx
-            .table<Transaction>('transactions')
-            .toCollection()
-            .modify((t) => {
-              if (t.original_amount === undefined) t.original_amount = null
-              if (t.overridden_amount === undefined) t.overridden_amount = null
-              if (t.override_note === undefined) t.override_note = null
-              if (t.overridden_at === undefined) t.overridden_at = null
-              if (t.is_transfer === undefined) t.is_transfer = false
-              if (t.transfer_pair_id === undefined) t.transfer_pair_id = null
-            }),
-        ]),
+        withoutRestamp(() =>
+          Promise.all([
+            tx
+              .table<RecurringItem>('recurringItems')
+              .toCollection()
+              .modify((item) => {
+                if (item.is_active === undefined) item.is_active = true
+                if (item.end_date === undefined) item.end_date = null
+                if (item.note === undefined) item.note = null
+              }),
+            tx
+              .table<Transaction>('transactions')
+              .toCollection()
+              .modify((t) => {
+                if (t.original_amount === undefined) t.original_amount = null
+                if (t.overridden_amount === undefined) t.overridden_amount = null
+                if (t.override_note === undefined) t.override_note = null
+                if (t.overridden_at === undefined) t.overridden_at = null
+                if (t.is_transfer === undefined) t.is_transfer = false
+                if (t.transfer_pair_id === undefined) t.transfer_pair_id = null
+              }),
+          ]),
+        ),
       )
 
     // v4: milestone gains income_event_id FK
     this.version(4)
       .stores({})
       .upgrade((tx) =>
-        tx
-          .table<Milestone>('milestones')
-          .toCollection()
-          .modify((m) => {
-            if (m.income_event_id === undefined) m.income_event_id = null
-          }),
+        withoutRestamp(() =>
+          tx
+            .table<Milestone>('milestones')
+            .toCollection()
+            .modify((m) => {
+              if (m.income_event_id === undefined) m.income_event_id = null
+            }),
+        ),
       )
 
     // v5: AI finance manager chat history (local-only, stays numeric autoincrement)
@@ -141,14 +145,16 @@ class FIDatabase extends Dexie {
     this.version(6)
       .stores({})
       .upgrade((tx) =>
-        tx
-          .table<Asset>('assets')
-          .toCollection()
-          .modify((a) => {
-            if (a.auto_price === undefined) a.auto_price = null
-            if (a.fx_code === undefined) a.fx_code = null
-            if (a.fx_amount === undefined) a.fx_amount = null
-          }),
+        withoutRestamp(() =>
+          tx
+            .table<Asset>('assets')
+            .toCollection()
+            .modify((a) => {
+              if (a.auto_price === undefined) a.auto_price = null
+              if (a.fx_code === undefined) a.fx_code = null
+              if (a.fx_amount === undefined) a.fx_amount = null
+            }),
+        ),
       )
 
     // v7: cloud-ready. Client-assigned string (UUID) primary keys on synced tables
@@ -193,12 +199,14 @@ class FIDatabase extends Dexie {
     this.version(10)
       .stores({})
       .upgrade((tx) =>
-        tx
-          .table<Transaction>('transactions')
-          .toCollection()
-          .modify((t) => {
-            if (t.title === undefined) t.title = null
-          }),
+        withoutRestamp(() =>
+          tx
+            .table<Transaction>('transactions')
+            .toCollection()
+            .modify((t) => {
+              if (t.title === undefined) t.title = null
+            }),
+        ),
       )
 
     // v11: recreate chatMessages with its v8 schema (string UUID key) now that
@@ -213,12 +221,14 @@ class FIDatabase extends Dexie {
     this.version(12)
       .stores({})
       .upgrade((tx) =>
-        tx
-          .table<Allowance>('allowance')
-          .toCollection()
-          .modify((a) => {
-            if (a.onboarding_snoozed_until === undefined) a.onboarding_snoozed_until = null
-          }),
+        withoutRestamp(() =>
+          tx
+            .table<Allowance>('allowance')
+            .toCollection()
+            .modify((a) => {
+              if (a.onboarding_snoozed_until === undefined) a.onboarding_snoozed_until = null
+            }),
+        ),
       )
 
     // transactions.recurring_item_id (tags a committed recurring payment so it
@@ -233,6 +243,21 @@ export const db = new FIDatabase()
 // While applying rows pulled from the cloud, suppress the hooks below so we don't
 // re-stamp updated_at (which would make pulled rows look dirty and echo back).
 export const syncControl = { applyingRemote: false }
+
+// Schema-upgrade backfills reuse the applyingRemote flag so the 'updating' hook
+// below leaves updated_at alone. A backfill is not a user edit: a bumped
+// watermark would push every touched row on the next sync and beat a newer
+// cloud row on last-write-wins. Saves/restores rather than clearing the flag so
+// it can never stomp a sync that is already holding it.
+async function withoutRestamp(work: () => PromiseLike<unknown>): Promise<void> {
+  const prev = syncControl.applyingRemote
+  syncControl.applyingRemote = true
+  try {
+    await work()
+  } finally {
+    syncControl.applyingRemote = prev
+  }
+}
 
 const nowIso = () => new Date().toISOString()
 
