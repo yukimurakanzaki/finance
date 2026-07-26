@@ -14,7 +14,11 @@ import { isWeekDraw } from '@engine/safeToSpend'
 import type { Allowance, Transaction } from '@db/types'
 
 const allowance: Allowance = {
-  id: 'local', monthly_amount: 3_000_000, weekend_allocation: 400_000, updated_at: '',
+  id: 'local',
+  monthly_amount: 3_000_000,
+  weekend_allocation: 400_000,
+  onboarding_snoozed_until: null,
+  updated_at: '',
 }
 
 const txn = (over: Partial<Transaction>): Transaction => ({
