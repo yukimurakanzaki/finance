@@ -1,4 +1,4 @@
-import type { Lane, Account, Category } from '@db/types'
+import type { Account, Category, Lane } from '@db/types'
 
 export interface ImportRow {
   date: string
@@ -17,6 +17,11 @@ export interface ValidImportRow extends ImportRow {
   // Set by transfer detector worker
   is_transfer?: boolean
   transfer_pair_id?: string | null
+  // Recurring-item link decided in the reconcile confirm screen (auto-matched
+  // by description against active recurring items, user-dismissible before
+  // import). undefined = not yet decided by the UI, in which case importBatch
+  // falls back to its own auto-match; null = explicitly not linked.
+  recurring_item_id?: string | null
 }
 
 export interface InvalidImportRow {

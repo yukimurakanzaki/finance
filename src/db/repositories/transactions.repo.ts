@@ -1,7 +1,17 @@
-import { db } from '../db'
-import type { Transaction, NetWorthSnapshot, Lane, AssetType } from '../types'
-import type { ValidImportRow } from '../../import/schema'
 import { advanceByOneMonth } from '@lib/dates'
+import {
+  matchRecurringItemByText,
+  resolveRecurringItemId,
+} from '@lib/recurringMatch'
+import type { ValidImportRow } from '../../import/schema'
+import { db } from '../db'
+import type {
+  AssetType,
+  Lane,
+  NetWorthSnapshot,
+  RecurringItem,
+  Transaction,
+} from '../types'
 
 const now = () => new Date().toISOString()
 
@@ -62,8 +72,18 @@ export const transactionsRepo = {
       created_at: now(),
     }
     return db.transaction('rw', db.transactions, async () => {
-      await db.transactions.add({ ...base, direction: 'out', account_id: data.from_account_id, lane: data.from_lane })
-      await db.transactions.add({ ...base, direction: 'in', account_id: data.to_account_id, lane: data.to_lane })
+      await db.transactions.add({
+        ...base,
+        direction: 'out',
+        account_id: data.from_account_id,
+        lane: data.from_lane,
+      })
+      await db.transactions.add({
+        ...base,
+        direction: 'in',
+        account_id: data.to_account_id,
+        lane: data.to_lane,
+      })
     })
   },
 
@@ -72,7 +92,10 @@ export const transactionsRepo = {
       const t = await db.transactions.get(id)
       if (!t) return
       if (t.transfer_pair_id) {
-        await db.transactions.where('transfer_pair_id').equals(t.transfer_pair_id).delete()
+        await db.transactions
+          .where('transfer_pair_id')
+          .equals(t.transfer_pair_id)
+          .delete()
       } else {
         await db.transactions.delete(id)
       }
@@ -97,8 +120,14 @@ export const transactionsRepo = {
   flagTransfer: (idA: string, idB: string) => {
     const pairId = crypto.randomUUID()
     return db.transaction('rw', db.transactions, async () => {
-      await db.transactions.update(idA, { is_transfer: true, transfer_pair_id: pairId })
-      await db.transactions.update(idB, { is_transfer: true, transfer_pair_id: pairId })
+      await db.transactions.update(idA, {
+        is_transfer: true,
+        transfer_pair_id: pairId,
+      })
+      await db.transactions.update(idB, {
+        is_transfer: true,
+        transfer_pair_id: pairId,
+      })
     })
   },
 
@@ -114,6 +143,10 @@ export const transactionsRepo = {
       db.netWorthSnapshots,
       db.recurringItems,
       async () => {
+        const activeRecurring = await db.recurringItems
+          .filter((r) => r.is_active)
+          .toArray()
+
         // 1. Write transactions
         const txnRecords: Omit<Transaction, 'id'>[] = rows.map((row) => ({
           date: row.date,
@@ -131,7 +164,17 @@ export const transactionsRepo = {
           overridden_at: null,
           is_transfer: row.is_transfer ?? false,
           transfer_pair_id: row.transfer_pair_id ?? null,
-          recurring_item_id: null,
+          // The reconcile confirm screen resolves (and lets the user dismiss)
+          // a suggested recurring-item link per row before calling this, and
+          // passes its decision through explicitly — including an explicit
+          // null when the user dismissed the suggestion. Only fall back to
+          // this repo's own auto-match when the field is entirely absent
+          // (e.g. a caller that bypasses the confirm screen, as the
+          // integration tests do).
+          recurring_item_id:
+            row.recurring_item_id !== undefined
+              ? resolveRecurringItemId(row.recurring_item_id, activeRecurring)
+              : (matchRecurringItem(row, activeRecurring)?.id ?? null),
           created_at: now(),
         }))
         await db.transactions.bulkAdd(txnRecords)
@@ -163,17 +206,23 @@ export const transactionsRepo = {
 }
 
 async function advanceNextDueFromBatch(rows: ValidImportRow[]) {
-  const activeRecurring = await db.recurringItems.filter((r) => r.is_active).toArray()
+  const activeRecurring = await db.recurringItems
+    .filter((r) => r.is_active)
+    .toArray()
   for (const item of activeRecurring) {
-    const matched = rows.some(
-      (row) =>
-        row.direction === 'out' &&
-        row.note?.toLowerCase().includes(item.name.toLowerCase()),
-    )
+    const matched = rows.some((row) => matchRecurringItem(row, [item]))
     if (matched && item.cadence === 'monthly') {
       await db.recurringItems.update(item.id!, {
         next_due: advanceByOneMonth(item.next_due),
       })
     }
   }
+}
+
+export function matchRecurringItem(
+  row: { direction: 'in' | 'out'; note?: string | null },
+  activeRecurring: RecurringItem[],
+): RecurringItem | null {
+  if (row.direction !== 'out') return null
+  return matchRecurringItemByText(row.note, activeRecurring)
 }

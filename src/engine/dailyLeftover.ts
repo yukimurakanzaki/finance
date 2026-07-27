@@ -24,6 +24,12 @@ export interface DailyLeftoverResult {
   isProjected: boolean
 }
 
+// First day (YYYY-MM-01) of the calendar month containing `iso`. Date strings
+// compare lexicographically, so no timezone juggling is needed.
+export function monthStartOf(iso: string): string {
+  return `${iso.slice(0, 7)}-01`
+}
+
 // Deliberately simple: no proration, no carry-over between months, no
 // retroactive rewrites when the allowance changes — everything is derived
 // fresh from `transactions` + the live `allowance` row, same pattern as
@@ -32,7 +38,7 @@ export function computeDailyLeftover(
   input: DailyLeftoverInput,
 ): DailyLeftoverResult {
   const { monthlyAmount, transactions, asOfDate } = input
-  const monthStart = `${asOfDate.slice(0, 7)}-01`
+  const monthStart = monthStartOf(asOfDate)
 
   let leftover = monthlyAmount
   for (const t of transactions) {

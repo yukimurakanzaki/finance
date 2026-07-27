@@ -1,8 +1,12 @@
 import { LanePill } from '@components/LanePill'
 import { Badge, SectionHeader } from '@components/ui'
+import { db } from '@db/db'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
+import type { RecurringItem } from '@db/types'
 import { formatRp, parseRpInput } from '@lib/currency'
+import { matchRecurringItemByText } from '@lib/recurringMatch'
 import { useReconcileStore } from '@stores/reconcileStore'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import type { ValidImportRow } from '../../import/schema'
 import { exclusionGroup } from './transferExclusion'
@@ -20,6 +24,48 @@ export function ReconcileConfirmScreen() {
   // toggle for valid rows, (b) a skip count baked into the action button copy
   // so it can't be missed.
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
+
+  // C1: recurring-item auto-tag. A row whose note/category plausibly names an
+  // active recurring item (simple case-insensitive substring match — see
+  // lib/recurringMatch.ts) is auto-tagged so it's excluded from the personal
+  // safe-to-spend pool like the manual form's "Pays a recurring item" picker.
+  // Chosen "auto-tag with a visible, dismissible indicator" over a blocking
+  // per-row confirm dialog: imports commonly carry 20-50 rows, and a modal per
+  // matched row would make bulk reconcile worse, not better. The badge is
+  // tappable to dismiss a wrong match before anything is saved, which is what
+  // keeps this safe despite auto-tagging (a mis-tag would otherwise silently
+  // hide real discretionary spend from the pool).
+  const [recurringDismissed, setRecurringDismissed] = useState<Set<number>>(
+    new Set(),
+  )
+  const activeRecurring =
+    useLiveQuery(() =>
+      db.recurringItems.filter((r) => r.is_active).toArray(),
+    ) ?? []
+
+  function suggestedRecurringFor(row: ValidImportRow): RecurringItem | null {
+    // Only outgoing, non-transfer rows can pay a recurring item. Transfers are
+    // rendered in a separate section with no dismiss badge, so a transfer whose
+    // note happened to contain a recurring item's name would otherwise get
+    // silently tagged (inert — is_transfer already excludes it from the pool —
+    // but a transfer row carrying a recurring_item_id is semantically wrong).
+    if (row.direction !== 'out' || row.is_transfer) return null
+    return matchRecurringItemByText(row.note || row.category, activeRecurring)
+  }
+
+  function resolvedRecurringIdFor(row: ValidImportRow): string | null {
+    if (recurringDismissed.has(row._row_index)) return null
+    return suggestedRecurringFor(row)?.id ?? null
+  }
+
+  function toggleRecurringDismissed(rowIndex: number) {
+    setRecurringDismissed((prev) => {
+      const next = new Set(prev)
+      if (next.has(rowIndex)) next.delete(rowIndex)
+      else next.add(rowIndex)
+      return next
+    })
+  }
 
   if (!parseResult) return null
 
@@ -61,7 +107,11 @@ export function ReconcileConfirmScreen() {
         .filter((r) => !excluded.has(r._row_index))
         .map((r) => {
           const ov = overrides[r._row_index]
-          return ov !== undefined ? { ...r, amount: ov } : r
+          const withAmount = ov !== undefined ? { ...r, amount: ov } : r
+          // Explicit decision from this screen (including explicit null when
+          // dismissed or unmatched) always wins over importBatch's own
+          // fallback auto-match — see transactions.repo.ts importBatch.
+          return { ...withAmount, recurring_item_id: resolvedRecurringIdFor(r) }
         })
 
       // Compute yearMonth from first row date
@@ -130,6 +180,11 @@ export function ReconcileConfirmScreen() {
                 }
                 excludedFlag={excluded.has(row._row_index)}
                 onToggleExcluded={() => toggleExcluded(row._row_index)}
+                suggestedRecurring={suggestedRecurringFor(row)}
+                recurringDismissed={recurringDismissed.has(row._row_index)}
+                onToggleRecurring={() =>
+                  toggleRecurringDismissed(row._row_index)
+                }
               />
             ))}
           </div>
@@ -347,12 +402,18 @@ function ReconcileRow({
   onOverride,
   excludedFlag,
   onToggleExcluded,
+  suggestedRecurring,
+  recurringDismissed,
+  onToggleRecurring,
 }: {
   row: ValidImportRow
   override: number | undefined
   onOverride: (v: number) => void
   excludedFlag: boolean
   onToggleExcluded: () => void
+  suggestedRecurring: RecurringItem | null
+  recurringDismissed: boolean
+  onToggleRecurring: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -405,6 +466,40 @@ function ReconcileRow({
         >
           {row.date} · {row._resolved_account.name}
           <LanePill lane={row.suggested_lane} size="xs" />
+          {suggestedRecurring && (
+            <button
+              type="button"
+              onClick={onToggleRecurring}
+              aria-pressed={!recurringDismissed}
+              aria-label={
+                recurringDismissed
+                  ? `Not tagged as ${suggestedRecurring.name} — tap to tag`
+                  : `Tagged as recurring: ${suggestedRecurring.name} — tap to untag`
+              }
+              title={
+                recurringDismissed
+                  ? `Looks like ${suggestedRecurring.name} — tap to tag as recurring`
+                  : `Tagged as ${suggestedRecurring.name} — excluded from safe-to-spend. Tap to untag.`
+              }
+              style={{
+                flexShrink: 0,
+                border: 'none',
+                background: 'none',
+                color: recurringDismissed ? 'var(--ink-3)' : 'var(--store)',
+                fontSize: 'var(--text-caption)',
+                lineHeight: 'var(--leading-caption)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                whiteSpace: 'nowrap',
+                textDecoration: recurringDismissed ? 'line-through' : 'none',
+              }}
+            >
+              🔁 {suggestedRecurring.name}
+            </button>
+          )}
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>

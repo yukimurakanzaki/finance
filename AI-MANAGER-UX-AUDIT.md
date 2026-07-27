@@ -57,7 +57,9 @@ The model operates under an explicit capability boundary, stated in the system p
 
 **The AI may:** explain and summarize the household's own numbers · classify/extract transactions from statements · surface trade-offs as numbers (safe-to-spend impact, FI-date delta) · look up published prices/NAV with cited sources · ask clarifying questions.
 
-**The AI may not:** recommend buying or selling any investment (no sell tooling exists — principle #2 — and the prompt forbids the *suggestion* too, e.g. "sell your emergency fund" / "move to equities") · issue affordability verdicts (principle #4) · suggest cutting protected categories (principle #5) · give tax or legal advice (redirect to a professional) · invent prices or figures not in the data or a cited source.
+**The AI may not:** recommend buying or selling any investment (no sell tooling exists — principle #2 — and the prompt forbids the *suggestion* too, e.g. "sell your emergency fund" / "move to equities") · **form** an affordability verdict of its own (principle #4) · suggest cutting protected categories (principle #5) · give tax or legal advice (redirect to a professional) · invent prices or figures not in the data or a cited source.
+
+**Amendment (2026-07-25, decision D-1c).** The AI *may* state a **computed** affordability verdict: `check_affordability` runs `computeAffordability` (`src/engine/affordability.ts`), a pure function returning `comfortable | tight | over | unknown` from this week's remaining pool, and the model phrases that result with its driving number attached. A1 is **not** superseded — its safety property is intact, because nothing about the conclusion is left to model judgement. What changed is that the app now answers a question its own arithmetic can answer, instead of withholding an answer it already has. Scope is discretionary purchases only; investments, protected items, and tax/legal remain verdict-free.
 
 Enforcement layers: (1) prompt rules, (2) tool surface — there is no sell/liquidate/reallocate tool to call, (3) the confirm card — every write is human-approved, (4) periodic transcript spot-checks during dogfooding as a Phase C exit item.
 

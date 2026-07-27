@@ -171,10 +171,13 @@ function Conversation() {
     sendMessage,
     resolvePending,
     clearSession,
+    stopTurn,
     sessions,
     activeSessionId,
     setSessionModel,
     setSessionSkills,
+    discardedPendingNotice,
+    clearDiscardedNotice,
   } = useChatStore()
   const [input, setInput] = useState('')
   const [images, setImages] = useState<{ media_type: string; data: string }[]>(
@@ -185,6 +188,9 @@ function Conversation() {
   const [showSessions, setShowSessions] = useState(false)
   const [showModel, setShowModel] = useState(false)
   const [showSkills, setShowSkills] = useState(false)
+  // Audit C7: two-step inline confirm instead of window.confirm (which uses
+  // the OS-native dialog and is off-design-system).
+  const [clearArmed, setClearArmed] = useState(false)
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null
   // M2 fix: was a hardcoded literal ('claude-sonnet-4-20250514') duplicating
@@ -449,15 +455,64 @@ function Conversation() {
 
         {status === 'thinking' && (
           <div
-            aria-live="polite"
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
               alignSelf: 'flex-start',
-              color: 'var(--ink-3)',
-              fontSize: 'var(--text-caption)',
-              padding: 'var(--space-2) var(--space-3)',
             }}
           >
-            Thinking…
+            <div
+              aria-live="polite"
+              style={{
+                color: 'var(--ink-3)',
+                fontSize: 'var(--text-caption)',
+                padding: 'var(--space-2) var(--space-3)',
+              }}
+            >
+              Thinking…
+            </div>
+            {/* Audit C2: Stop button. Visible only during a turn; aborts the
+                active loop via AbortController. */}
+            <button
+              onClick={stopTurn}
+              aria-label="Stop the AI"
+              style={{
+                background: 'var(--bg-2)', border: '1px solid var(--border-2)',
+                borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                color: 'var(--ink-2)', cursor: 'pointer',
+              }}
+            >
+              ■ Stop
+            </button>
+          </div>
+        )}
+
+        {/* Audit B1: surface a notice when the previous session ended on a
+            dangling tool_use and we (correctly) dropped it. The user saw a
+            confirmation card before the app closed; tell them nothing was saved. */}
+        {discardedPendingNotice && (
+          <div
+            role="status"
+            style={{
+              alignSelf: 'stretch', background: 'var(--amber-bg)',
+              border: '1px solid var(--amber)', borderRadius: 10,
+              padding: 'var(--space-3) var(--space-3)', fontSize: 'var(--text-caption)',
+              color: 'var(--amber-text)',
+              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+            }}
+          >
+            <span style={{ flex: 1 }}>{discardedPendingNotice}</span>
+            <button
+              onClick={clearDiscardedNotice}
+              aria-label="Dismiss notice"
+              style={{
+                background: 'none', border: 'none', color: 'var(--amber-text)',
+                cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -641,26 +696,56 @@ function Conversation() {
         </button>
       </div>
 
-      {/* Footer: clear chat */}
+      {/* Footer: clear chat — Audit C7 inline two-step confirm instead of
+          window.confirm (which uses the OS-native dialog and is
+          off-design-system). */}
       {messages.length > 0 && (
-        <button
-          onClick={() => {
-            if (window.confirm('Clear this conversation?')) clearSession()
-          }}
+        <div
           style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--ink-3)',
-            fontSize: 'var(--text-caption)',
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 'var(--space-2)',
             padding: 'var(--space-1) 0 var(--space-2)',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-ui)',
-            textTransform: 'uppercase',
-            letterSpacing: '.5px',
           }}
         >
-          Clear conversation
-        </button>
+          {!clearArmed ? (
+            <button
+              onClick={() => setClearArmed(true)}
+              style={{
+                background: 'none', border: 'none', color: 'var(--ink-3)',
+                fontSize: 'var(--text-caption)', padding: 0, cursor: 'pointer',
+                fontFamily: 'var(--font-ui)', textTransform: 'uppercase', letterSpacing: '.5px',
+              }}
+            >
+              Clear conversation
+            </button>
+          ) : (
+            <>
+              <span style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-2)', alignSelf: 'center' }}>
+                Clear this conversation?
+              </span>
+              <button
+                onClick={() => { setClearArmed(false); clearSession() }}
+                style={{
+                  background: 'var(--bg-2)', border: '1px solid var(--amber)',
+                  borderRadius: 6, padding: '2px 10px', fontSize: 'var(--text-caption)', fontWeight: 600,
+                  color: 'var(--amber-text)', cursor: 'pointer',
+                }}
+              >
+                Yes, clear
+              </button>
+              <button
+                onClick={() => setClearArmed(false)}
+                style={{
+                  background: 'none', border: 'none', fontSize: 'var(--text-caption)',
+                  color: 'var(--ink-3)', cursor: 'pointer', padding: 0,
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {/* Pickers */}
