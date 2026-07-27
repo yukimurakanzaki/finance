@@ -2,7 +2,7 @@ import { BottomSheet } from '@components/BottomSheet'
 import { Row, Screen, SectionHeader } from '@components/ui'
 import { db } from '@db/db'
 import { settingsRepo } from '@db/repositories/settings.repo'
-import { DecideScreen } from '@features/decide/DecideScreen'
+import { PlanScreen } from '@features/decide/PlanScreen'
 import { IncomeLog } from '@features/decide/IncomeLog'
 import { hasPin } from '@lib/crypto'
 import { supabase } from '@lib/supabaseClient'
@@ -28,7 +28,7 @@ type Sheet =
   | 'categories'
   | 'import_prompt'
   | 'household'
-  | 'decide'
+  | 'plan'
   | null
 
 export function MoreScreen() {
@@ -185,9 +185,9 @@ export function MoreScreen() {
       <SectionHeader>Plan</SectionHeader>
       <div>
         <Row
-          onClick={() => setSheet('decide')}
-          primary="Decide"
-          caption="What does this buy? Milestones, income, spending lens"
+          onClick={() => setSheet('plan')}
+          primary="Plan"
+          caption="Spending lens and milestones — what does this buy?"
         />
       </div>
 
@@ -355,12 +355,12 @@ export function MoreScreen() {
       </BottomSheet>
 
       <BottomSheet
-        open={sheet === 'decide'}
+        open={sheet === 'plan'}
         onClose={() => setSheet(null)}
-        title="Decide"
+        title="Plan"
         height="92dvh"
       >
-        <DecideScreen />
+        <PlanScreen />
       </BottomSheet>
     </Screen>
   )

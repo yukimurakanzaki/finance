@@ -1,22 +1,19 @@
 import { useState } from 'react'
-import { IncomeLog } from './IncomeLog'
 import { Milestones } from './Milestones'
 import { SpendingLens } from './SpendingLens'
 
-type Tab = 'lens' | 'income' | 'milestones'
+type Tab = 'lens' | 'milestones'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'lens', label: 'Spending Lens' },
-  { id: 'income', label: 'Income Log' },
   { id: 'milestones', label: 'Milestones' },
 ]
 
-export function DecideScreen() {
+export function PlanScreen() {
   const [tab, setTab] = useState<Tab>('lens')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Sub-tab bar */}
       <div
         style={{
           display: 'flex',
@@ -59,7 +56,6 @@ export function DecideScreen() {
         }}
       >
         {tab === 'lens' && <SpendingLens />}
-        {tab === 'income' && <IncomeLog />}
         {tab === 'milestones' && <Milestones />}
       </div>
     </div>

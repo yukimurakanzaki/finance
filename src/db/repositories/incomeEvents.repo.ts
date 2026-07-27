@@ -10,4 +10,11 @@ export const incomeEventsRepo = {
 
   create: (data: Omit<IncomeEvent, 'id' | 'created_at'>) =>
     db.incomeEvents.add({ ...data, created_at: now() }),
+
+  remove: (id: number) => db.incomeEvents.delete(id),
+
+  update: (
+    id: number,
+    patch: Partial<Omit<IncomeEvent, 'id' | 'created_at'>>,
+  ) => db.incomeEvents.update(id, patch),
 }

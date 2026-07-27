@@ -6,13 +6,28 @@ import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import { formatRp } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 export function IncomeLog() {
   const [open, setOpen] = useState(false)
   const events =
     useLiveQuery(() => db.incomeEvents.orderBy('date').reverse().toArray()) ??
     []
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function startLongPress(id: number, label: string) {
+    longPressTimer.current = setTimeout(() => {
+      if (window.confirm(`Delete this income event?\n${label}`)) {
+        incomeEventsRepo.remove(id)
+      }
+    }, 600)
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
 
   return (
     <div
@@ -60,7 +75,22 @@ export function IncomeLog() {
         const prev = events[i + 1]
         const delta = prev ? ev.take_home_net - prev.take_home_net : null
         return (
-          <Card key={ev.id} padding="var(--space-3) var(--space-4)">
+          <Card
+            key={ev.id}
+            padding="var(--space-3) var(--space-4)"
+            interactive
+            onTouchStart={() =>
+              startLongPress(ev.id!, `${formatRp(ev.take_home_net)} · ${ev.date}`)
+            }
+            onTouchEnd={cancelLongPress}
+            onTouchCancel={cancelLongPress}
+            onMouseDown={() =>
+              startLongPress(ev.id!, `${formatRp(ev.take_home_net)} · ${ev.date}`)
+            }
+            onMouseUp={cancelLongPress}
+            onMouseLeave={cancelLongPress}
+            title="Long-press to delete"
+          >
             <div
               style={{
                 display: 'flex',
@@ -206,6 +236,7 @@ function AddIncomeForm({
         <Input
           type="date"
           value={date}
+          max={todayISO()}
           onChange={(e) => setDate(e.target.value)}
           mono
         />

@@ -4,10 +4,10 @@ import { Row, SectionHeader } from '@components/ui'
 import { db } from '@db/db'
 import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import type { Cadence, Lane, RecurringItem, RecurringKind } from '@db/types'
-import { formatRp } from '@lib/currency'
+import { formatRp, formatRpInput, parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 const KIND_LABELS: Record<RecurringKind, string> = {
   pay_yourself_first: 'Pay yourself first (Pipe)',
@@ -40,6 +40,21 @@ export function RecurringRegister() {
   const [editing, setEditing] = useState<RecurringItem | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function startLongPress(item: RecurringItem) {
+    longPressTimer.current = setTimeout(() => {
+      if (window.confirm(`Delete "${item.name}"? Linked payment history stays intact.`)) {
+        recurringRepo.remove(item.id!)
+      }
+    }, 600)
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
 
   function openAdd() {
     setEditing(null)
@@ -78,7 +93,8 @@ export function RecurringRegister() {
   async function handleSave() {
     if (!form.name || !form.amount) return
     setSaving(true)
-    const amount = Number(form.amount.replace(/[.,]/g, ''))
+    const amount = parseRpInput(form.amount)
+    if (amount === null) return
     const today = todayISO()
 
     if (editing?.id) {
@@ -162,7 +178,13 @@ export function RecurringRegister() {
           </div>
         )}
         {active.map((item) => (
-          <ItemRow key={item.id} item={item} onEdit={() => openEdit(item)} />
+          <ItemRow
+            key={item.id}
+            item={item}
+            onEdit={() => openEdit(item)}
+            onLongPressStart={() => startLongPress(item)}
+            onLongPressEnd={cancelLongPress}
+          />
         ))}
       </div>
 
@@ -175,6 +197,8 @@ export function RecurringRegister() {
                 key={item.id}
                 item={item}
                 onEdit={() => openEdit(item)}
+                onLongPressStart={() => startLongPress(item)}
+                onLongPressEnd={cancelLongPress}
                 dim
               />
             ))}
@@ -208,7 +232,7 @@ export function RecurringRegister() {
               inputMode="numeric"
               mono
               value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
+              onChange={(e) => set('amount', formatRpInput(e.target.value))}
               placeholder="165.000"
             />
           </Field>
@@ -290,11 +314,26 @@ export function RecurringRegister() {
 function ItemRow({
   item,
   onEdit,
+  onLongPressStart,
+  onLongPressEnd,
   dim,
-}: { item: RecurringItem; onEdit: () => void; dim?: boolean }) {
+}: {
+  item: RecurringItem
+  onEdit: () => void
+  onLongPressStart: () => void
+  onLongPressEnd: () => void
+  dim?: boolean
+}) {
   return (
     <Row
       onClick={onEdit}
+      onTouchStart={onLongPressStart}
+      onTouchEnd={onLongPressEnd}
+      onTouchCancel={onLongPressEnd}
+      onMouseDown={onLongPressStart}
+      onMouseUp={onLongPressEnd}
+      onMouseLeave={onLongPressEnd}
+      title="Long-press to delete · tap to edit"
       style={{ opacity: dim ? 0.5 : 1 }}
       icon={
         <span
