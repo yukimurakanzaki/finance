@@ -23,6 +23,7 @@ const allowance: Allowance = {
   id: 'local',
   monthly_amount: 3_000_000,
   weekend_allocation: 400_000,
+  onboarding_snoozed_until: null,
   updated_at: '',
 }
 

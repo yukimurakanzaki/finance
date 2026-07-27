@@ -11,7 +11,11 @@ import { validateRow } from '../import/validator'
 import type { Allowance, Assumptions, AssetType, RecurringItem } from '@db/types'
 
 const allowance = (monthly: number, weekend = 0): Allowance => ({
-  id: 'local', monthly_amount: monthly, weekend_allocation: weekend, updated_at: '',
+  id: 'local',
+  monthly_amount: monthly,
+  weekend_allocation: weekend,
+  onboarding_snoozed_until: null,
+  updated_at: '',
 })
 
 const recurring = (kind: RecurringItem['kind'], amount: number): RecurringItem => ({
