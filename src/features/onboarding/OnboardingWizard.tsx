@@ -255,7 +255,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     // successes would leave the user with a half-written setup, a wizard that
     // never re-appears (setup_complete unset but stale rows present), and
     // no clean recovery short of clearing IndexedDB. PAIN-POINTS §Reliability.
-    const written: { incomeIds: number[]; recurringIds: number[]; accountIds: number[] } = {
+    const written: { incomeIds: string[]; recurringIds: string[]; accountIds: string[] } = {
       incomeIds: [],
       recurringIds: [],
       accountIds: [],

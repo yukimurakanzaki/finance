@@ -151,6 +151,7 @@ export interface IncomeEvent {
   note: string | null
   source: 'manual' | 'seed'
   created_at: string
+  deleted_at?: string | null
 }
 
 export interface Milestone {

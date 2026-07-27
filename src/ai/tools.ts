@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
+import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import {
   matchRecurringItem,
   transactionsRepo,
@@ -574,7 +575,7 @@ async function logTransactions(input: ToolInput): Promise<string> {
 }
 
 async function logIncome(input: ToolInput): Promise<string> {
-  const prev = await db.incomeEvents.orderBy('date').last()
+  const prev = await incomeEventsRepo.getLatest()
   const takeHome = Number(input['take_home_net'])
   const id = await db.incomeEvents.add({
     date: String(input['date'] ?? todayISO()),

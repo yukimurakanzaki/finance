@@ -10,12 +10,10 @@ import { useRef, useState } from 'react'
 
 export function IncomeLog() {
   const [open, setOpen] = useState(false)
-  const events =
-    useLiveQuery(() => db.incomeEvents.orderBy('date').reverse().toArray()) ??
-    []
+  const events = useLiveQuery(() => incomeEventsRepo.getAllDesc()) ?? []
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function startLongPress(id: number, label: string) {
+  function startLongPress(id: string, label: string) {
     longPressTimer.current = setTimeout(() => {
       if (window.confirm(`Delete this income event?\n${label}`)) {
         incomeEventsRepo.remove(id)

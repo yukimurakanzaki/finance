@@ -1,5 +1,6 @@
 import { Amount, Card, Row, Screen, SectionHeader } from '@components/ui'
 import { db } from '@db/db'
+import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import type { RecurringKind } from '@db/types'
 import { formatRp } from '@lib/currency'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -32,7 +33,7 @@ export function MonthlyScreen() {
     ) ?? []
   const allowance = useLiveQuery(() => db.allowance.get('local'))
   const latestIncome = useLiveQuery(() =>
-    db.incomeEvents.orderBy('date').last(),
+    incomeEventsRepo.getLatest(),
   )
 
   const takeHome = latestIncome?.take_home_net ?? 0
