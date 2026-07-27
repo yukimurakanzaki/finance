@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromCloudRow, isSyncable, maxUpdatedAt, toCloudRow } from './syncMappers'
+import { fromCloudRow, isSyncable, maxUpdatedAt, scrubNumericStrings, toCloudRow } from './syncMappers'
 
 const UUID = '11111111-1111-1111-1111-111111111111'
 
@@ -52,6 +52,51 @@ describe('fromCloudRow', () => {
       monthly_amount: 2500000,
     })
     expect(out).toEqual({ id: 'local', monthly_amount: 2500000 })
+  })
+  // Postgres returns bigint as a string over the wire. Without coercion, the
+  // string lands in Dexie, and the next push 400s on the bigint column.
+  it('coerces numeric fields from string to number (bigint wire format)', () => {
+    const out = fromCloudRow('transactions', {
+      id: UUID,
+      household_id: 'hh1',
+      amount: '295.32',
+      original_amount: null,
+      overridden_amount: '100',
+    })
+    expect(out.amount).toBe(295.32)
+    expect(typeof out.amount).toBe('number')
+    expect(out.overridden_amount).toBe(100)
+    expect(out.original_amount).toBeNull()
+  })
+  it('leaves non-numeric, non-listed fields untouched', () => {
+    const out = fromCloudRow('accounts', {
+      id: UUID,
+      household_id: 'hh1',
+      name: 'BCA',
+      lane: 'protected_living',
+    })
+    expect(out).toEqual({ id: UUID, name: 'BCA', lane: 'protected_living' })
+  })
+})
+
+describe('scrubNumericStrings', () => {
+  it('coerces a string numeric field in place and reports the change', () => {
+    const row: Record<string, unknown> = { id: UUID, amount: '295.32' }
+    const changed = scrubNumericStrings('transactions', row)
+    expect(changed).toBe(true)
+    expect(row.amount).toBe(295.32)
+  })
+  it('returns false when the row is already numeric', () => {
+    const row: Record<string, unknown> = { id: UUID, amount: 295.32 }
+    const changed = scrubNumericStrings('transactions', row)
+    expect(changed).toBe(false)
+    expect(row.amount).toBe(295.32)
+  })
+  it('leaves an empty string alone (it is not a number)', () => {
+    const row: Record<string, unknown> = { id: UUID, amount: '' }
+    const changed = scrubNumericStrings('transactions', row)
+    expect(changed).toBe(false)
+    expect(row.amount).toBe('')
   })
 })
 

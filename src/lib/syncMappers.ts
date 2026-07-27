@@ -67,10 +67,81 @@ export function toCloudRow(
 
 /** Cloud row -> local Dexie row (singletons collapse to the fixed local id). */
 export function fromCloudRow(table: SyncTable, row: Record<string, unknown>): Record<string, unknown> {
+  const coerced = coerceNumeric(table, row)
   if (SINGLETON[table]) {
-    const { household_id: _h, member_id: _m, ...rest } = row
+    const { household_id: _h, member_id: _m, ...rest } = coerced
     return { id: 'local', ...rest }
   }
-  const { household_id: _h, ...rest } = row
+  const { household_id: _h, ...rest } = coerced
   return { ...rest, id: row.id }
+}
+
+// Number-typed fields per syncable table. Postgres returns bigint as a string
+// over the wire (no precision loss past 2^53), so a row we pull can carry
+// "295.32" where our Dexie schema says `number`. Re-pushing that string to
+// the cloud's bigint column 400s, which is the recurring sync error
+// `pushTable` was throwing. Coerce here so the local copy — and every future
+// push — stays numeric. Anything not on this list is left as the cloud sent
+// it; that matches the existing syncMappers.test.ts expectations.
+export const NUMERIC: Partial<Record<SyncTable, readonly string[]>> = {
+  transactions: ['amount', 'original_amount', 'overridden_amount'],
+  accounts: ['manual_balance_override'],
+  assets: ['quantity_grams', 'price_per_gram', 'fx_amount'],
+  envelopes: ['target_amount'],
+  recurringItems: ['amount'],
+  allowance: ['monthly_amount', 'weekend_allocation'],
+  incomeEvents: [
+    'gross',
+    'take_home_net',
+    'delta_vs_prev',
+    'routed_to_pipe',
+    'routed_to_lifestyle',
+  ],
+  assumptions: [
+    'target_low',
+    'target_high',
+    'return_rdpu',
+    'return_equity',
+    'return_dplk',
+    'return_gold',
+    'inflation_rate',
+    'equity_switch_month',
+    'lifestyle_ceiling_monthly',
+  ],
+  netWorthSnapshots: ['total'],
+  milestones: [],
+}
+
+function coerceNumeric(table: SyncTable, row: Record<string, unknown>): Record<string, unknown> {
+  const fields = NUMERIC[table]
+  if (!fields || fields.length === 0) return row
+  const out = { ...row }
+  for (const k of fields) {
+    const v = out[k]
+    if (typeof v === 'string' && v !== '') {
+      const n = Number(v)
+      if (Number.isFinite(n)) out[k] = n
+    }
+  }
+  return out
+}
+
+// Shared helper: scrub any already-corrupted local rows where a numeric field
+// arrived as a string from a prior pull (before `coerceNumeric` existed in
+// `fromCloudRow`). Used by the Dexie v12 upgrade and by tests.
+export function scrubNumericStrings(table: SyncTable, row: Record<string, unknown>): boolean {
+  const fields = NUMERIC[table]
+  if (!fields || fields.length === 0) return false
+  let changed = false
+  for (const k of fields) {
+    const v = row[k]
+    if (typeof v === 'string' && v !== '') {
+      const n = Number(v)
+      if (Number.isFinite(n)) {
+        row[k] = n
+        changed = true
+      }
+    }
+  }
+  return changed
 }
