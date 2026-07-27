@@ -7,7 +7,8 @@ import type { Cadence, Lane, RecurringItem, RecurringKind } from '@db/types'
 import { formatRp, formatRpInput, parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useRef, useState } from 'react'
+import { useLongPress } from '../../hooks/useLongPress'
+import { useState } from 'react'
 
 const KIND_LABELS: Record<RecurringKind, string> = {
   pay_yourself_first: 'Pay yourself first (Pipe)',
@@ -40,21 +41,11 @@ export function RecurringRegister() {
   const [editing, setEditing] = useState<RecurringItem | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function startLongPress(item: RecurringItem) {
-    longPressTimer.current = setTimeout(() => {
-      if (window.confirm(`Delete "${item.name}"? Linked payment history stays intact.`)) {
-        recurringRepo.remove(item.id!)
-      }
-    }, 600)
-  }
-  function cancelLongPress() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
+  const longPress = useLongPress((item: RecurringItem) => {
+    if (window.confirm(`Delete "${item.name}"? Linked payment history stays intact.`)) {
+      recurringRepo.remove(item.id!)
     }
-  }
+  })
 
   function openAdd() {
     setEditing(null)
@@ -63,6 +54,10 @@ export function RecurringRegister() {
   }
 
   function openEdit(item: RecurringItem) {
+    // The row is tappable AND long-pressable: the press that just deleted this
+    // item still dispatches a click, which would reopen the sheet on the row
+    // the user deleted.
+    if (longPress.consumedClick()) return
     setEditing(item)
     setForm({
       name: item.name,
@@ -182,8 +177,7 @@ export function RecurringRegister() {
             key={item.id}
             item={item}
             onEdit={() => openEdit(item)}
-            onLongPressStart={() => startLongPress(item)}
-            onLongPressEnd={cancelLongPress}
+            gestures={longPress.handlers(item)}
           />
         ))}
       </div>
@@ -197,8 +191,7 @@ export function RecurringRegister() {
                 key={item.id}
                 item={item}
                 onEdit={() => openEdit(item)}
-                onLongPressStart={() => startLongPress(item)}
-                onLongPressEnd={cancelLongPress}
+                gestures={longPress.handlers(item)}
                 dim
               />
             ))}
@@ -314,25 +307,18 @@ export function RecurringRegister() {
 function ItemRow({
   item,
   onEdit,
-  onLongPressStart,
-  onLongPressEnd,
+  gestures,
   dim,
 }: {
   item: RecurringItem
   onEdit: () => void
-  onLongPressStart: () => void
-  onLongPressEnd: () => void
+  gestures: React.DOMAttributes<HTMLElement>
   dim?: boolean
 }) {
   return (
     <Row
       onClick={onEdit}
-      onTouchStart={onLongPressStart}
-      onTouchEnd={onLongPressEnd}
-      onTouchCancel={onLongPressEnd}
-      onMouseDown={onLongPressStart}
-      onMouseUp={onLongPressEnd}
-      onMouseLeave={onLongPressEnd}
+      {...gestures}
       title="Long-press to delete · tap to edit"
       style={{ opacity: dim ? 0.5 : 1 }}
       icon={

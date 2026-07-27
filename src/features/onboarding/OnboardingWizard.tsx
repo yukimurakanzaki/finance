@@ -208,11 +208,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (!validated.ok) return
     setFinishError(null)
     setSaving(true)
+    let accountId: string | null = null
     try {
-      await createFirstAccount(todayISO(), validated.openingBalance)
+      accountId = await createFirstAccount(todayISO(), validated.openingBalance)
       await finishCommon()
     } catch (err) {
-      console.error('[onboarding] quick-finish failed', err)
+      console.error('[onboarding] quick-finish failed, rolling back', err)
+      // Same rollback contract as handleFinish: finishCommon can throw AFTER
+      // the account exists, and the retry would then create a second one.
+      if (accountId !== null) await accountsRepo.remove(accountId)
       setFinishError(
         `Couldn't save — ${err instanceof Error ? err.message : 'unknown error'}. Try again.`,
       )

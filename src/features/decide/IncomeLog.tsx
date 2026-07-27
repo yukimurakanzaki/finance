@@ -6,26 +6,19 @@ import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import { formatRp } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useRef, useState } from 'react'
+import { useLongPress } from '../../hooks/useLongPress'
+import { useState } from 'react'
 
 export function IncomeLog() {
   const [open, setOpen] = useState(false)
   const events = useLiveQuery(() => incomeEventsRepo.getAllDesc()) ?? []
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function startLongPress(id: string, label: string) {
-    longPressTimer.current = setTimeout(() => {
+  const longPress = useLongPress(
+    ({ id, label }: { id: string; label: string }) => {
       if (window.confirm(`Delete this income event?\n${label}`)) {
         incomeEventsRepo.remove(id)
       }
-    }, 600)
-  }
-  function cancelLongPress() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }
+    },
+  )
 
   return (
     <div
@@ -77,16 +70,10 @@ export function IncomeLog() {
             key={ev.id}
             padding="var(--space-3) var(--space-4)"
             interactive
-            onTouchStart={() =>
-              startLongPress(ev.id!, `${formatRp(ev.take_home_net)} · ${ev.date}`)
-            }
-            onTouchEnd={cancelLongPress}
-            onTouchCancel={cancelLongPress}
-            onMouseDown={() =>
-              startLongPress(ev.id!, `${formatRp(ev.take_home_net)} · ${ev.date}`)
-            }
-            onMouseUp={cancelLongPress}
-            onMouseLeave={cancelLongPress}
+            {...longPress.handlers({
+              id: ev.id!,
+              label: `${formatRp(ev.take_home_net)} · ${ev.date}`,
+            })}
             title="Long-press to delete"
           >
             <div
