@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie'
+import { scrubNumericStrings } from '@lib/syncMappers'
 import type {
   Account,
   Asset,
@@ -211,6 +212,36 @@ class FIDatabase extends Dexie {
     // no longer draws the personal pool) needs NO schema version: it is not
     // indexed, and readers treat missing/undefined as untagged (isWeekDraw),
     // so a full-table backfill upgrade would only slow startup for nothing.
+
+    // v12: scrub string-typed numeric fields from synced tables. Before
+    // `coerceNumeric` lived in `fromCloudRow`, a cloud pull could land a
+    // Postgres bigint (returned as a string over the wire) into a Dexie
+    // number column, and the next sync push would 400 on the same bigint
+    // column. Walk every synced table once, coerce in place, and reset the
+    // push watermark for any table where at least one row was touched so
+    // the corrected values re-upload to the cloud on the next sync cycle.
+    // Runs once per device, no-op when no rows match.
+    this.version(12)
+      .stores({})
+      .upgrade(async (tx) => {
+        for (const name of SYNC_TABLES) {
+          let touched = 0
+          await tx
+            .table(name)
+            .toCollection()
+            .modify((row: Record<string, unknown>) => {
+              if (scrubNumericStrings(name as SyncTable, row)) touched++
+            })
+          if (touched > 0) {
+            // Force a re-push of this table by rewinding its push watermark.
+            // Dexie's `.modify()` bypasses our `updating` hook, so `updated_at`
+            // is unchanged and the watermark would otherwise skip the row.
+            await tx
+              .table('syncMeta')
+              .put({ key: `pushed:${name}`, value: '1970-01-01T00:00:00.000Z' })
+          }
+        }
+      })
   }
 }
 
