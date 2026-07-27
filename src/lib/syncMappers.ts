@@ -83,10 +83,13 @@ export function fromCloudRow(table: SyncTable, row: Record<string, unknown>): Re
 // `pushTable` was throwing. Coerce here so the local copy — and every future
 // push — stays numeric. Anything not on this list is left as the cloud sent
 // it; that matches the existing syncMappers.test.ts expectations.
-export const NUMERIC: Partial<Record<SyncTable, readonly string[]>> = {
+//
+// Not Partial: a full Record forces every new syncable table to declare its
+// numeric fields (or an explicit []) instead of silently inheriting the bug.
+export const NUMERIC: Record<SyncTable, readonly string[]> = {
   transactions: ['amount', 'original_amount', 'overridden_amount'],
   accounts: ['manual_balance_override'],
-  assets: ['quantity_grams', 'price_per_gram', 'fx_amount'],
+  assets: ['value', 'quantity_grams', 'price_per_gram', 'fx_amount'],
   envelopes: ['target_amount'],
   recurringItems: ['amount'],
   allowance: ['monthly_amount', 'weekend_allocation'],
@@ -109,7 +112,12 @@ export const NUMERIC: Partial<Record<SyncTable, readonly string[]>> = {
     'lifestyle_ceiling_monthly',
   ],
   netWorthSnapshots: ['total'],
+  chatSessions: ['message_count', 'total_input_tokens', 'total_output_tokens'],
+  chatMessages: ['input_tokens', 'output_tokens'],
   milestones: [],
+  categories: [],
+  chatMemories: [],
+  chatCustomSkills: [],
 }
 
 function coerceNumeric(table: SyncTable, row: Record<string, unknown>): Record<string, unknown> {
