@@ -33,8 +33,9 @@ const EMPTY_FORM = {
 }
 
 export function RecurringRegister() {
-  const items =
+  const items = (
     useLiveQuery(() => db.recurringItems.orderBy('kind').toArray()) ?? []
+  ).filter((r) => !r.deleted_at)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<RecurringItem | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -110,6 +111,13 @@ export function RecurringRegister() {
   async function handleDeactivate(item: RecurringItem) {
     if (!item.id) return
     await recurringRepo.deactivate(item.id)
+  }
+
+  async function handleDelete(item: RecurringItem) {
+    if (!item.id) return
+    if (!confirm(`Delete "${item.name}"? Linked payment history stays intact.`)) return
+    await recurringRepo.remove(item.id)
+    setOpen(false)
   }
 
   const active = items.filter((i) => i.is_active)
@@ -244,16 +252,25 @@ export function RecurringRegister() {
             }}
           >
             {editing && (
-              <Btn
-                variant="danger"
-                style={{ flex: 1 }}
-                onClick={async () => {
-                  await handleDeactivate(editing)
-                  setOpen(false)
-                }}
-              >
-                Pause
-              </Btn>
+              <>
+                <Btn
+                  variant="danger"
+                  style={{ flex: 1 }}
+                  onClick={() => handleDelete(editing)}
+                >
+                  Delete
+                </Btn>
+                <Btn
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                  onClick={async () => {
+                    await handleDeactivate(editing)
+                    setOpen(false)
+                  }}
+                >
+                  Pause
+                </Btn>
+              </>
             )}
             <Btn
               style={{ flex: 2 }}
