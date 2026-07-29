@@ -7,7 +7,7 @@ import type { Cadence, Lane, RecurringItem, RecurringKind } from '@db/types'
 import { formatRp, formatRpInput, parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useLongPress } from '../../hooks/useLongPress'
+import { useLongPress, type LongPressHandlers } from '../../hooks/useLongPress'
 import { useState } from 'react'
 
 const KIND_LABELS: Record<RecurringKind, string> = {
@@ -312,7 +312,7 @@ function ItemRow({
 }: {
   item: RecurringItem
   onEdit: () => void
-  gestures: React.DOMAttributes<HTMLElement>
+  gestures: LongPressHandlers
   dim?: boolean
 }) {
   return (

@@ -14,6 +14,21 @@ const HOLD_MS = 600
  *   edit sheet on tap) swallow the click that follows the press, which would
  *   otherwise open the sheet for the row the user just deleted.
  */
+/**
+ * Exactly the handlers the gesture needs — deliberately NOT DOMAttributes,
+ * which carries an optional onClick that would widen (and clash with) the
+ * `onClick: () => void` of any row this bag is spread onto.
+ */
+export type LongPressHandlers = {
+  onTouchStart: () => void
+  onTouchEnd: () => void
+  onTouchMove: () => void
+  onTouchCancel: () => void
+  onMouseDown: () => void
+  onMouseUp: () => void
+  onMouseLeave: () => void
+}
+
 export function useLongPress<T>(onLongPress: (arg: T) => void, ms = HOLD_MS) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fired = useRef(false)
@@ -25,7 +40,7 @@ export function useLongPress<T>(onLongPress: (arg: T) => void, ms = HOLD_MS) {
     }
   }
 
-  function handlers(arg: T) {
+  function handlers(arg: T): LongPressHandlers {
     const start = () => {
       fired.current = false
       cancel()

@@ -14,6 +14,11 @@ interface Props {
   className?: string
 }
 
+// Gesture handlers, `title`, and friends ride along via `...rest`. onClick is
+// omitted from the DOM attributes because Row narrows it to `() => void` — the
+// wider MouseEventHandler would clash with it in the intersection.
+type RowProps = Props & Omit<React.HTMLAttributes<HTMLElement>, 'onClick'>
+
 // Flush list row (Calm Ledger v2 §3 — "rows, not boxes"): 56px min height,
 // 12×16 padding, a single hairline separator, and a pressed state (via the
 // .ui-row class in index.css). Renders as a <button> when interactive, else a
@@ -27,7 +32,7 @@ export function Row({
   style,
   className,
   ...rest
-}: Props) {
+}: RowProps) {
   // No `background` here on purpose: the button variant carries the .ui-row
   // class, and an inline background would always outrank .ui-row:active's
   // pressed state (inline beats any non-!important stylesheet rule). Idle
