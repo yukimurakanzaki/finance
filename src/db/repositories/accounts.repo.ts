@@ -23,4 +23,6 @@ export const accountsRepo = {
       manual_balance_override: balance,
       last_balance_updated_at: todayISO(),
     }),
+
+  remove: (id: string) => db.accounts.delete(id),
 }

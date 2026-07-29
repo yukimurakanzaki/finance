@@ -4,9 +4,10 @@ import { Row, SectionHeader } from '@components/ui'
 import { db } from '@db/db'
 import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import type { Cadence, Lane, RecurringItem, RecurringKind } from '@db/types'
-import { formatRp } from '@lib/currency'
+import { formatRp, formatRpInput, parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useLongPress, type LongPressHandlers } from '../../hooks/useLongPress'
 import { useState } from 'react'
 
 const KIND_LABELS: Record<RecurringKind, string> = {
@@ -40,6 +41,11 @@ export function RecurringRegister() {
   const [editing, setEditing] = useState<RecurringItem | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const longPress = useLongPress((item: RecurringItem) => {
+    if (window.confirm(`Delete "${item.name}"? Linked payment history stays intact.`)) {
+      recurringRepo.remove(item.id!)
+    }
+  })
 
   function openAdd() {
     setEditing(null)
@@ -48,6 +54,10 @@ export function RecurringRegister() {
   }
 
   function openEdit(item: RecurringItem) {
+    // The row is tappable AND long-pressable: the press that just deleted this
+    // item still dispatches a click, which would reopen the sheet on the row
+    // the user deleted.
+    if (longPress.consumedClick()) return
     setEditing(item)
     setForm({
       name: item.name,
@@ -78,7 +88,8 @@ export function RecurringRegister() {
   async function handleSave() {
     if (!form.name || !form.amount) return
     setSaving(true)
-    const amount = Number(form.amount.replace(/[.,]/g, ''))
+    const amount = parseRpInput(form.amount)
+    if (amount === null) return
     const today = todayISO()
 
     if (editing?.id) {
@@ -162,7 +173,12 @@ export function RecurringRegister() {
           </div>
         )}
         {active.map((item) => (
-          <ItemRow key={item.id} item={item} onEdit={() => openEdit(item)} />
+          <ItemRow
+            key={item.id}
+            item={item}
+            onEdit={() => openEdit(item)}
+            gestures={longPress.handlers(item)}
+          />
         ))}
       </div>
 
@@ -175,6 +191,7 @@ export function RecurringRegister() {
                 key={item.id}
                 item={item}
                 onEdit={() => openEdit(item)}
+                gestures={longPress.handlers(item)}
                 dim
               />
             ))}
@@ -208,7 +225,7 @@ export function RecurringRegister() {
               inputMode="numeric"
               mono
               value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
+              onChange={(e) => set('amount', formatRpInput(e.target.value))}
               placeholder="165.000"
             />
           </Field>
@@ -290,11 +307,19 @@ export function RecurringRegister() {
 function ItemRow({
   item,
   onEdit,
+  gestures,
   dim,
-}: { item: RecurringItem; onEdit: () => void; dim?: boolean }) {
+}: {
+  item: RecurringItem
+  onEdit: () => void
+  gestures: LongPressHandlers
+  dim?: boolean
+}) {
   return (
     <Row
       onClick={onEdit}
+      {...gestures}
+      title="Long-press to delete · tap to edit"
       style={{ opacity: dim ? 0.5 : 1 }}
       icon={
         <span

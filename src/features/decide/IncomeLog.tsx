@@ -6,13 +6,19 @@ import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import { formatRp } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useLongPress } from '../../hooks/useLongPress'
 import { useState } from 'react'
 
 export function IncomeLog() {
   const [open, setOpen] = useState(false)
-  const events =
-    useLiveQuery(() => db.incomeEvents.orderBy('date').reverse().toArray()) ??
-    []
+  const events = useLiveQuery(() => incomeEventsRepo.getAllDesc()) ?? []
+  const longPress = useLongPress(
+    ({ id, label }: { id: string; label: string }) => {
+      if (window.confirm(`Delete this income event?\n${label}`)) {
+        incomeEventsRepo.remove(id)
+      }
+    },
+  )
 
   return (
     <div
@@ -60,7 +66,16 @@ export function IncomeLog() {
         const prev = events[i + 1]
         const delta = prev ? ev.take_home_net - prev.take_home_net : null
         return (
-          <Card key={ev.id} padding="var(--space-3) var(--space-4)">
+          <Card
+            key={ev.id}
+            padding="var(--space-3) var(--space-4)"
+            interactive
+            {...longPress.handlers({
+              id: ev.id!,
+              label: `${formatRp(ev.take_home_net)} · ${ev.date}`,
+            })}
+            title="Long-press to delete"
+          >
             <div
               style={{
                 display: 'flex',
@@ -206,6 +221,7 @@ function AddIncomeForm({
         <Input
           type="date"
           value={date}
+          max={todayISO()}
           onChange={(e) => setDate(e.target.value)}
           mono
         />

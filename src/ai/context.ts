@@ -1,4 +1,5 @@
 import { db } from '@db/db'
+import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import type { AssetType, Lane } from '@db/types'
 import { computeFIProjection } from '@engine/fiProjection'
 import { safeToSpendFromLedger } from '@engine/safeToSpend'
@@ -56,7 +57,7 @@ export async function buildSystemPrompt(
     db.recurringItems.filter((r) => r.is_active).toArray(),
     db.allowance.get('local'),
     db.assumptions.orderBy('id').last(),
-    db.incomeEvents.orderBy('date').last(),
+    incomeEventsRepo.getLatest(),
   ])
 
   // Account balances: same derivation as the Assets screen (override anchor +
