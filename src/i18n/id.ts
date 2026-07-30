@@ -10,6 +10,7 @@ export const id: Translations = {
     back: 'Kembali',
     next: 'Lanjut',
     loading: 'Memuat...',
+    working: 'Memproses…',
     error: 'Error',
     retry: 'Coba Lagi',
     confirm: 'Konfirmasi',
@@ -22,12 +23,15 @@ export const id: Translations = {
   },
 
   nav: {
-    home: 'Beranda',
+    today: 'Hari Ini',
     budget: 'Budget',
-    assets: 'Aset',
-    decide: 'Keputusan',
-    more: 'Lainnya',
     chat: 'Manajer',
+    assets: 'Aset',
+    report: 'Laporan',
+    more: 'Lainnya',
+    home: 'Beranda',
+    decide: 'Keputusan',
+    primaryLandmark: 'Navigasi utama',
   },
 
   home: {
@@ -45,6 +49,7 @@ export const id: Translations = {
     goldStaleWarning:
       'Harga emas belum diperbarui 30+ hari. Tap Aset untuk update.',
     savingsRate: 'Rasio tabungan',
+    pipeVsNet: '{pipe} pipe / {net} bersih',
     gapToLowTarget: 'Gap ke target rendah',
     gapToHighTarget: 'Gap ke target tinggi',
     lanes: {
@@ -74,7 +79,7 @@ export const id: Translations = {
     negativePoolWarning:
       'Item komitmen melebihi allowance bulan ini. Review recurring items Anda.',
     weekendLabel: 'Akhir Pekan',
-    weekendReset: 'Alokasi akhir pekan sudah dipisahkan. Reset Senin.',
+    weekendReset: 'Allowance akhir pekan, sudah dipisahkan. Reset Senin.',
     addTransaction: 'Tambah Transaksi',
     reconcile: 'Rekonsiliasi',
     viewAllTransactions: 'Lihat semua transaksi',
@@ -88,21 +93,35 @@ export const id: Translations = {
     takeHomeNet: 'Take-home net',
     payYourselfFirst: 'Pay Yourself First',
     billsAndSubs: 'Tagihan & langganan',
+    personalSubscriptions: 'Langganan Pribadi',
+    subscriptions: 'Langganan',
+    otherCommitted: 'Komitmen Lainnya',
     discretionaryPool: 'Pool diskresioner',
     monthlyAllowance: 'Allowance bulanan',
     recurringItemsEmpty:
       'Belum ada item rutin. Tambahkan di Lainnya → Daftar Rutin.',
+    perDayShort: '/hari',
     perMonthShort: '/bln',
     perYearShort: '/thn',
+    leftSuffix: 'tersisa',
+    workdayToGo: 'hari kerja lagi',
+    workdaysToGo: 'hari kerja lagi',
     intoPipePerYear: 'ke pipe',
     horizonWeekly: 'Mingguan',
     horizonMonthly: 'Bulanan',
     horizonYearly: 'Tahunan',
     noTransactions: 'Belum ada transaksi',
+    setAllowanceTitle: 'Atur allowance bulanan Anda',
     setAllowancePrompt:
-      'Buka Lainnya → Daftar Rutin untuk mengatur pool pribadi dan melihat batas aman harian Anda.',
+      'Buka Lainnya → Allowance untuk mengatur pool pribadi dan melihat batas aman harian Anda.',
     spent: 'Terpakai',
     earned: 'Diterima',
+    cadences: {
+      monthly: 'bulanan',
+      weekly: 'mingguan',
+      yearly: 'tahunan',
+      one_off: 'sekali bayar',
+    },
   },
 
   assets: {
@@ -113,19 +132,32 @@ export const id: Translations = {
     accounts: 'Akun',
     accountsCount: 'Akun',
     assetsCount: 'Aset',
+    totalBalance: 'Saldo total',
     noAccounts: 'Belum ada akun. Tambahkan akun pengeluaran utama Anda.',
     noAssets: 'Belum ada aset.',
+    noAssetsHint: 'Belum ada aset. Tambahkan investasi, emas, DPLK Anda.',
     refreshPrices: 'Perbarui harga pasar',
     refreshing: 'Memperbarui...',
     lastRefreshed: 'Terakhir diperbarui',
     refreshError:
       'Tidak dapat mengakses API harga. Periksa koneksi dan coba lagi.',
+    pricesRefreshedAt: 'Harga diperbarui {date}',
+    pricesNotFetched: 'Harga belum diambil',
+    autoBadge: 'Otomatis',
+    priceStale: 'Harga usang',
     accountTypes: {
       bank: 'Bank',
-      brokerage: 'Sekuritas',
-      crypto: 'Kripto',
-      pension: 'Pensiun',
-      property: 'Properti',
+      digital_wallet: 'Dompet digital',
+      cash: 'Tunai',
+    },
+    assetTypes: {
+      investment_rdpu: 'RDPU',
+      investment_equity: 'Saham',
+      gold: 'Emas',
+      dplk: 'DPLK',
+      storyforge: 'StoryForge',
+      currency: 'Valuta',
+      other: 'Lainnya',
     },
   },
 
@@ -152,29 +184,70 @@ export const id: Translations = {
   more: {
     title: 'Lainnya',
     settings: 'Pengaturan',
+    appearance: 'Tampilan',
+    theme: 'Tema',
+    themeLight: 'Terang (biru)',
+    themeDark: 'Gelap',
+    themeCaption: 'Tap untuk beralih antara gelap dan terang',
     language: 'Bahasa',
     languageDesc: 'Pilih bahasa yang Anda inginkan',
+    financialSetup: 'Pengaturan keuangan',
     household: 'Rumah Tangga',
     export: 'Ekspor Data',
     signOut: 'Keluar dari AI Manager',
     version: 'Versi',
     allowance: 'Allowance',
+    allowanceCaption: 'Pool bulanan & alokasi akhir pekan',
     recurringRegister: 'Daftar Rutin',
+    recurringRegisterCaption:
+      'Pipe, tagihan, langganan — apa yang dikomit tiap bulan',
     pinLock: 'Kunci PIN',
     pinLockSet: 'Ubah / Hapus PIN',
     pinLockNotSet: 'Atur kunci PIN',
+    pinLockedCaption: 'Aplikasi terkunci saat berpindah',
+    pinNotLockedCaption: 'Kunci aplikasi saat Anda berpindah',
     fiAssumptions: 'Asumsi FI',
+    fiAssumptionsCaption: 'Target, tingkat imbal hasil, inflasi',
     categories: 'Kategori',
+    categoriesCaption:
+      'Beri tag transaksi per lane untuk auto-match saat impor',
+    income: 'Pendapatan',
+    logIncome: 'Catat pendapatan / kenaikan gaji',
+    logIncomeCaption:
+      'Perbarui take-home pay — memengaruhi rasio tabungan & tanggal FI',
+    plan: 'Rencana',
+    decideCaption: 'Apa manfaatnya? Milestone, pendapatan, lensa pengeluaran',
+    membersInvites: 'Anggota & Undangan',
+    membersInvitesCaption:
+      'Lihat siapa saja yang gabung, undang pasangan, alihkan admin',
+    data: 'Data',
+    logViaManager: 'Catat via AI Manager',
+    logViaManagerCaption:
+      'Tempel screenshot rekening koran di chat — tanpa bolak-balik salin/tempel',
     getClaudePrompt: 'Ambil Prompt Claude',
     importTransactions: 'Impor Transaksi',
+    importTransactionsCaption: 'Tempel output JSON ke Rekonsiliasi',
+    advancedImport: 'Lanjutan / impor massal',
+    advancedImportCaption:
+      'Salin prompt untuk sesi Claude terpisah — untuk impor besar multi-bulan',
     exportBackup: 'Ekspor Backup',
+    exportBackupCaption: 'Unduh semua data sebagai JSON',
     restoreBackup: 'Pulihkan Backup',
+    restoreBackupCaption: 'Ganti semua data dari file backup',
     signOutManager: 'Keluar dari AI Manager',
+    signOutCaption: 'Akhiri sesi rumah tangga di perangkat ini',
+    signOutConfirm:
+      'Keluar dari AI Manager? Tab Manager akan meminta Anda masuk lagi.',
+    signedOutAlert: 'Berhasil keluar.',
+    footer:
+      'FI Dashboard v0.1.0 · Offline-first dengan sinkronisasi cloud rumah tangga · Riwayat chat tetap di perangkat ini.',
   },
 
   auth: {
     signIn: 'Masuk',
     signUp: 'Daftar',
+    signInSubtitle: 'Masuk ke rumah tangga Anda.',
+    signUpSubtitle: 'Buat akun untuk memulai.',
     email: 'Email',
     password: 'Kata Sandi',
     signInButton: 'Masuk',
@@ -214,6 +287,57 @@ export const id: Translations = {
     step3Desc: 'Lihat kapan Anda akan mencapai kebebasan finansial',
     skip: 'Lewati',
     finish: 'Selesai',
+    stepOfTotal: 'Langkah {step} dari {total}',
+    chooseTitle: 'Selamat datang',
+    chooseSub:
+      'Dua cara untuk memulai — Anda selalu bisa melengkapi sisanya nanti dari Lainnya.',
+    quickSetupTitle: 'Setup cepat',
+    quickSetupBadge: 'TERCEPAT',
+    quickSetupDesc:
+      'Cukup nama dan akun pertama Anda. Langsung catat pengeluaran — tambahkan pendapatan, pay-yourself-first, dan allowance Anda nanti.',
+    fullSetupTitle: 'Setup lengkap',
+    fullSetupDesc:
+      'Atur pendapatan take-home, pipe pay-yourself-first, DPLK, dan allowance pribadi Anda sekarang, plus akun pertama Anda.',
+    changeSetupType: '‹ Ganti tipe setup',
+    firstAccountTitle: 'Akun pertama',
+    firstAccountSubQuick:
+      'Tambahkan akun agar Anda bisa mulai mencatat transaksi. Sisanya bisa menyusul.',
+    firstAccountSubFull:
+      'Tambahkan akun pengeluaran utama Anda untuk mulai melacak transaksi.',
+    bankAccountOption: 'Rekening bank',
+    digitalWalletOption: 'Dompet digital (GoPay, OVO…)',
+    cashOption: 'Tunai',
+    currentBalanceRp: 'Saldo saat ini (Rp)',
+    balanceOptionalNote:
+      'Opsional. Berapa saldo di akun ini sekarang, agar saldo mulai dari angka yang benar. Anda bisa sesuaikan nanti.',
+    addLaterNote:
+      'Anda bisa menambahkan pendapatan, pipe, dan allowance pribadi kapan saja dari Lainnya → Pendapatan / Allowance.',
+    incomeTitle: 'Pendapatan take-home Anda',
+    incomeSub:
+      'Titik awal model keuangan Anda. Tabungan akan mengalir dari sini terlebih dahulu.',
+    grossSalaryMonthly: 'Gaji kotor (bulanan)',
+    takeHomeNetMonthlyRequired: 'Take-home net (bulanan) *',
+    takeHomeExplainer:
+      'Take-home adalah yang benar-benar masuk ke rekening bank Anda setelah pajak dan BPJS. Ini menentukan rasio tabungan Anda.',
+    pipeDplkTitle: 'Pipe & DPLK',
+    pipeDplkSub:
+      'Pay yourself first — ini keluar dari akun Anda sebelum Anda melihat sisanya.',
+    pipeNameLabel: 'Nama pipe {n}',
+    monthlyRp: 'Bulanan (Rp)',
+    addPipe: '+ Tambah pipe',
+    dplkMonthlyOptional: 'DPLK (bulanan, opsional)',
+    principle6:
+      'Prinsip 6: tabungan bukan sisa. Pipe keluar duluan, baru Anda hidup dari sisanya.',
+    allowanceTitle: 'Allowance pribadi',
+    allowanceSub:
+      'Yang tersisa untuk pengeluaran diskresioner setelah pipe dan tagihan.',
+    monthlyPersonalPoolRequired: 'Pool pribadi bulanan (Rp) *',
+    weekendAllocationMonthly: 'Alokasi akhir pekan (Rp, bulanan)',
+    weekendExplainer:
+      'Pengeluaran akhir pekan dipisahkan lebih dulu, agar batas hari kerja Anda akurat. Gauge aman-untuk-dibelanjakan membagi sisanya dengan hari kerja yang tersisa.',
+    continueButton: 'Lanjut',
+    finishSetup: 'Selesaikan setup',
+    finishQuickSetup: 'Selesaikan setup cepat',
   },
 
   reconcile: {
@@ -222,10 +346,13 @@ export const id: Translations = {
     pasteJson: 'Paste output Claude (JSON)',
     import: 'Impor',
     transfers: 'Transfer',
+    transferSingular: 'Transfer',
     duplicates: 'Duplikat',
     invalid: 'Invalid',
     approve: 'Setuju',
     approveAll: 'Setujui semua',
+    approveAllCount: 'Setujui semua ({count})',
+    approvePartial: 'Setujui {count} dari {total} — {skipped} dilewati',
     importing: 'Menyimpan...',
     importSuccess: 'Berhasil diimpor',
     importFailed: 'Impor gagal',
@@ -233,6 +360,19 @@ export const id: Translations = {
     reviewDuplicates: 'Periksa duplikat',
     validRows: 'baris valid',
     invalidRows: 'baris invalid',
+    transactionsCount: 'Transaksi ({count})',
+    autoCollapsedTransfers: 'Transfer yang digabung otomatis ({count})',
+    invalidRowsCount: 'Baris invalid ({count})',
+    includeRow: 'Sertakan baris ini',
+    excludeRow: 'Kecualikan baris ini',
+    skipped: 'Dilewati',
+    rowLabel: 'Baris {number}:',
+    recurringNotTagged: 'Belum ditandai sebagai {name} — tap untuk menandai',
+    recurringTagged:
+      'Ditandai sebagai rutin: {name} — tap untuk batalkan tanda',
+    recurringSuggestTitle: 'Sepertinya {name} — tap untuk tandai sebagai rutin',
+    recurringTaggedTitle:
+      'Ditandai sebagai {name} — dikecualikan dari aman-untuk-dibelanjakan. Tap untuk batalkan tanda.',
   },
 
   forms: {
@@ -240,6 +380,10 @@ export const id: Translations = {
     institution: 'Institusi',
     accountType: 'Tipe akun',
     balance: 'Saldo',
+    currentBalanceLabel: 'Saldo saat ini',
+    grossSalaryLabel: 'Gaji kotor',
+    pipeLabel: 'Pipe {n}',
+    monthlyPoolLabel: 'Pool bulanan',
     assetName: 'Nama aset',
     assetType: 'Tipe aset',
     value: 'Nilai',
@@ -247,5 +391,8 @@ export const id: Translations = {
     notes: 'Catatan',
     required: 'Wajib',
     optional: 'Opsional',
+    egPrefix: 'mis. ',
+    checkAmountsError:
+      'Periksa jumlah berikut — angka dengan pemisah ribuan opsional (mis. 12.500.000): {items}',
   },
 }

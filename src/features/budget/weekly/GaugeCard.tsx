@@ -1,5 +1,6 @@
 import { Amount, Card, StatTile } from '@components/ui'
 import type { SafeToSpendResult } from '@engine/safeToSpend'
+import { useI18n } from '@i18n/index'
 import { DayDots } from './DayDots'
 
 interface Props {
@@ -20,14 +21,15 @@ export function GaugeCard({ result }: Props) {
     isNegativePool,
     weekendAllocation,
   } = result
+  const { t } = useI18n()
 
   if (isNegativePool) {
     return (
       <Card style={gaugeCardStyle}>
         <StatTile
-          label="Safe to spend today"
+          label={t.budget.safeToSpend}
           value={<Amount value={0} full tone="negative" />}
-          sub="Committed items exceed your allowance this month. Review your recurring items."
+          sub={t.budget.negativePoolWarning}
         />
       </Card>
     )
@@ -40,9 +42,9 @@ export function GaugeCard({ result }: Props) {
     return (
       <Card style={gaugeCardStyle}>
         <StatTile
-          label="Safe to spend today"
+          label={t.budget.safeToSpend}
           value={<Amount value={weekendAllocation} full />}
-          sub="Weekend allowance, pre-carved. Resets Monday."
+          sub={t.budget.weekendReset}
         />
       </Card>
     )
@@ -51,7 +53,7 @@ export function GaugeCard({ result }: Props) {
   return (
     <Card style={gaugeCardStyle}>
       <StatTile
-        label="Safe to spend today"
+        label={t.budget.safeToSpend}
         value={
           <>
             <Amount value={todayCeiling} full />
@@ -63,15 +65,17 @@ export function GaugeCard({ result }: Props) {
               }}
             >
               {' '}
-              /day
+              {t.budget.perDayShort}
             </span>
           </>
         }
         sub={
           <>
-            <Amount value={remainingPool} full tone="muted" /> left ·{' '}
-            {remainingWorkdays} workday{remainingWorkdays !== 1 ? 's' : ''} to
-            go
+            <Amount value={remainingPool} full tone="muted" />{' '}
+            {t.budget.leftSuffix} · {remainingWorkdays}{' '}
+            {remainingWorkdays === 1
+              ? t.budget.workdayToGo
+              : t.budget.workdaysToGo}
           </>
         }
       />

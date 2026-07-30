@@ -4,6 +4,7 @@ import { db } from '@db/db'
 import { settingsRepo } from '@db/repositories/settings.repo'
 import { DecideScreen } from '@features/decide/DecideScreen'
 import { IncomeLog } from '@features/decide/IncomeLog'
+import { useI18n } from '@i18n/index'
 import { hasPin } from '@lib/crypto'
 import { supabase } from '@lib/supabaseClient'
 import { useAppStore } from '@stores/appStore'
@@ -32,6 +33,7 @@ type Sheet =
   | null
 
 export function MoreScreen() {
+  const { t, language, setLanguage } = useI18n()
   const { start: startReconcile } = useReconcileStore()
   const { setTab } = useAppStore()
   const [sheet, setSheet] = useState<Sheet>(null)
@@ -123,43 +125,48 @@ export function MoreScreen() {
     setTab('budget')
   }
 
-  const pinLabel = pinConfigured ? 'Change / Remove PIN' : 'Set up PIN lock'
+  const pinLabel = pinConfigured ? t.more.pinLockSet : t.more.pinLockNotSet
   const pinSub = pinConfigured
-    ? 'App is locked on switch'
-    : 'Lock app when you switch away'
+    ? t.more.pinLockedCaption
+    : t.more.pinNotLockedCaption
 
   return (
     <Screen>
-      <SectionHeader>Appearance</SectionHeader>
+      <SectionHeader>{t.more.appearance}</SectionHeader>
       <div>
         <Row
           onClick={toggleTheme}
-          primary={`Theme: ${theme === 'light' ? 'Light (blue)' : 'Dark'}`}
-          caption="Tap to switch between dark and light"
+          primary={`${t.more.theme}: ${theme === 'light' ? t.more.themeLight : t.more.themeDark}`}
+          caption={t.more.themeCaption}
+        />
+        <Row
+          onClick={() => setLanguage(language === 'en' ? 'id' : 'en')}
+          primary={`${t.more.language}: ${language === 'id' ? 'Bahasa Indonesia' : 'English'}`}
+          caption={t.more.languageDesc}
         />
       </div>
 
-      <SectionHeader>Financial setup</SectionHeader>
+      <SectionHeader>{t.more.financialSetup}</SectionHeader>
       <div>
         <Row
           onClick={() => setSheet('allowance')}
-          primary="Allowance"
-          caption="Monthly pool & weekend allocation"
+          primary={t.more.allowance}
+          caption={t.more.allowanceCaption}
         />
         <Row
           onClick={() => setSheet('recurring')}
-          primary="Recurring Register"
-          caption="Pipe, bills, subs — what's committed monthly"
+          primary={t.more.recurringRegister}
+          caption={t.more.recurringRegisterCaption}
         />
         <Row
           onClick={() => setSheet('assumptions')}
-          primary="FI Assumptions"
-          caption="Target, return rates, inflation"
+          primary={t.more.fiAssumptions}
+          caption={t.more.fiAssumptionsCaption}
         />
         <Row
           onClick={() => setSheet('categories')}
-          primary="Categories"
-          caption="Tag transactions by lane for import auto-match"
+          primary={t.more.categories}
+          caption={t.more.categoriesCaption}
         />
         <Row
           onClick={() => setSheet('pin')}
@@ -173,30 +180,30 @@ export function MoreScreen() {
           section and sheet here, matching how Allowance already sits one tap
           away — the Decide sheet (below) still holds the full Income Log
           history, this is just a direct shortcut to log a raise. */}
-      <SectionHeader>Income</SectionHeader>
+      <SectionHeader>{t.more.income}</SectionHeader>
       <div>
         <Row
           onClick={() => setSheet('income')}
-          primary="Log income / raise"
-          caption="Update take-home pay — drives savings rate & FI date"
+          primary={t.more.logIncome}
+          caption={t.more.logIncomeCaption}
         />
       </div>
 
-      <SectionHeader>Plan</SectionHeader>
+      <SectionHeader>{t.more.plan}</SectionHeader>
       <div>
         <Row
           onClick={() => setSheet('decide')}
-          primary="Decide"
-          caption="What does this buy? Milestones, income, spending lens"
+          primary={t.nav.decide}
+          caption={t.more.decideCaption}
         />
       </div>
 
-      <SectionHeader>Household</SectionHeader>
+      <SectionHeader>{t.more.household}</SectionHeader>
       <div>
         <Row
           onClick={() => setSheet('household')}
-          primary="Members & Invites"
-          caption="See who's in, invite your partner, transfer admin"
+          primary={t.more.membersInvites}
+          caption={t.more.membersInvitesCaption}
         />
       </div>
 
@@ -212,46 +219,42 @@ export function MoreScreen() {
           "Advanced / bulk import" instead of the more-discoverable-looking
           "Get Claude Prompt", and a new row above both points at the
           in-app path first. */}
-      <SectionHeader>Data</SectionHeader>
+      <SectionHeader>{t.more.data}</SectionHeader>
       <div>
         <Row
           onClick={() => setTab('chat')}
-          primary="Log via AI Manager"
-          caption="Paste a statement screenshot in chat — no copy/paste round trip"
+          primary={t.more.logViaManager}
+          caption={t.more.logViaManagerCaption}
         />
         <Row
           onClick={handleReconcile}
-          primary="Import Transactions"
-          caption="Paste JSON output into Reconcile"
+          primary={t.more.importTransactions}
+          caption={t.more.importTransactionsCaption}
         />
         <Row
           onClick={() => setSheet('import_prompt')}
-          primary="Advanced / bulk import"
-          caption="Copy a prompt for a separate Claude session — for large multi-month imports"
+          primary={t.more.advancedImport}
+          caption={t.more.advancedImportCaption}
         />
         <Row
           onClick={handleExport}
-          primary="Export Backup"
-          caption="Download all data as JSON"
+          primary={t.more.exportBackup}
+          caption={t.more.exportBackupCaption}
         />
         <Row
           onClick={() => setSheet('restore')}
-          primary="Restore Backup"
-          caption="Replace all data from a backup file"
+          primary={t.more.restoreBackup}
+          caption={t.more.restoreBackupCaption}
         />
         <Row
           onClick={async () => {
-            if (
-              window.confirm(
-                'Sign out of the AI Manager? The Manager tab will ask you to sign in again.',
-              )
-            ) {
+            if (window.confirm(t.more.signOutConfirm)) {
               await supabase.auth.signOut()
-              window.alert('Signed out.')
+              window.alert(t.more.signedOutAlert)
             }
           }}
-          primary="Sign out of AI Manager"
-          caption="End your household session on this device"
+          primary={t.more.signOutManager}
+          caption={t.more.signOutCaption}
         />
       </div>
 
@@ -263,15 +266,14 @@ export function MoreScreen() {
             lineHeight: 1.6,
           }}
         >
-          FI Dashboard v0.1.0 · Offline-first with household cloud sync · Chat
-          history stays on this device.
+          {t.more.footer}
         </div>
       </div>
 
       <BottomSheet
         open={sheet === 'allowance'}
         onClose={() => setSheet(null)}
-        title="Allowance"
+        title={t.more.allowance}
         height="65dvh"
       >
         <AllowanceEditor />
@@ -280,7 +282,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'recurring'}
         onClose={() => setSheet(null)}
-        title="Recurring Register"
+        title={t.more.recurringRegister}
         height="90dvh"
       >
         <RecurringRegister />
@@ -289,7 +291,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'income'}
         onClose={() => setSheet(null)}
-        title="Income Log"
+        title={t.decide.incomeLog}
         height="85dvh"
       >
         <IncomeLog />
@@ -312,7 +314,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'assumptions'}
         onClose={() => setSheet(null)}
-        title="FI Assumptions"
+        title={t.more.fiAssumptions}
         height="90dvh"
       >
         <AssumptionsEditor />
@@ -321,7 +323,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'restore'}
         onClose={() => setSheet(null)}
-        title="Restore Backup"
+        title={t.more.restoreBackup}
         height="70dvh"
       >
         <RestoreBackup onDone={() => setSheet(null)} />
@@ -330,7 +332,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'categories'}
         onClose={() => setSheet(null)}
-        title="Categories"
+        title={t.more.categories}
         height="90dvh"
       >
         <CategoryManager />
@@ -339,7 +341,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'import_prompt'}
         onClose={() => setSheet(null)}
-        title="Advanced / Bulk Import"
+        title={t.more.advancedImport}
         height="90dvh"
       >
         <ImportPromptSheet />
@@ -348,7 +350,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'household'}
         onClose={() => setSheet(null)}
-        title="Household"
+        title={t.more.household}
         height="75dvh"
       >
         <HouseholdSheet />
@@ -357,7 +359,7 @@ export function MoreScreen() {
       <BottomSheet
         open={sheet === 'decide'}
         onClose={() => setSheet(null)}
-        title="Decide"
+        title={t.nav.decide}
         height="92dvh"
       >
         <DecideScreen />

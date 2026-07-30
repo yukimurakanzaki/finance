@@ -11,6 +11,7 @@ export interface Translations {
     back: string
     next: string
     loading: string
+    working: string
     error: string
     retry: string
     confirm: string
@@ -22,14 +23,19 @@ export interface Translations {
     no: string
   }
 
-  // Navigation / Tabs
+  // Navigation / Tabs. Keys mirror the `Tab` union in components/TabBar.tsx so
+  // the tab bar can index this by tab id. `home` and `decide` are not tabs —
+  // HomeScreen is embedded in the Report tab, DecideScreen in the More tab.
   nav: {
-    home: string
+    today: string
     budget: string
-    assets: string
-    decide: string
-    more: string
     chat: string
+    assets: string
+    report: string
+    more: string
+    home: string
+    decide: string
+    primaryLandmark: string
   }
 
   // Home Screen
@@ -47,6 +53,7 @@ export interface Translations {
     notOnTrack: string
     goldStaleWarning: string
     savingsRate: string
+    pipeVsNet: string
     gapToLowTarget: string
     gapToHighTarget: string
     lanes: {
@@ -90,19 +97,34 @@ export interface Translations {
     takeHomeNet: string
     payYourselfFirst: string
     billsAndSubs: string
+    personalSubscriptions: string
+    subscriptions: string
+    otherCommitted: string
     discretionaryPool: string
     monthlyAllowance: string
     recurringItemsEmpty: string
+    perDayShort: string
     perMonthShort: string
     perYearShort: string
+    leftSuffix: string
+    workdayToGo: string
+    workdaysToGo: string
     intoPipePerYear: string
     horizonWeekly: string
     horizonMonthly: string
     horizonYearly: string
     noTransactions: string
+    setAllowanceTitle: string
     setAllowancePrompt: string
     spent: string
     earned: string
+    // Keys mirror the `Cadence` union in db/types.ts.
+    cadences: {
+      monthly: string
+      weekly: string
+      yearly: string
+      one_off: string
+    }
   }
 
   // Assets Screen
@@ -114,18 +136,33 @@ export interface Translations {
     accounts: string
     accountsCount: string
     assetsCount: string
+    totalBalance: string
     noAccounts: string
     noAssets: string
+    noAssetsHint: string
     refreshPrices: string
     refreshing: string
     lastRefreshed: string
     refreshError: string
+    pricesRefreshedAt: string
+    pricesNotFetched: string
+    autoBadge: string
+    priceStale: string
+    // Keys mirror the `AccountType` union in db/types.ts.
     accountTypes: {
       bank: string
-      brokerage: string
-      crypto: string
-      pension: string
-      property: string
+      digital_wallet: string
+      cash: string
+    }
+    // Keys mirror the `AssetType` union in db/types.ts.
+    assetTypes: {
+      investment_rdpu: string
+      investment_equity: string
+      gold: string
+      dplk: string
+      storyforge: string
+      currency: string
+      other: string
     }
   }
 
@@ -155,30 +192,63 @@ export interface Translations {
   more: {
     title: string
     settings: string
+    appearance: string
+    theme: string
+    themeLight: string
+    themeDark: string
+    themeCaption: string
     language: string
     languageDesc: string
+    financialSetup: string
     household: string
     export: string
     signOut: string
     version: string
     allowance: string
+    allowanceCaption: string
     recurringRegister: string
+    recurringRegisterCaption: string
     pinLock: string
     pinLockSet: string
     pinLockNotSet: string
+    pinLockedCaption: string
+    pinNotLockedCaption: string
     fiAssumptions: string
+    fiAssumptionsCaption: string
     categories: string
+    categoriesCaption: string
+    income: string
+    logIncome: string
+    logIncomeCaption: string
+    plan: string
+    decideCaption: string
+    membersInvites: string
+    membersInvitesCaption: string
+    data: string
+    logViaManager: string
+    logViaManagerCaption: string
     getClaudePrompt: string
     importTransactions: string
+    importTransactionsCaption: string
+    advancedImport: string
+    advancedImportCaption: string
     exportBackup: string
+    exportBackupCaption: string
     restoreBackup: string
+    restoreBackupCaption: string
     signOutManager: string
+    signOutCaption: string
+    signOutConfirm: string
+    signedOutAlert: string
+    footer: string
   }
 
   // Auth
   auth: {
     signIn: string
     signUp: string
+    signInSubtitle: string
+    signUpSubtitle: string
     email: string
     password: string
     signInButton: string
@@ -217,6 +287,44 @@ export interface Translations {
     step3Desc: string
     skip: string
     finish: string
+    stepOfTotal: string
+    chooseTitle: string
+    chooseSub: string
+    quickSetupTitle: string
+    quickSetupBadge: string
+    quickSetupDesc: string
+    fullSetupTitle: string
+    fullSetupDesc: string
+    changeSetupType: string
+    firstAccountTitle: string
+    firstAccountSubQuick: string
+    firstAccountSubFull: string
+    bankAccountOption: string
+    digitalWalletOption: string
+    cashOption: string
+    currentBalanceRp: string
+    balanceOptionalNote: string
+    addLaterNote: string
+    incomeTitle: string
+    incomeSub: string
+    grossSalaryMonthly: string
+    takeHomeNetMonthlyRequired: string
+    takeHomeExplainer: string
+    pipeDplkTitle: string
+    pipeDplkSub: string
+    pipeNameLabel: string
+    monthlyRp: string
+    addPipe: string
+    dplkMonthlyOptional: string
+    principle6: string
+    allowanceTitle: string
+    allowanceSub: string
+    monthlyPersonalPoolRequired: string
+    weekendAllocationMonthly: string
+    weekendExplainer: string
+    continueButton: string
+    finishSetup: string
+    finishQuickSetup: string
   }
 
   // Reconcile
@@ -226,10 +334,13 @@ export interface Translations {
     pasteJson: string
     import: string
     transfers: string
+    transferSingular: string
     duplicates: string
     invalid: string
     approve: string
     approveAll: string
+    approveAllCount: string
+    approvePartial: string
     importing: string
     importSuccess: string
     importFailed: string
@@ -237,6 +348,17 @@ export interface Translations {
     reviewDuplicates: string
     validRows: string
     invalidRows: string
+    transactionsCount: string
+    autoCollapsedTransfers: string
+    invalidRowsCount: string
+    includeRow: string
+    excludeRow: string
+    skipped: string
+    rowLabel: string
+    recurringNotTagged: string
+    recurringTagged: string
+    recurringSuggestTitle: string
+    recurringTaggedTitle: string
   }
 
   // Forms
@@ -245,6 +367,10 @@ export interface Translations {
     institution: string
     accountType: string
     balance: string
+    currentBalanceLabel: string
+    grossSalaryLabel: string
+    pipeLabel: string
+    monthlyPoolLabel: string
     assetName: string
     assetType: string
     value: string
@@ -252,5 +378,8 @@ export interface Translations {
     notes: string
     required: string
     optional: string
+    // Prefix for illustrative placeholder values, e.g. `${egPrefix}BCA Tabungan`.
+    egPrefix: string
+    checkAmountsError: string
   }
 }

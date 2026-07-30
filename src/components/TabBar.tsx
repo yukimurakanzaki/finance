@@ -1,23 +1,25 @@
 import { Icon, type IconName } from '@components/ui'
+import { useI18n } from '@i18n/index'
 import { useAppStore } from '@stores/appStore'
 
 type Tab = 'today' | 'budget' | 'chat' | 'assets' | 'report' | 'more'
 
-const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: 'today', label: 'Today', icon: 'today' },
-  { id: 'budget', label: 'Budget', icon: 'budget' },
-  { id: 'chat', label: 'Manager', icon: 'manager' },
-  { id: 'assets', label: 'Assets', icon: 'assets' },
-  { id: 'report', label: 'Report', icon: 'report' },
-  { id: 'more', label: 'More', icon: 'more' },
+const TABS: { id: Tab; icon: IconName }[] = [
+  { id: 'today', icon: 'today' },
+  { id: 'budget', icon: 'budget' },
+  { id: 'chat', icon: 'manager' },
+  { id: 'assets', icon: 'assets' },
+  { id: 'report', icon: 'report' },
+  { id: 'more', icon: 'more' },
 ]
 
 export function TabBar() {
   const { activeTab, setTab } = useAppStore()
+  const { t } = useI18n()
 
   return (
     <nav
-      aria-label="Primary"
+      aria-label={t.nav.primaryLandmark}
       style={{
         display: 'flex',
         height: 56,
@@ -26,13 +28,13 @@ export function TabBar() {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      {TABS.map((t) => {
-        const active = activeTab === t.id
+      {TABS.map((tab) => {
+        const active = activeTab === tab.id
         return (
           <button
-            key={t.id}
+            key={tab.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(tab.id)}
             aria-current={active ? 'page' : undefined}
             style={{
               flex: 1,
@@ -51,8 +53,8 @@ export function TabBar() {
               transition: 'color .15s',
             }}
           >
-            <Icon name={t.icon} size={21} />
-            {t.label}
+            <Icon name={tab.icon} size={21} />
+            {t.nav[tab.id]}
           </button>
         )
       })}

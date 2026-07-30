@@ -1,5 +1,6 @@
 import { BottomSheet } from '@components/BottomSheet'
 import { Icon } from '@components/ui'
+import { useI18n } from '@i18n/index'
 import { useAppStore } from '@stores/appStore'
 import { useState } from 'react'
 import { TransactionHistory } from './TransactionHistory'
@@ -9,12 +10,13 @@ import { YearlyScreen } from './yearly/YearlyScreen'
 
 export function BudgetScreen() {
   const { budgetHorizon, setBudgetHorizon } = useAppStore()
+  const { t } = useI18n()
   const [historyOpen, setHistoryOpen] = useState(false)
 
   const horizons: { id: 'yearly' | 'monthly' | 'weekly'; label: string }[] = [
-    { id: 'yearly', label: 'Yearly' },
-    { id: 'monthly', label: 'Monthly' },
-    { id: 'weekly', label: 'Weekly' },
+    { id: 'yearly', label: t.budget.horizonYearly },
+    { id: 'monthly', label: t.budget.horizonMonthly },
+    { id: 'weekly', label: t.budget.horizonWeekly },
   ]
 
   return (
@@ -87,14 +89,14 @@ export function BudgetScreen() {
             fontWeight: 600,
           }}
         >
-          View all transactions <Icon name="chevron-right" size={14} />
+          {t.budget.viewAllTransactions} <Icon name="chevron-right" size={14} />
         </button>
       </div>
 
       <BottomSheet
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
-        title="Transaction history"
+        title={t.budget.transactionHistory}
         height="92dvh"
       >
         <TransactionHistory />
