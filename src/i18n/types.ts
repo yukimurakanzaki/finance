@@ -21,7 +21,7 @@ export interface Translations {
     yes: string
     no: string
   }
-  
+
   // Navigation / Tabs
   nav: {
     home: string
@@ -31,7 +31,7 @@ export interface Translations {
     more: string
     chat: string
   }
-  
+
   // Home Screen
   home: {
     title: string
@@ -57,7 +57,7 @@ export interface Translations {
       pass_through: string
     }
   }
-  
+
   // Budget Screen
   budget: {
     title: string
@@ -104,7 +104,7 @@ export interface Translations {
     spent: string
     earned: string
   }
-  
+
   // Assets Screen
   assets: {
     title: string
@@ -128,7 +128,7 @@ export interface Translations {
       property: string
     }
   }
-  
+
   // Decide Screen
   decide: {
     title: string
@@ -139,7 +139,7 @@ export interface Translations {
     incomeLog: string
     milestones: string
   }
-  
+
   // Chat Screen
   chat: {
     title: string
@@ -150,7 +150,7 @@ export interface Translations {
     thinking: string
     error: string
   }
-  
+
   // More Screen
   more: {
     title: string
@@ -174,7 +174,7 @@ export interface Translations {
     restoreBackup: string
     signOutManager: string
   }
-  
+
   // Auth
   auth: {
     signIn: string
@@ -204,7 +204,7 @@ export interface Translations {
     startFreshCreate: string
     signOutButton: string
   }
-  
+
   // Onboarding
   onboarding: {
     welcome: string
@@ -218,7 +218,7 @@ export interface Translations {
     skip: string
     finish: string
   }
-  
+
   // Reconcile
   reconcile: {
     title: string
@@ -238,7 +238,7 @@ export interface Translations {
     validRows: string
     invalidRows: string
   }
-  
+
   // Forms
   forms: {
     accountName: string

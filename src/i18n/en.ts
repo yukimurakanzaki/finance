@@ -20,7 +20,7 @@ export const en: Translations = {
     yes: 'Yes',
     no: 'No',
   },
-  
+
   nav: {
     home: 'Home',
     budget: 'Budget',
@@ -29,7 +29,7 @@ export const en: Translations = {
     more: 'More',
     chat: 'Manager',
   },
-  
+
   home: {
     title: 'Home',
     subtitle: 'The Scoreboard',
@@ -42,7 +42,8 @@ export const en: Translations = {
     yearsAway: 'years away',
     reachedFI: "You've reached FI!",
     notOnTrack: 'Not on track to FI',
-    goldStaleWarning: "Gold price hasn't been updated in 30+ days. Tap Assets to update.",
+    goldStaleWarning:
+      "Gold price hasn't been updated in 30+ days. Tap Assets to update.",
     savingsRate: 'Savings rate',
     gapToLowTarget: 'Gap to low target',
     gapToHighTarget: 'Gap to high target',
@@ -54,12 +55,12 @@ export const en: Translations = {
       pass_through: 'Pass Through',
     },
   },
-  
+
   budget: {
     title: 'Budget',
     subtitle: 'This workweek',
     safeToSpend: 'Safe to Spend',
-    todayCeiling: 'Today\'s Ceiling',
+    todayCeiling: "Today's Ceiling",
     weekPool: 'Week Pool',
     monthPool: 'Month Pool',
     yearPool: 'Year Pool',
@@ -70,7 +71,8 @@ export const en: Translations = {
     workdaysLeft: 'Workdays Left',
     daysLeft: 'Days Left',
     weekendAllocation: 'Weekend Allocation',
-    negativePoolWarning: 'Committed items exceed your allowance this month. Review your recurring items.',
+    negativePoolWarning:
+      'Committed items exceed your allowance this month. Review your recurring items.',
     weekendLabel: 'Weekend',
     weekendReset: 'Your weekend allocation is pre-carved. Resets Monday.',
     addTransaction: 'Add Transaction',
@@ -88,7 +90,8 @@ export const en: Translations = {
     billsAndSubs: 'Bills & subs',
     discretionaryPool: 'Discretionary pool',
     monthlyAllowance: 'Monthly allowance',
-    recurringItemsEmpty: 'No recurring items yet. Add them in More → Recurring Register.',
+    recurringItemsEmpty:
+      'No recurring items yet. Add them in More → Recurring Register.',
     perMonthShort: '/mo',
     perYearShort: '/yr',
     intoPipePerYear: 'into pipe',
@@ -96,11 +99,12 @@ export const en: Translations = {
     horizonMonthly: 'Monthly',
     horizonYearly: 'Yearly',
     noTransactions: 'No transactions yet',
-    setAllowancePrompt: 'Go to More → Recurring Register to configure your personal pool and see your daily safe-to-spend ceiling.',
+    setAllowancePrompt:
+      'Go to More → Recurring Register to configure your personal pool and see your daily safe-to-spend ceiling.',
     spent: 'Spent',
     earned: 'Earned',
   },
-  
+
   assets: {
     title: 'Assets',
     subtitle: 'Accounts & assets',
@@ -114,7 +118,8 @@ export const en: Translations = {
     refreshPrices: 'Refresh market prices',
     refreshing: 'Refreshing...',
     lastRefreshed: 'Last refreshed',
-    refreshError: 'Could not reach the price APIs. Check your connection and try again.',
+    refreshError:
+      'Could not reach the price APIs. Check your connection and try again.',
     accountTypes: {
       bank: 'Bank',
       brokerage: 'Brokerage',
@@ -123,7 +128,7 @@ export const en: Translations = {
       property: 'Property',
     },
   },
-  
+
   decide: {
     title: 'Decide',
     subtitle: 'Decisions & scenarios',
@@ -133,7 +138,7 @@ export const en: Translations = {
     incomeLog: 'Income Log',
     milestones: 'Milestones',
   },
-  
+
   chat: {
     title: 'Manager',
     subtitle: 'AI financial coach',
@@ -143,7 +148,7 @@ export const en: Translations = {
     thinking: 'Thinking...',
     error: 'Failed to send message',
   },
-  
+
   more: {
     title: 'More',
     settings: 'Setup',
@@ -166,7 +171,7 @@ export const en: Translations = {
     restoreBackup: 'Restore Backup',
     signOutManager: 'Sign out of AI Manager',
   },
-  
+
   auth: {
     signIn: 'Sign In',
     signUp: 'Sign Up',
@@ -185,8 +190,10 @@ export const en: Translations = {
     haveAccountSignIn: 'Already have an account? Sign in',
     nameHousehold: 'Name your household',
     joinHousehold: 'Join a household',
-    signedInAsCreate: 'Signed in as {email}. Your household is the shared financial picture you and your partner will use. You can invite members later.',
-    signedInAsJoin: 'Signed in as {email}. Enter the invite code your household admin shared with you.',
+    signedInAsCreate:
+      'Signed in as {email}. Your household is the shared financial picture you and your partner will use. You can invite members later.',
+    signedInAsJoin:
+      'Signed in as {email}. Enter the invite code your household admin shared with you.',
     householdName: 'Household name',
     inviteCode: 'Invite code',
     createHousehold: 'Create household',
@@ -195,20 +202,20 @@ export const en: Translations = {
     startFreshCreate: 'Start fresh? Create a household',
     signOutButton: 'Sign out',
   },
-  
+
   onboarding: {
     welcome: 'Welcome to FI Dashboard',
     getStarted: 'Get started',
     step1Title: 'Track your net worth',
     step1Desc: 'See all your accounts and assets in one place',
-    step2Title: 'Know what\'s safe to spend',
+    step2Title: "Know what's safe to spend",
     step2Desc: 'Weekly budget that adjusts to your savings goal',
     step3Title: 'Project your FI date',
-    step3Desc: 'See when you\'ll reach financial independence',
+    step3Desc: "See when you'll reach financial independence",
     skip: 'Skip',
     finish: 'Finish',
   },
-  
+
   reconcile: {
     title: 'Reconcile',
     subtitle: 'Import transactions',
@@ -227,7 +234,7 @@ export const en: Translations = {
     validRows: 'valid rows',
     invalidRows: 'invalid rows',
   },
-  
+
   forms: {
     accountName: 'Account name',
     institution: 'Institution',

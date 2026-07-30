@@ -1,8 +1,8 @@
-import { create } from 'zustand'
 import { settingsRepo } from '@db/repositories/settings.repo'
-import type { Language, Translations } from './types'
+import { create } from 'zustand'
 import { en } from './en'
 import { id } from './id'
+import type { Language, Translations } from './types'
 
 const translations: Record<Language, Translations> = { en, id }
 
@@ -16,13 +16,13 @@ interface I18nState {
 export const useI18n = create<I18nState>((set) => ({
   language: 'en',
   t: en,
-  
+
   init: async () => {
     const saved = await settingsRepo.get('language')
     const lang = (saved === 'id' ? 'id' : 'en') as Language
     set({ language: lang, t: translations[lang] })
   },
-  
+
   setLanguage: async (lang: Language) => {
     await settingsRepo.set('language', lang)
     set({ language: lang, t: translations[lang] })

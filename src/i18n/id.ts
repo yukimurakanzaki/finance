@@ -20,7 +20,7 @@ export const id: Translations = {
     yes: 'Ya',
     no: 'Tidak',
   },
-  
+
   nav: {
     home: 'Beranda',
     budget: 'Budget',
@@ -29,7 +29,7 @@ export const id: Translations = {
     more: 'Lainnya',
     chat: 'Manajer',
   },
-  
+
   home: {
     title: 'Beranda',
     subtitle: 'Scoreboard',
@@ -42,7 +42,8 @@ export const id: Translations = {
     yearsAway: 'tahun lagi',
     reachedFI: 'Anda sudah mencapai FI!',
     notOnTrack: 'Belum menuju FI',
-    goldStaleWarning: 'Harga emas belum diperbarui 30+ hari. Tap Aset untuk update.',
+    goldStaleWarning:
+      'Harga emas belum diperbarui 30+ hari. Tap Aset untuk update.',
     savingsRate: 'Rasio tabungan',
     gapToLowTarget: 'Gap ke target rendah',
     gapToHighTarget: 'Gap ke target tinggi',
@@ -54,7 +55,7 @@ export const id: Translations = {
       pass_through: 'Pass Through',
     },
   },
-  
+
   budget: {
     title: 'Budget',
     subtitle: 'Minggu kerja ini',
@@ -70,7 +71,8 @@ export const id: Translations = {
     workdaysLeft: 'Hari Kerja Tersisa',
     daysLeft: 'Hari Tersisa',
     weekendAllocation: 'Alokasi Akhir Pekan',
-    negativePoolWarning: 'Item komitmen melebihi allowance bulan ini. Review recurring items Anda.',
+    negativePoolWarning:
+      'Item komitmen melebihi allowance bulan ini. Review recurring items Anda.',
     weekendLabel: 'Akhir Pekan',
     weekendReset: 'Alokasi akhir pekan sudah dipisahkan. Reset Senin.',
     addTransaction: 'Tambah Transaksi',
@@ -88,7 +90,8 @@ export const id: Translations = {
     billsAndSubs: 'Tagihan & langganan',
     discretionaryPool: 'Pool diskresioner',
     monthlyAllowance: 'Allowance bulanan',
-    recurringItemsEmpty: 'Belum ada item rutin. Tambahkan di Lainnya → Daftar Rutin.',
+    recurringItemsEmpty:
+      'Belum ada item rutin. Tambahkan di Lainnya → Daftar Rutin.',
     perMonthShort: '/bln',
     perYearShort: '/thn',
     intoPipePerYear: 'ke pipe',
@@ -96,11 +99,12 @@ export const id: Translations = {
     horizonMonthly: 'Bulanan',
     horizonYearly: 'Tahunan',
     noTransactions: 'Belum ada transaksi',
-    setAllowancePrompt: 'Buka Lainnya → Daftar Rutin untuk mengatur pool pribadi dan melihat batas aman harian Anda.',
+    setAllowancePrompt:
+      'Buka Lainnya → Daftar Rutin untuk mengatur pool pribadi dan melihat batas aman harian Anda.',
     spent: 'Terpakai',
     earned: 'Diterima',
   },
-  
+
   assets: {
     title: 'Aset',
     subtitle: 'Akun & aset',
@@ -114,7 +118,8 @@ export const id: Translations = {
     refreshPrices: 'Perbarui harga pasar',
     refreshing: 'Memperbarui...',
     lastRefreshed: 'Terakhir diperbarui',
-    refreshError: 'Tidak dapat mengakses API harga. Periksa koneksi dan coba lagi.',
+    refreshError:
+      'Tidak dapat mengakses API harga. Periksa koneksi dan coba lagi.',
     accountTypes: {
       bank: 'Bank',
       brokerage: 'Sekuritas',
@@ -123,7 +128,7 @@ export const id: Translations = {
       property: 'Properti',
     },
   },
-  
+
   decide: {
     title: 'Keputusan',
     subtitle: 'Keputusan & skenario',
@@ -133,7 +138,7 @@ export const id: Translations = {
     incomeLog: 'Log Pendapatan',
     milestones: 'Milestone',
   },
-  
+
   chat: {
     title: 'Manajer',
     subtitle: 'AI pelatih keuangan',
@@ -143,7 +148,7 @@ export const id: Translations = {
     thinking: 'Berpikir...',
     error: 'Gagal mengirim pesan',
   },
-  
+
   more: {
     title: 'Lainnya',
     settings: 'Pengaturan',
@@ -166,7 +171,7 @@ export const id: Translations = {
     restoreBackup: 'Pulihkan Backup',
     signOutManager: 'Keluar dari AI Manager',
   },
-  
+
   auth: {
     signIn: 'Masuk',
     signUp: 'Daftar',
@@ -185,8 +190,10 @@ export const id: Translations = {
     haveAccountSignIn: 'Sudah punya akun? Masuk',
     nameHousehold: 'Beri nama rumah tangga Anda',
     joinHousehold: 'Gabung rumah tangga',
-    signedInAsCreate: 'Masuk sebagai {email}. Rumah tangga adalah gambaran keuangan bersama yang Anda dan pasangan gunakan. Anda bisa mengundang anggota nanti.',
-    signedInAsJoin: 'Masuk sebagai {email}. Masukkan kode undangan dari admin rumah tangga Anda.',
+    signedInAsCreate:
+      'Masuk sebagai {email}. Rumah tangga adalah gambaran keuangan bersama yang Anda dan pasangan gunakan. Anda bisa mengundang anggota nanti.',
+    signedInAsJoin:
+      'Masuk sebagai {email}. Masukkan kode undangan dari admin rumah tangga Anda.',
     householdName: 'Nama rumah tangga',
     inviteCode: 'Kode undangan',
     createHousehold: 'Buat rumah tangga',
@@ -195,7 +202,7 @@ export const id: Translations = {
     startFreshCreate: 'Mulai baru? Buat rumah tangga',
     signOutButton: 'Keluar',
   },
-  
+
   onboarding: {
     welcome: 'Selamat datang di FI Dashboard',
     getStarted: 'Mulai',
@@ -208,7 +215,7 @@ export const id: Translations = {
     skip: 'Lewati',
     finish: 'Selesai',
   },
-  
+
   reconcile: {
     title: 'Rekonsiliasi',
     subtitle: 'Impor transaksi',
@@ -227,7 +234,7 @@ export const id: Translations = {
     validRows: 'baris valid',
     invalidRows: 'baris invalid',
   },
-  
+
   forms: {
     accountName: 'Nama akun',
     institution: 'Institusi',
