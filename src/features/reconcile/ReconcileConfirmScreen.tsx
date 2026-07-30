@@ -3,6 +3,7 @@ import { Badge, SectionHeader } from '@components/ui'
 import { db } from '@db/db'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
 import type { RecurringItem } from '@db/types'
+import { useI18n } from '@i18n/index'
 import { formatRp, parseRpInput } from '@lib/currency'
 import { matchRecurringItemByText } from '@lib/recurringMatch'
 import { useReconcileStore } from '@stores/reconcileStore'
@@ -12,6 +13,7 @@ import type { ValidImportRow } from '../../import/schema'
 import { exclusionGroup } from './transferExclusion'
 
 export function ReconcileConfirmScreen() {
+  const { t } = useI18n()
   const { parseResult, flaggedRows, complete, cancel, setStep } =
     useReconcileStore()
   const [busy, setBusy] = useState(false)
@@ -148,11 +150,23 @@ export function ReconcileConfirmScreen() {
     >
       {/* Stats chips */}
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        <Chip label="Import" value={regular.length} color="var(--engine)" />
-        <Chip label="Transfers" value={transfers.length} color="var(--store)" />
-        <Chip label="Dupes" value={duplicates.length} color="var(--ink-3)" />
         <Chip
-          label="Invalid"
+          label={t.reconcile.import}
+          value={regular.length}
+          color="var(--engine)"
+        />
+        <Chip
+          label={t.reconcile.transfers}
+          value={transfers.length}
+          color="var(--store)"
+        />
+        <Chip
+          label={t.reconcile.duplicates}
+          value={duplicates.length}
+          color="var(--ink-3)"
+        />
+        <Chip
+          label={t.reconcile.invalid}
           value={invalid.length}
           color={invalid.length > 0 ? 'var(--amber-text)' : 'var(--ink-3)'}
         />
@@ -161,7 +175,12 @@ export function ReconcileConfirmScreen() {
       {/* Regular transactions */}
       {regular.length > 0 && (
         <section>
-          <SectionHeader>Transactions ({regular.length})</SectionHeader>
+          <SectionHeader>
+            {t.reconcile.transactionsCount.replace(
+              '{count}',
+              String(regular.length),
+            )}
+          </SectionHeader>
           <div
             style={{
               display: 'flex',
@@ -195,7 +214,10 @@ export function ReconcileConfirmScreen() {
       {transfers.length > 0 && (
         <section>
           <SectionHeader>
-            Auto-collapsed transfers ({transfers.length})
+            {t.reconcile.autoCollapsedTransfers.replace(
+              '{count}',
+              String(transfers.length),
+            )}
           </SectionHeader>
           <div
             style={{
@@ -225,8 +247,8 @@ export function ReconcileConfirmScreen() {
                   onClick={() => toggleExcluded(row._row_index)}
                   aria-label={
                     excluded.has(row._row_index)
-                      ? 'Include this row'
-                      : 'Exclude this row'
+                      ? t.reconcile.includeRow
+                      : t.reconcile.excludeRow
                   }
                   aria-pressed={excluded.has(row._row_index)}
                   style={excludeToggleStyle(excluded.has(row._row_index))}
@@ -249,7 +271,7 @@ export function ReconcileConfirmScreen() {
                       marginTop: 2,
                     }}
                   >
-                    {row.date} · Transfer
+                    {row.date} · {t.reconcile.transferSingular}
                   </div>
                 </div>
                 <span
@@ -272,8 +294,13 @@ export function ReconcileConfirmScreen() {
           button copy below (S2 fix). */}
       {invalid.length > 0 && (
         <section>
-          <SectionHeader trailing={<Badge tone="warning">Skipped</Badge>}>
-            Invalid rows ({invalid.length})
+          <SectionHeader
+            trailing={<Badge tone="warning">{t.reconcile.skipped}</Badge>}
+          >
+            {t.reconcile.invalidRowsCount.replace(
+              '{count}',
+              String(invalid.length),
+            )}
           </SectionHeader>
           <div style={{ marginTop: 'var(--space-2)' }}>
             {invalid.map((row) => (
@@ -285,7 +312,10 @@ export function ReconcileConfirmScreen() {
                   padding: 'var(--space-1) 0',
                 }}
               >
-                Row {row._row_index + 1}:{' '}
+                {t.reconcile.rowLabel.replace(
+                  '{number}',
+                  String(row._row_index + 1),
+                )}{' '}
                 {row.errors.map((e) => e.message).join(', ')}
               </div>
             ))}
@@ -309,7 +339,7 @@ export function ReconcileConfirmScreen() {
             fontFamily: 'var(--font-ui)',
           }}
         >
-          Cancel
+          {t.common.cancel}
         </button>
         <button
           type="button"
@@ -330,10 +360,16 @@ export function ReconcileConfirmScreen() {
           }}
         >
           {busy
-            ? 'Saving…'
+            ? t.reconcile.importing
             : skippedCount > 0
-              ? `Approve ${willImportCount} of ${totalParsedRows} — ${skippedCount} skipped`
-              : `Approve all (${willImportCount})`}
+              ? t.reconcile.approvePartial
+                  .replace('{count}', String(willImportCount))
+                  .replace('{total}', String(totalParsedRows))
+                  .replace('{skipped}', String(skippedCount))
+              : t.reconcile.approveAllCount.replace(
+                  '{count}',
+                  String(willImportCount),
+                )}
         </button>
       </div>
     </div>
@@ -415,6 +451,7 @@ function ReconcileRow({
   recurringDismissed: boolean
   onToggleRecurring: () => void
 }) {
+  const { t } = useI18n()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -435,7 +472,9 @@ function ReconcileRow({
       <button
         type="button"
         onClick={onToggleExcluded}
-        aria-label={excludedFlag ? 'Include this row' : 'Exclude this row'}
+        aria-label={
+          excludedFlag ? t.reconcile.includeRow : t.reconcile.excludeRow
+        }
         aria-pressed={excludedFlag}
         style={excludeToggleStyle(excludedFlag)}
       >
@@ -473,13 +512,25 @@ function ReconcileRow({
               aria-pressed={!recurringDismissed}
               aria-label={
                 recurringDismissed
-                  ? `Not tagged as ${suggestedRecurring.name} — tap to tag`
-                  : `Tagged as recurring: ${suggestedRecurring.name} — tap to untag`
+                  ? t.reconcile.recurringNotTagged.replace(
+                      '{name}',
+                      suggestedRecurring.name,
+                    )
+                  : t.reconcile.recurringTagged.replace(
+                      '{name}',
+                      suggestedRecurring.name,
+                    )
               }
               title={
                 recurringDismissed
-                  ? `Looks like ${suggestedRecurring.name} — tap to tag as recurring`
-                  : `Tagged as ${suggestedRecurring.name} — excluded from safe-to-spend. Tap to untag.`
+                  ? t.reconcile.recurringSuggestTitle.replace(
+                      '{name}',
+                      suggestedRecurring.name,
+                    )
+                  : t.reconcile.recurringTaggedTitle.replace(
+                      '{name}',
+                      suggestedRecurring.name,
+                    )
               }
               style={{
                 flexShrink: 0,

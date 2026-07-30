@@ -33,7 +33,7 @@ function AppShell() {
   const { activeTab } = useAppStore()
   const { isInProgress, step } = useReconcileStore()
   const { ready, markDone } = useSetupComplete()
-  const { init: initI18n } = useI18n()
+  const { t, init: initI18n } = useI18n()
 
   // Initialize i18n, seed demo transactions once, and silent daily market-price refresh
   useEffect(() => {
@@ -58,7 +58,7 @@ function AppShell() {
         <div
           style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
         >
-          <AppBar title="Reconcile" />
+          <AppBar title={t.reconcile.title} />
           <main style={{ flex: 1, overflowY: 'auto' }}>
             <ReconcileConfirmScreen />
           </main>
@@ -68,7 +68,7 @@ function AppShell() {
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <AppBar title="Reconcile" />
+        <AppBar title={t.reconcile.title} />
         <main style={{ flex: 1, overflowY: 'auto' }}>
           <ReconcileEntryScreen />
         </main>
@@ -79,12 +79,12 @@ function AppShell() {
 
   // Slim AppBar (PAIN-POINTS.md D9): title only, no subtitle line.
   const SCREENS = {
-    today: { title: 'Today', component: <TodayScreen /> },
-    budget: { title: 'Budget', component: <BudgetScreen /> },
-    chat: { title: 'Manager', component: <ChatScreen /> },
-    assets: { title: 'Assets', component: <AssetsScreen /> },
-    report: { title: 'Report', component: <ReportScreen /> },
-    more: { title: 'More', component: <MoreScreen /> },
+    today: { title: t.nav.today, component: <TodayScreen /> },
+    budget: { title: t.nav.budget, component: <BudgetScreen /> },
+    chat: { title: t.nav.chat, component: <ChatScreen /> },
+    assets: { title: t.nav.assets, component: <AssetsScreen /> },
+    report: { title: t.nav.report, component: <ReportScreen /> },
+    more: { title: t.nav.more, component: <MoreScreen /> },
   }
 
   const screen = SCREENS[activeTab]

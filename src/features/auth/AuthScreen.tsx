@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { Btn, Field, Input } from '@components/FormField'
+import { useI18n } from '@i18n/index'
 import { useAuthStore } from '@stores/authStore'
-import { Field, Input, Btn } from '@components/FormField'
+import { useState } from 'react'
 
 // Rendered when status is 'signed_out' (auth form) or 'no_household' (household setup).
 export function AuthScreen() {
@@ -27,6 +28,7 @@ export function AuthScreen() {
 }
 
 function SignInUp() {
+  const { t } = useI18n()
   const { signIn, signUp, error, notice } = useAuthStore()
   const [mode, setMode] = useState<'in' | 'up'>('in')
   const [email, setEmail] = useState('')
@@ -46,21 +48,33 @@ function SignInUp() {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.4px', margin: 0 }}>
+        <h1
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            color: 'var(--ink-1)',
+            letterSpacing: '-.4px',
+            margin: 0,
+          }}
+        >
           FI Dashboard
         </h1>
         <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 6 }}>
-          {mode === 'in' ? 'Sign in to your household.' : 'Create an account to get started.'}
+          {mode === 'in' ? t.auth.signInSubtitle : t.auth.signUpSubtitle}
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {mode === 'up' && (
-          <Field label="Display name (optional)">
-            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. Yuki" />
+          <Field label={t.auth.displayNameOptional}>
+            <Input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={`${t.forms.egPrefix}Yuki`}
+            />
           </Field>
         )}
-        <Field label="Email">
+        <Field label={t.auth.email}>
           <Input
             type="email"
             inputMode="email"
@@ -70,21 +84,31 @@ function SignInUp() {
             placeholder="you@example.com"
           />
         </Field>
-        <Field label="Password">
+        <Field label={t.auth.password}>
           <Input
             type="password"
             autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 6 characters"
+            placeholder={t.auth.passwordMin}
           />
         </Field>
 
-        {error && <div role="alert" style={{ fontSize: 12, color: '#ef4444' }}>{error}</div>}
-        {notice && <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>{notice}</div>}
+        {error && (
+          <div role="alert" style={{ fontSize: 12, color: '#ef4444' }}>
+            {error}
+          </div>
+        )}
+        {notice && (
+          <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>{notice}</div>
+        )}
 
         <Btn fullWidth disabled={!canSubmit} onClick={submit}>
-          {busy ? 'Working…' : mode === 'in' ? 'Sign in' : 'Create account'}
+          {busy
+            ? t.common.working
+            : mode === 'in'
+              ? t.auth.signInButton
+              : t.auth.signUpButton}
         </Btn>
 
         <button
@@ -100,7 +124,7 @@ function SignInUp() {
             padding: 8,
           }}
         >
-          {mode === 'in' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+          {mode === 'in' ? t.auth.noAccountSignUp : t.auth.haveAccountSignIn}
         </button>
       </div>
     </>
@@ -108,7 +132,9 @@ function SignInUp() {
 }
 
 function HouseholdSetup() {
-  const { createHousehold, joinHousehold, signOut, error, user } = useAuthStore()
+  const { t } = useI18n()
+  const { createHousehold, joinHousehold, signOut, error, user } =
+    useAuthStore()
   const [mode, setMode] = useState<'create' | 'join'>('create')
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
@@ -124,35 +150,69 @@ function HouseholdSetup() {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-1)', letterSpacing: '-.4px', margin: 0 }}>
-          {mode === 'create' ? 'Name your household' : 'Join a household'}
+        <h1
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            color: 'var(--ink-1)',
+            letterSpacing: '-.4px',
+            margin: 0,
+          }}
+        >
+          {mode === 'create' ? t.auth.nameHousehold : t.auth.joinHousehold}
         </h1>
-        <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.5 }}>
+        <div
+          style={{
+            fontSize: 13,
+            color: 'var(--ink-2)',
+            marginTop: 8,
+            lineHeight: 1.5,
+          }}
+        >
           {mode === 'create'
-            ? `Signed in as ${user?.email}. Your household is the shared financial picture you and your partner will use. You can invite members later.`
-            : `Signed in as ${user?.email}. Enter the invite code your household admin shared with you.`}
+            ? t.auth.signedInAsCreate.replace('{email}', user?.email ?? '')
+            : t.auth.signedInAsJoin.replace('{email}', user?.email ?? '')}
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {mode === 'create' ? (
-          <Field label="Household name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kanzaki Household" />
+          <Field label={t.auth.householdName}>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={`${t.forms.egPrefix}Kanzaki Household`}
+            />
           </Field>
         ) : (
-          <Field label="Invite code">
+          <Field label={t.auth.inviteCode}>
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="e.g. 3F9A21BC"
+              placeholder={`${t.forms.egPrefix}3F9A21BC`}
               autoComplete="off"
               style={{ textTransform: 'uppercase', letterSpacing: '2px' }}
             />
           </Field>
         )}
-        {error && <div role="alert" style={{ fontSize: 12, color: 'var(--amber-text)' }}>{error}</div>}
-        <Btn fullWidth disabled={busy || (mode === 'join' && code.trim().length < 6)} onClick={submit}>
-          {busy ? 'Working…' : mode === 'create' ? 'Create household' : 'Join household'}
+        {error && (
+          <div
+            role="alert"
+            style={{ fontSize: 12, color: 'var(--amber-text)' }}
+          >
+            {error}
+          </div>
+        )}
+        <Btn
+          fullWidth
+          disabled={busy || (mode === 'join' && code.trim().length < 6)}
+          onClick={submit}
+        >
+          {busy
+            ? t.common.working
+            : mode === 'create'
+              ? t.auth.createHousehold
+              : t.auth.joinHouseholdButton}
         </Btn>
         <button
           type="button"
@@ -167,7 +227,7 @@ function HouseholdSetup() {
             padding: 8,
           }}
         >
-          {mode === 'create' ? 'Have an invite code? Join a household' : 'Start fresh? Create a household'}
+          {mode === 'create' ? t.auth.haveInviteJoin : t.auth.startFreshCreate}
         </button>
         <button
           type="button"
@@ -182,7 +242,7 @@ function HouseholdSetup() {
             padding: 8,
           }}
         >
-          Sign out
+          {t.auth.signOutButton}
         </button>
       </div>
     </>

@@ -10,6 +10,7 @@ import {
 } from '@components/ui'
 import { db } from '@db/db'
 import type { Account, Asset } from '@db/types'
+import { useI18n } from '@i18n/index'
 import { formatRp } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { refreshAssetPrices } from '@lib/marketPrices'
@@ -20,6 +21,7 @@ import { AccountForm } from './AccountForm'
 import { AssetForm } from './AssetForm'
 
 export function AssetsScreen() {
+  const { t } = useI18n()
   const accounts = useLiveQuery(() =>
     db.accounts.filter((a) => a.is_active).toArray(),
   )
@@ -45,9 +47,7 @@ export function AssetsScreen() {
     try {
       await refreshAssetPrices(true)
     } catch {
-      setRefreshError(
-        'Could not reach the price APIs. Check your connection and try again.',
-      )
+      setRefreshError(t.assets.refreshError)
     }
     setRefreshing(false)
   }
@@ -74,7 +74,7 @@ export function AssetsScreen() {
       {/* Total balance — the screen's one hero number (Calm Ledger v2 §2). */}
       <Card>
         <StatTile
-          label="Total balance"
+          label={t.assets.totalBalance}
           size="display"
           value={
             accountBalances ? <Amount value={accountBalances.total} /> : '—'
@@ -97,15 +97,15 @@ export function AssetsScreen() {
             alignItems: 'center',
           }}
         >
-          <SectionHeader>Accounts ({accounts?.length ?? 0})</SectionHeader>
+          <SectionHeader>
+            {t.assets.accountsCount} ({accounts?.length ?? 0})
+          </SectionHeader>
           <button type="button" onClick={openAddAccount} style={addBtnStyle}>
-            + Add
+            + {t.common.add}
           </button>
         </div>
         {accounts?.length === 0 && (
-          <div style={emptyStyle}>
-            No accounts yet. Add your main spending account.
-          </div>
+          <div style={emptyStyle}>{t.assets.noAccounts}</div>
         )}
         <div>
           {accounts?.map((acc) => (
@@ -118,7 +118,8 @@ export function AssetsScreen() {
                   style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
                 >
                   <span>
-                    {acc.institution} · {acc.account_type.replace('_', ' ')}
+                    {acc.institution} ·{' '}
+                    {t.assets.accountTypes[acc.account_type]}
                   </span>
                   <LanePill lane={acc.lane} size="xs" />
                 </span>
@@ -184,9 +185,11 @@ export function AssetsScreen() {
             alignItems: 'center',
           }}
         >
-          <SectionHeader>Assets ({assets?.length ?? 0})</SectionHeader>
+          <SectionHeader>
+            {t.assets.assetsCount} ({assets?.length ?? 0})
+          </SectionHeader>
           <button type="button" onClick={openAddAsset} style={addBtnStyle}>
-            + Add
+            + {t.common.add}
           </button>
         </div>
         {hasAutoAssets && (
@@ -201,8 +204,14 @@ export function AssetsScreen() {
               style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}
             >
               {lastRefreshed
-                ? `Prices refreshed ${new Date(lastRefreshed.value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}`
-                : 'Prices not fetched yet'}
+                ? t.assets.pricesRefreshedAt.replace(
+                    '{date}',
+                    new Date(lastRefreshed.value).toLocaleString('id-ID', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    }),
+                  )
+                : t.assets.pricesNotFetched}
             </div>
             <button
               type="button"
@@ -210,7 +219,7 @@ export function AssetsScreen() {
               disabled={refreshing}
               style={{ ...refreshBtnStyle, opacity: refreshing ? 0.6 : 1 }}
             >
-              {refreshing ? 'Refreshing…' : '↻ Refresh prices'}
+              {refreshing ? t.assets.refreshing : `↻ ${t.assets.refreshPrices}`}
             </button>
           </div>
         )}
@@ -223,9 +232,7 @@ export function AssetsScreen() {
           </div>
         )}
         {assets?.length === 0 && (
-          <div style={emptyStyle}>
-            No assets yet. Add your investments, gold, DPLK.
-          </div>
+          <div style={emptyStyle}>{t.assets.noAssetsHint}</div>
         )}
         <div>
           {assets?.map((asset) => {
@@ -247,7 +254,7 @@ export function AssetsScreen() {
                     style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
                   >
                     <span>
-                      {asset.asset_type.replace(/_/g, ' ')}
+                      {t.assets.assetTypes[asset.asset_type]}
                       {asset.quantity_grams
                         ? ` · ${asset.quantity_grams}g`
                         : ''}
@@ -264,9 +271,11 @@ export function AssetsScreen() {
                     >
                       <LanePill lane={asset.lane} size="xs" />
                       {asset.auto_price !== null && (
-                        <Badge tone="positive">Auto</Badge>
+                        <Badge tone="positive">{t.assets.autoBadge}</Badge>
                       )}
-                      {stale && <Badge tone="warning">Price stale</Badge>}
+                      {stale && (
+                        <Badge tone="warning">{t.assets.priceStale}</Badge>
+                      )}
                     </span>
                   </span>
                 }

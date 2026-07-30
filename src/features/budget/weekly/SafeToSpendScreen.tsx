@@ -1,16 +1,18 @@
 import { Card, Screen } from '@components/ui'
+import { useI18n } from '@i18n/index'
 import { useSafeToSpend } from '../../../hooks/useSafeToSpend'
 import { GaugeCard } from './GaugeCard'
 import { Waterfall } from './Waterfall'
 
 export function SafeToSpendScreen() {
   const { result, isLoading } = useSafeToSpend()
+  const { t } = useI18n()
 
   if (isLoading) {
     return (
       <Screen>
         <div style={{ color: 'var(--ink-3)', fontSize: 'var(--text-body)' }}>
-          Loading…
+          {t.common.loading}
         </div>
       </Screen>
     )
@@ -29,7 +31,7 @@ export function SafeToSpendScreen() {
               marginBottom: 'var(--space-2)',
             }}
           >
-            Set your monthly allowance
+            {t.budget.setAllowanceTitle}
           </div>
           <div
             style={{
@@ -42,8 +44,7 @@ export function SafeToSpendScreen() {
                 allowance.monthly_amount) is set in More → Allowance, not
                 Recurring Register — pointing users there left the gauge
                 empty. */}
-            Go to More → Allowance to configure your personal pool and see your
-            daily safe-to-spend ceiling.
+            {t.budget.setAllowancePrompt}
           </div>
         </Card>
       </Screen>

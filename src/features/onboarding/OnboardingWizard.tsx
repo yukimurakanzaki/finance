@@ -7,6 +7,7 @@ import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { settingsRepo } from '@db/repositories/settings.repo'
 import type { AccountType, AssetType, Lane, RecurringKind } from '@db/types'
+import { useI18n } from '@i18n/index'
 import { parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useEffect, useRef, useState } from 'react'
@@ -52,6 +53,7 @@ const DEFAULT_DRAFT: DraftState = {
 }
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+  const { t } = useI18n()
   const [loaded, setLoaded] = useState(false)
   const [mode, setMode] = useState<Mode>('choose')
   const [step, setStep] = useState(1)
@@ -153,10 +155,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       if (n === null) invalid.push(label)
       return n
     }
-    const openingBalance = money('Current balance', startingBalance)
+    const openingBalance = money(t.forms.currentBalanceLabel, startingBalance)
     if (invalid.length > 0) {
       setFinishError(
-        `Check these amounts — digits with optional thousand separators (e.g. 12.500.000): ${invalid.join(', ')}`,
+        t.forms.checkAmountsError.replace('{items}', invalid.join(', ')),
       )
       return { ok: false }
     }
@@ -223,18 +225,20 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       if (n === null) invalid.push(label)
       return n
     }
-    const grossN = money('Gross salary', gross)
-    const takeHomeN = money('Take-home net', takeHome)
+    const grossN = money(t.forms.grossSalaryLabel, gross)
+    const takeHomeN = money(t.budget.takeHomeNet, takeHome)
     const pipeNs = pipes.map((p, i) =>
-      p.name && p.amount ? money(`Pipe ${i + 1}`, p.amount) : null,
+      p.name && p.amount
+        ? money(t.forms.pipeLabel.replace('{n}', String(i + 1)), p.amount)
+        : null,
     )
     const dplkN = money('DPLK', dplk)
-    const monthlyN = money('Monthly pool', monthly)
-    const weekendN = money('Weekend allocation', weekend)
-    const openingBalance = money('Current balance', startingBalance)
+    const monthlyN = money(t.forms.monthlyPoolLabel, monthly)
+    const weekendN = money(t.budget.weekendAllocation, weekend)
+    const openingBalance = money(t.forms.currentBalanceLabel, startingBalance)
     if (invalid.length > 0) {
       setFinishError(
-        `Check these amounts — digits with optional thousand separators (e.g. 12.500.000): ${invalid.join(', ')}`,
+        t.forms.checkAmountsError.replace('{items}', invalid.join(', ')),
       )
       return
     }
@@ -353,8 +357,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         {mode === 'choose' && (
           <>
             <StepHeader
-              title="Welcome"
-              sub="Two ways to get started — you can always fill in the rest later from More."
+              title={t.onboarding.chooseTitle}
+              sub={t.onboarding.chooseSub}
             />
             <div
               style={{
@@ -364,14 +368,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               }}
             >
               <ChoiceCard
-                title="Quick setup"
-                badge="FASTEST"
-                description="Just your name and first account. Log spending right away — add income, pay-yourself-first, and your allowance later."
+                title={t.onboarding.quickSetupTitle}
+                badge={t.onboarding.quickSetupBadge}
+                description={t.onboarding.quickSetupDesc}
                 onClick={() => setMode('quick')}
               />
               <ChoiceCard
-                title="Full setup"
-                description="Set up take-home income, pay-yourself-first pipes, DPLK, and your personal allowance now, plus your first account."
+                title={t.onboarding.fullSetupTitle}
+                description={t.onboarding.fullSetupDesc}
                 onClick={() => {
                   setMode('full')
                   setStep(1)
@@ -384,8 +388,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         {mode === 'quick' && (
           <>
             <StepHeader
-              title="First account"
-              sub="Add an account so you can start logging transactions. Everything else can wait."
+              title={t.onboarding.firstAccountTitle}
+              sub={t.onboarding.firstAccountSubQuick}
             />
             <div
               style={{
@@ -394,40 +398,40 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 gap: 'var(--space-3)',
               }}
             >
-              <Field label="Account name *">
+              <Field label={`${t.forms.accountName} *`}>
                 <Input
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
-                  placeholder="e.g. BCA Tabungan"
+                  placeholder={`${t.forms.egPrefix}BCA Tabungan`}
                 />
               </Field>
-              <Field label="Institution">
+              <Field label={t.forms.institution}>
                 <Input
                   value={accountInstitution}
                   onChange={(e) => setAccountInstitution(e.target.value)}
-                  placeholder="e.g. BCA"
+                  placeholder={`${t.forms.egPrefix}BCA`}
                 />
               </Field>
-              <Field label="Type">
+              <Field label={t.forms.accountType}>
                 <Select
                   value={accountType}
                   onChange={(e) =>
                     setAccountType(e.target.value as AccountType)
                   }
                 >
-                  <option value="bank">Bank account</option>
+                  <option value="bank">{t.onboarding.bankAccountOption}</option>
                   <option value="digital_wallet">
-                    Digital wallet (GoPay, OVO…)
+                    {t.onboarding.digitalWalletOption}
                   </option>
-                  <option value="cash">Cash</option>
+                  <option value="cash">{t.onboarding.cashOption}</option>
                 </Select>
               </Field>
-              <Field label="Current balance (Rp)">
+              <Field label={t.onboarding.currentBalanceRp}>
                 <Input
                   type="text"
                   inputMode="numeric"
                   mono
-                  placeholder="e.g. 3.500.000"
+                  placeholder={`${t.forms.egPrefix}3.500.000`}
                   value={startingBalance}
                   onChange={(e) => setStartingBalance(e.target.value)}
                 />
@@ -439,8 +443,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   lineHeight: 1.6,
                 }}
               >
-                Optional. What's in this account right now, so balances start
-                correct. You can adjust it later.
+                {t.onboarding.balanceOptionalNote}
               </div>
               <div
                 style={{
@@ -449,8 +452,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   lineHeight: 1.6,
                 }}
               >
-                You can add income, pipes, and your personal allowance any time
-                from More → Income / Allowance.
+                {t.onboarding.addLaterNote}
               </div>
             </div>
           </>
@@ -461,8 +463,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             <StepHeader
               step={1}
               total={4}
-              title="Your take-home income"
-              sub="The starting point of your financial model. Savings will flow from here first."
+              title={t.onboarding.incomeTitle}
+              sub={t.onboarding.incomeSub}
             />
             <div
               style={{
@@ -471,21 +473,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 gap: 'var(--space-3)',
               }}
             >
-              <Field label="Gross salary (monthly)">
+              <Field label={t.onboarding.grossSalaryMonthly}>
                 <Input
                   type="text"
                   inputMode="numeric"
-                  placeholder="e.g. 15.000.000"
+                  placeholder={`${t.forms.egPrefix}15.000.000`}
                   value={gross}
                   onChange={(e) => setGross(e.target.value)}
                   mono
                 />
               </Field>
-              <Field label="Take-home net (monthly) *">
+              <Field label={t.onboarding.takeHomeNetMonthlyRequired}>
                 <Input
                   type="text"
                   inputMode="numeric"
-                  placeholder="e.g. 12.500.000"
+                  placeholder={`${t.forms.egPrefix}12.500.000`}
                   value={takeHome}
                   onChange={(e) => setTakeHome(e.target.value)}
                   mono
@@ -498,8 +500,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   lineHeight: 1.6,
                 }}
               >
-                Take-home is what actually lands in your bank account after tax
-                and BPJS. This drives your savings rate.
+                {t.onboarding.takeHomeExplainer}
               </div>
               <button
                 type="button"
@@ -516,7 +517,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   alignSelf: 'flex-start',
                 }}
               >
-                ‹ Change setup type
+                {t.onboarding.changeSetupType}
               </button>
             </div>
           </>
@@ -527,8 +528,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             <StepHeader
               step={2}
               total={4}
-              title="Pipe & DPLK"
-              sub="Pay yourself first — these leave your account before you see the rest."
+              title={t.onboarding.pipeDplkTitle}
+              sub={t.onboarding.pipeDplkSub}
             />
             <div
               style={{
@@ -547,7 +548,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     alignItems: 'flex-end',
                   }}
                 >
-                  <Field label={`Pipe ${i + 1} name`}>
+                  <Field
+                    label={t.onboarding.pipeNameLabel.replace(
+                      '{n}',
+                      String(i + 1),
+                    )}
+                  >
                     <Input
                       value={p.name}
                       onChange={(e) =>
@@ -557,10 +563,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                           ),
                         )
                       }
-                      placeholder="e.g. RDPU Reksa Dana"
+                      placeholder={`${t.forms.egPrefix}RDPU Reksa Dana`}
                     />
                   </Field>
-                  <Field label="Monthly (Rp)">
+                  <Field label={t.onboarding.monthlyRp}>
                     <Input
                       type="text"
                       inputMode="numeric"
@@ -593,16 +599,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   padding: 'var(--space-2) 0',
                 }}
               >
-                + Add pipe
+                {t.onboarding.addPipe}
               </button>
-              <Field label="DPLK (monthly, optional)">
+              <Field label={t.onboarding.dplkMonthlyOptional}>
                 <Input
                   type="text"
                   inputMode="numeric"
                   mono
                   value={dplk}
                   onChange={(e) => setDplk(e.target.value)}
-                  placeholder="e.g. 500.000"
+                  placeholder={`${t.forms.egPrefix}500.000`}
                 />
               </Field>
               <div
@@ -612,8 +618,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   lineHeight: 1.6,
                 }}
               >
-                Principle 6: savings is never the leftover. Pipe goes out first,
-                then you live on what's left.
+                {t.onboarding.principle6}
               </div>
             </div>
           </>
@@ -624,8 +629,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             <StepHeader
               step={3}
               total={4}
-              title="Personal allowance"
-              sub="What you have left for discretionary spending after pipes and bills."
+              title={t.onboarding.allowanceTitle}
+              sub={t.onboarding.allowanceSub}
             />
             <div
               style={{
@@ -634,22 +639,22 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 gap: 'var(--space-3)',
               }}
             >
-              <Field label="Monthly personal pool (Rp) *">
+              <Field label={t.onboarding.monthlyPersonalPoolRequired}>
                 <Input
                   type="text"
                   inputMode="numeric"
                   mono
-                  placeholder="e.g. 2.500.000"
+                  placeholder={`${t.forms.egPrefix}2.500.000`}
                   value={monthly}
                   onChange={(e) => setMonthly(e.target.value)}
                 />
               </Field>
-              <Field label="Weekend allocation (Rp, monthly)">
+              <Field label={t.onboarding.weekendAllocationMonthly}>
                 <Input
                   type="text"
                   inputMode="numeric"
                   mono
-                  placeholder="e.g. 800.000"
+                  placeholder={`${t.forms.egPrefix}800.000`}
                   value={weekend}
                   onChange={(e) => setWeekend(e.target.value)}
                 />
@@ -661,9 +666,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   lineHeight: 1.6,
                 }}
               >
-                Weekend spend is carved out first, so your workweek ceiling is
-                honest. The safe-to-spend gauge divides what's left by remaining
-                workdays.
+                {t.onboarding.weekendExplainer}
               </div>
             </div>
           </>
@@ -674,8 +677,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             <StepHeader
               step={4}
               total={4}
-              title="First account"
-              sub="Add your main spending account to start tracking transactions."
+              title={t.onboarding.firstAccountTitle}
+              sub={t.onboarding.firstAccountSubFull}
             />
             <div
               style={{
@@ -684,40 +687,40 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 gap: 'var(--space-3)',
               }}
             >
-              <Field label="Account name *">
+              <Field label={`${t.forms.accountName} *`}>
                 <Input
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
-                  placeholder="e.g. BCA Tabungan"
+                  placeholder={`${t.forms.egPrefix}BCA Tabungan`}
                 />
               </Field>
-              <Field label="Institution">
+              <Field label={t.forms.institution}>
                 <Input
                   value={accountInstitution}
                   onChange={(e) => setAccountInstitution(e.target.value)}
-                  placeholder="e.g. BCA"
+                  placeholder={`${t.forms.egPrefix}BCA`}
                 />
               </Field>
-              <Field label="Type">
+              <Field label={t.forms.accountType}>
                 <Select
                   value={accountType}
                   onChange={(e) =>
                     setAccountType(e.target.value as AccountType)
                   }
                 >
-                  <option value="bank">Bank account</option>
+                  <option value="bank">{t.onboarding.bankAccountOption}</option>
                   <option value="digital_wallet">
-                    Digital wallet (GoPay, OVO…)
+                    {t.onboarding.digitalWalletOption}
                   </option>
-                  <option value="cash">Cash</option>
+                  <option value="cash">{t.onboarding.cashOption}</option>
                 </Select>
               </Field>
-              <Field label="Current balance (Rp)">
+              <Field label={t.onboarding.currentBalanceRp}>
                 <Input
                   type="text"
                   inputMode="numeric"
                   mono
-                  placeholder="e.g. 3.500.000"
+                  placeholder={`${t.forms.egPrefix}3.500.000`}
                   value={startingBalance}
                   onChange={(e) => setStartingBalance(e.target.value)}
                 />
@@ -729,8 +732,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   lineHeight: 1.6,
                 }}
               >
-                Optional. What's in this account right now, so balances start
-                correct. You can adjust it later.
+                {t.onboarding.balanceOptionalNote}
               </div>
             </div>
           </>
@@ -764,7 +766,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 style={{ flex: 1 }}
                 onClick={() => setStep((s) => s - 1)}
               >
-                Back
+                {t.common.back}
               </Btn>
             )}
             {mode === 'full' && step < 4 && (
@@ -773,12 +775,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 onClick={() => setStep((s) => s + 1)}
                 disabled={(step === 1 && !takeHome) || (step === 3 && !monthly)}
               >
-                Continue
+                {t.onboarding.continueButton}
               </Btn>
             )}
             {mode === 'full' && step === 4 && (
               <Btn style={{ flex: 2 }} onClick={handleFinish} disabled={saving}>
-                {saving ? 'Saving…' : 'Finish setup'}
+                {saving ? t.reconcile.importing : t.onboarding.finishSetup}
               </Btn>
             )}
             {mode === 'quick' && (
@@ -787,7 +789,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 onClick={handleQuickFinish}
                 disabled={saving || !accountName.trim()}
               >
-                {saving ? 'Saving…' : 'Finish quick setup'}
+                {saving ? t.reconcile.importing : t.onboarding.finishQuickSetup}
               </Btn>
             )}
           </div>
@@ -803,6 +805,7 @@ function StepHeader({
   title,
   sub,
 }: { step?: number; total?: number; title: string; sub: string }) {
+  const { t } = useI18n()
   return (
     <div>
       {step !== undefined && total !== undefined && (
@@ -815,7 +818,9 @@ function StepHeader({
             marginBottom: 'var(--space-2)',
           }}
         >
-          Step {step} of {total}
+          {t.onboarding.stepOfTotal
+            .replace('{step}', String(step))
+            .replace('{total}', String(total))}
         </div>
       )}
       <div
