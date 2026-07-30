@@ -1,3 +1,4 @@
+import { BottomSheet } from '@components/BottomSheet'
 import {
   Amount,
   Card,
@@ -9,7 +10,9 @@ import {
 } from '@components/ui'
 import { db } from '@db/db'
 import type { Transaction } from '@db/types'
-import { todayISO } from '@lib/dates'
+import { isWeekDraw } from '@engine/safeToSpend'
+import { SpendingLens } from '@features/decide/SpendingLens'
+import { isoWeekEnd, isoWeekStart, todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
 import { useAccountBalances } from '../../hooks/useAccountBalances'
@@ -18,7 +21,14 @@ import { useSafeToSpend } from '../../hooks/useSafeToSpend'
 import { SpeedDialFAB } from './SpeedDialFAB'
 import { TransactionForm } from './TransactionForm'
 
-type Scope = 'today' | 'week' | 'month' | 'all'
+type Scope = 'day' | 'week' | 'month' | 'all'
+
+const SCOPES: { id: Scope; label: string }[] = [
+  { id: 'day', label: 'Day' },
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Month' },
+  { id: 'all', label: 'All' },
+]
 
 function shiftDay(iso: string, delta: number): string {
   const d = new Date(`${iso}T12:00:00`)
@@ -36,66 +46,67 @@ function dayLabel(iso: string): string {
   })
 }
 
-function monthBounds(day: string) {
-  const start = `${day.slice(0, 7)}-01`
-  const [y, m] = start.split('-').map(Number) as [number, number]
-  const end = `${start.slice(0, 8)}${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
-  return { start, end }
-}
-
-function weekBounds(day: string) {
-  const d = new Date(`${day}T12:00:00`)
-  const dow = (d.getDay() + 6) % 7
-  const start = new Date(d)
-  start.setDate(d.getDate() - dow)
-  const end = new Date(start)
-  end.setDate(start.getDate() + 6)
-  const toISO = (x: Date) => {
-    const m = String(x.getMonth() + 1).padStart(2, '0')
-    return `${x.getFullYear()}-${m}-${String(x.getDate()).padStart(2, '0')}`
+// Bounds for the period-scope control (PHASE-3-HANDOFF.md §2.3). 'all' has no
+// bound. 'day'/'week'/'month' are all anchored to the day nav's current `day`,
+// not to the device's real "today" — browsing to a past day and picking
+// "Week"/"Month" shows that day's week/month, matching the day nav's own frame.
+function scopeBounds(
+  scope: Scope,
+  day: string,
+): { from: string; to: string } | null {
+  if (scope === 'day') return { from: day, to: day }
+  if (scope === 'week') {
+    const d = new Date(`${day}T12:00:00`)
+    return { from: isoWeekStart(d), to: isoWeekEnd(d) }
   }
-  return { start: toISO(start), end: toISO(end) }
-}
-
-function boundsFor(scope: Scope, day: string) {
-  if (scope === 'today') return { start: day, end: day }
-  if (scope === 'week') return weekBounds(day)
-  if (scope === 'month') return monthBounds(day)
+  if (scope === 'month') {
+    const [y, m] = day.split('-').map(Number) as [number, number]
+    const lastDay = new Date(y, m, 0).getDate()
+    return {
+      from: `${day.slice(0, 7)}-01`,
+      to: `${day.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`,
+    }
+  }
   return null
-}
-
-function scopeLabel(scope: Scope) {
-  if (scope === 'today') return 'Today'
-  if (scope === 'week') return 'Week'
-  if (scope === 'month') return 'Month'
-  return 'All'
 }
 
 export function TodayScreen() {
   const [day, setDay] = useState(todayISO())
-  const [scope, setScope] = useState<Scope>('today')
+  const [scope, setScope] = useState<Scope>('day')
+  const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<{
     mode: 'out' | 'in' | 'transfer'
     editing?: Transaction
   } | null>(null)
+  // B3 fix (PAIN-POINTS.md): Spending Lens previously only lived in the
+  // Decide sheet, disconnected from the moment someone's actually looking at
+  // the gauge and wondering "should I buy this?". This opens the exact same
+  // <SpendingLens> component the Decide sheet uses — no logic duplicated,
+  // just a second door into it, right next to the standing strip.
+  const [lensOpen, setLensOpen] = useState(false)
 
-  const bounds = useMemo(() => boundsFor(scope, day), [scope, day])
+  const isToday = day === todayISO()
+  const bounds = scopeBounds(scope, day)
+
   const txns =
-    useLiveQuery(async () => {
-      if (!bounds) return db.transactions.orderBy('date').reverse().toArray()
-      return db.transactions
-        .where('date')
-        .between(bounds.start, bounds.end, true, true)
-        .reverse()
-        .toArray()
-    }, [bounds?.start, bounds?.end, scope]) ?? []
-
+    useLiveQuery(
+      () =>
+        bounds
+          ? db.transactions
+              .where('date')
+              .between(bounds.from, bounds.to, true, true)
+              .toArray()
+          : db.transactions.toArray(),
+      [bounds?.from, bounds?.to],
+    ) ?? []
   const accounts = useLiveQuery(() => db.accounts.toArray()) ?? []
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
-  const safe = useSafeToSpend()
-  const balances = useAccountBalances()
-  const leftover = useDailyLeftover(day)
+
+  const { result: safeToSpend, isLoading: safeToSpendLoading } =
+    useSafeToSpend()
+  const accountBalances = useAccountBalances()
+  const { result: leftover } = useDailyLeftover(day)
 
   const accName = useMemo(
     () => new Map(accounts.map((a) => [a.id, a.name])),
@@ -105,32 +116,31 @@ export function TodayScreen() {
     () => new Map(categories.map((c) => [c.id, c.name])),
     [categories],
   )
-  const todayRows =
+
+  // Spent today: the day nav's own day, regardless of the list's scope — the
+  // standing strip always answers "today", the list below answers "this scope".
+  // Uses isWeekDraw (the same discretionary definition as the safe-to-spend hero
+  // and the monthly-leftover tile beside it), so the three numbers in the strip
+  // tell one coherent story: committed bills / transfers / pass-through don't
+  // count against "spent today" any more than they draw the leftover pool.
+  const spentToday =
     useLiveQuery(
       () => db.transactions.where('date').equals(day).toArray(),
       [day],
     ) ?? []
-  const spentToday = todayRows
-    .filter((t) => t.direction === 'out' && !t.is_transfer)
+  const spentTodayTotal = spentToday
+    .filter(isWeekDraw)
     .reduce((s, t) => s + t.amount, 0)
 
   const rows = useMemo(() => {
-    const q = search.trim().toLowerCase()
     const seen = new Set<string>()
-    const out: { txn: Transaction; transferTo?: string }[] = []
+    const out: { txn: Transaction; transferTo?: string | undefined }[] = []
     const sorted = [...txns].sort(
       (a, b) =>
         b.date.localeCompare(a.date) ||
         b.created_at.localeCompare(a.created_at),
     )
     for (const t of sorted) {
-      const category = catName.get(t.category_id ?? '') ?? ''
-      const account = accName.get(t.account_id) ?? ''
-      const haystack = [t.title, category, t.note, account]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      if (q && !haystack.includes(q)) continue
       if (t.is_transfer && t.transfer_pair_id) {
         if (seen.has(t.transfer_pair_id)) continue
         seen.add(t.transfer_pair_id)
@@ -139,261 +149,283 @@ export function TodayScreen() {
         )
         const outLeg = t.direction === 'out' ? t : (other ?? t)
         const inLeg = t.direction === 'in' ? t : other
-        const transferTo = inLeg ? accName.get(inLeg.account_id) : undefined
-        out.push(transferTo ? { txn: outLeg, transferTo } : { txn: outLeg })
-      } else out.push({ txn: t })
+        out.push({
+          txn: outLeg,
+          transferTo: inLeg ? accName.get(inLeg.account_id) : undefined,
+        })
+      } else {
+        out.push({ txn: t })
+      }
     }
     return out
-  }, [txns, search, catName, accName])
+  }, [txns, accName])
 
-  const totalOut = rows
-    .filter(({ txn }) => txn.direction === 'out' && !txn.is_transfer)
-    .reduce((s, { txn }) => s + txn.amount, 0)
-  const totalIn = rows
-    .filter(({ txn }) => txn.direction === 'in' && !txn.is_transfer)
-    .reduce((s, { txn }) => s + txn.amount, 0)
-  const isToday = day === todayISO()
+  // Search fixes F3: matches title, category name, AND note (the old
+  // TransactionHistory only matched note + account name).
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(({ txn }) => {
+      const title = (txn.title ?? '').toLowerCase()
+      const cat = (catName.get(txn.category_id ?? '') ?? '').toLowerCase()
+      const note = (txn.note ?? '').toLowerCase()
+      return title.includes(q) || cat.includes(q) || note.includes(q)
+    })
+  }, [rows, search, catName])
+
+  const listNet = filteredRows
+    .filter(({ txn }) => !txn.is_transfer)
+    .reduce(
+      (s, { txn }) => s + (txn.direction === 'in' ? txn.amount : -txn.amount),
+      0,
+    )
 
   return (
-    <Screen style={{ paddingBottom: 'calc(var(--space-6) * 3)' }}>
+    <Screen>
+      {/* ① Standing strip — replaces the three DayChips (F1, T4) */}
       <Card>
-        <StatTile
-          label="Safe to spend today"
-          value={
-            safe.result?.isNegativePool ||
-            safe.result?.remainingWorkdays === 0 ? (
-              <Amount value={0} sign="never" />
-            ) : (
-              <Amount value={safe.result?.todayCeiling ?? 0} sign="never" />
-            )
-          }
-          sub={
-            safe.result?.isNegativePool
-              ? 'Committed items exceed allowance'
-              : safe.result?.remainingWorkdays === 0
-                ? 'Weekend · resets Monday'
-                : '/day'
-          }
-        />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 'var(--space-3)',
+          }}
+        >
+          <SafeToSpendHero
+            result={safeToSpend}
+            isLoading={safeToSpendLoading}
+          />
+          {/* B3 — "what does this cost me?" affordance, opens SpendingLens
+              in-context instead of requiring More → Decide → Spending Lens. */}
+          <button
+            type="button"
+            onClick={() => setLensOpen(true)}
+            style={{
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1)',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border-2)',
+              borderRadius: 999,
+              padding: 'var(--space-1) var(--space-3)',
+              fontSize: 'var(--text-caption)',
+              fontWeight: 600,
+              color: 'var(--ink-2)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+            }}
+          >
+            <Icon name="lens" size={14} />
+            Cost me?
+          </button>
+        </div>
+        {/* Carryover fix (#26, P2): same responsive-grid pattern as Report's
+            "This month — actuals" grid. Three nowrap StatTiles in a single
+            flex row overflow on narrow phones — worse here than on Report
+            since these use un-abbreviated `full` amounts — so this reflows
+            3→2→1 columns via auto-fit instead of clipping. */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 'var(--space-3)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(7.5rem, 1fr))',
             marginTop: 'var(--space-4)',
+            paddingTop: 'var(--space-3)',
+            borderTop: '1px solid var(--border-1)',
+            gap: 'var(--space-4) var(--space-5)',
           }}
         >
           <StatTile
             label="Spent today"
             size="title"
-            value={<Amount value={spentToday} sign="never" />}
+            value={<Amount value={spentTodayTotal} full />}
           />
           <StatTile
             label="Wallet balance"
             size="title"
-            value={<Amount value={balances?.total ?? 0} sign="never" />}
+            value={<Amount value={accountBalances?.total ?? 0} full />}
           />
           <StatTile
             label="Monthly leftover"
             size="title"
             value={
               <Amount
-                value={leftover.result?.leftover ?? 0}
+                value={leftover?.leftover ?? 0}
+                full
                 tone={
-                  (leftover.result?.leftover ?? 0) < 0 ? 'negative' : 'default'
+                  leftover && leftover.leftover < 0 ? 'negative' : 'default'
                 }
               />
             }
-            sub={leftover.result?.isProjected ? 'projected' : undefined}
+            sub={leftover?.isProjected ? 'projected' : undefined}
           />
         </div>
       </Card>
 
+      {/* ② Date navigator with the Today anchor pill */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 'var(--space-3)',
         }}
       >
-        <IconButton
-          label="Previous day"
+        <button
+          type="button"
           onClick={() => setDay(shiftDay(day, -1))}
-          icon="chevron-left"
-        />
-        <label
-          style={{
-            position: 'relative',
-            flex: 1,
-            textAlign: 'center',
-            color: 'var(--ink-1)',
-            cursor: 'pointer',
-          }}
+          aria-label="Previous day"
+          style={navBtnStyle}
         >
-          <span
+          <Icon name="chevron-left" />
+        </button>
+        <div style={{ textAlign: 'center' }}>
+          <div
             style={{
-              display: 'block',
               fontSize: 'var(--text-body)',
               lineHeight: 'var(--leading-body)',
               fontWeight: 600,
+              color: 'var(--ink-1)',
             }}
           >
             {dayLabel(day)}
-          </span>
+          </div>
           {isToday ? (
-            <span
-              style={{
-                display: 'inline-flex',
-                marginTop: 'var(--space-1)',
-                color: 'var(--accent-text)',
-                fontSize: 'var(--text-caption)',
-                lineHeight: 'var(--leading-caption)',
-              }}
-            >
-              Today
-            </span>
+            <span style={pillStyle}>Today</span>
           ) : (
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                setDay(todayISO())
-              }}
-              style={pillStyle}
+              onClick={() => setDay(todayISO())}
+              style={{ ...pillStyle, ...pillButtonStyle }}
             >
               Back to today
             </button>
           )}
-          <input
-            type="date"
-            value={day}
-            onChange={(e) => e.target.value && setDay(e.target.value)}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              opacity: 0,
-              cursor: 'pointer',
-            }}
-          />
-        </label>
-        <IconButton
-          label="Next day"
+        </div>
+        <button
+          type="button"
           onClick={() => setDay(shiftDay(day, 1))}
-          icon="chevron-right"
-        />
+          aria-label="Next day"
+          style={navBtnStyle}
+        >
+          <Icon name="chevron-right" />
+        </button>
       </div>
 
+      {/* ③ Unified transaction surface: search + period scope (F2/F3) */}
       <div
-        style={{ display: 'flex', gap: 'var(--space-2)' }}
-        aria-label="Transaction period scope"
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
       >
-        {(['today', 'week', 'month', 'all'] as Scope[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setScope(s)}
-            style={segmentStyle(scope === s)}
-          >
-            {scopeLabel(s)}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => {
+            setSearchOpen((o) => !o)
+            if (searchOpen) setSearch('')
+          }}
+          aria-label={searchOpen ? 'Close search' : 'Search transactions'}
+          style={iconBtnStyle}
+        >
+          <Icon name={searchOpen ? 'close' : 'search'} />
+        </button>
+        <div style={{ display: 'flex', flex: 1, gap: 'var(--space-1)' }}>
+          {SCOPES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setScope(s.id)}
+              style={segmentStyle(scope === s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
       </div>
-
-      <label
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)',
-          background: 'var(--bg-2)',
-          border: '1px solid var(--border-2)',
-          borderRadius: 'var(--space-2)',
-          padding: 'var(--space-3)',
-          color: 'var(--ink-2)',
-        }}
-      >
-        <Icon name="search" />
+      {searchOpen && (
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search title, category, or note…"
-          style={{
-            flex: 1,
-            border: 'none',
-            outline: 'none',
-            background: 'transparent',
-            color: 'var(--ink-1)',
-            font: 'inherit',
-            minWidth: 0,
-          }}
+          style={searchInputStyle}
         />
-      </label>
+      )}
 
       <SectionHeader
         trailing={
-          <span style={{ display: 'inline-flex', gap: 'var(--space-1)' }}>
-            <span>{rows.length} ·</span>
-            <Amount value={totalIn - totalOut} sign="auto" />
-          </span>
+          <>
+            {filteredRows.length} · <Amount value={listNet} full />
+          </>
         }
       >
         Transactions
       </SectionHeader>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {rows.length === 0 && (
-          <div
-            style={{
-              color: 'var(--ink-3)',
-              fontSize: 'var(--text-section)',
-              lineHeight: 'var(--leading-section)',
-              textAlign: 'center',
-              padding: 'var(--space-6) 0',
-            }}
-          >
-            No transactions found.
-          </div>
-        )}
-        {rows.map(({ txn, transferTo }) => {
-          const category = catName.get(txn.category_id ?? '')
-          const account = accName.get(txn.account_id)
-          const title = txn.is_transfer
-            ? `${account ?? '?'} → ${transferTo ?? '?'}`
-            : (txn.title ?? txn.note ?? category ?? '(no title)')
-          const caption = txn.is_transfer
-            ? 'Transfer'
-            : [category, account, scope === 'today' ? null : txn.date]
-                .filter(Boolean)
-                .join(' · ')
-          return (
-            <Row
-              key={txn.id}
-              {...(txn.is_transfer ? { icon: <Icon name="transfer" /> } : {})}
-              primary={title}
-              caption={caption}
-              right={
-                txn.is_transfer ? (
-                  <Amount value={0} tone="muted" sign="never" />
-                ) : (
-                  <Amount
-                    value={txn.direction === 'in' ? txn.amount : -txn.amount}
-                    tone={txn.direction === 'in' ? 'positive' : 'default'}
-                    sign="auto"
-                  />
-                )
-              }
-              onClick={() =>
-                setForm({
-                  mode: txn.is_transfer ? 'transfer' : txn.direction,
-                  editing: txn,
-                })
-              }
-              aria-label={`Edit ${title}`}
-              {...(txn.is_transfer ? { style: { opacity: '.7' } } : {})}
-            />
-          )
-        })}
+      {filteredRows.length === 0 && (
+        <div
+          style={{
+            color: 'var(--ink-3)',
+            fontSize: 'var(--text-body)',
+            textAlign: 'center',
+            padding: 'var(--space-6) 0',
+          }}
+        >
+          {search
+            ? 'No transactions match your search.'
+            : 'No transactions in this period.'}
+        </div>
+      )}
+      <div>
+        {filteredRows.map(({ txn, transferTo }) => (
+          <Row
+            key={txn.id}
+            onClick={() =>
+              setForm({
+                mode: txn.is_transfer ? 'transfer' : txn.direction,
+                editing: txn,
+              })
+            }
+            icon={
+              txn.is_transfer ? (
+                <Icon name="transfer" size={18} aria-label="Transfer" />
+              ) : undefined
+            }
+            primary={
+              txn.is_transfer
+                ? `${accName.get(txn.account_id) ?? '?'} → ${transferTo ?? '?'}`
+                : (txn.title ??
+                  txn.note ??
+                  catName.get(txn.category_id ?? '') ??
+                  '(no title)')
+            }
+            caption={
+              txn.is_transfer
+                ? 'Transfer'
+                : [
+                    catName.get(txn.category_id ?? ''),
+                    accName.get(txn.account_id),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+            }
+            right={
+              <Amount
+                value={txn.direction === 'in' ? txn.amount : -txn.amount}
+                full
+                tone={
+                  txn.is_transfer
+                    ? 'muted'
+                    : txn.direction === 'in'
+                      ? 'positive'
+                      : 'default'
+                }
+                sign={txn.is_transfer ? 'never' : 'auto'}
+              />
+            }
+          />
+        ))}
       </div>
+
+      {/* Spacer so the last row can scroll clear of the fixed FAB. */}
+      <div style={{ height: 80 }} />
 
       <SpeedDialFAB onAdd={(mode) => setForm({ mode })} />
 
@@ -407,69 +439,159 @@ export function TodayScreen() {
           {...(form.editing ? { editing: form.editing } : {})}
         />
       )}
+
+      <BottomSheet
+        open={lensOpen}
+        onClose={() => setLensOpen(false)}
+        title="What does this cost me?"
+        height="85dvh"
+      >
+        <SpendingLens />
+      </BottomSheet>
     </Screen>
   )
 }
 
-function IconButton({
-  label,
-  onClick,
-  icon,
+// Hero stat tile: mirrors GaugeCard's null/negative-pool/weekend/normal branches
+// (PHASE-3-HANDOFF.md §2.1), rendered through StatTile/Amount instead of
+// GaugeCard's own inline styles.
+function SafeToSpendHero({
+  result,
+  isLoading,
 }: {
-  label: string
-  onClick: () => void
-  icon: 'chevron-left' | 'chevron-right'
+  result: ReturnType<typeof useSafeToSpend>['result']
+  isLoading: boolean
 }) {
+  if (isLoading) {
+    return <StatTile label="Safe to spend today" value="…" />
+  }
+  if (!result) {
+    return (
+      <StatTile
+        label="Safe to spend today"
+        value={<Amount value={0} full />}
+        sub="Set your monthly allowance in More → Allowance to see your daily ceiling."
+      />
+    )
+  }
+  if (result.isNegativePool) {
+    return (
+      <StatTile
+        label="Safe to spend today"
+        value={<Amount value={0} full tone="negative" />}
+        sub="Committed items exceed your allowance this month."
+      />
+    )
+  }
+  if (result.remainingWorkdays === 0) {
+    // O3 fix: the weekend allocation is a real configured number — surface
+    // it instead of the bare word "Weekend" (mirrored into GaugeCard.tsx so
+    // Today and Budget don't diverge on this branch).
+    return (
+      <StatTile
+        label="Safe to spend today"
+        value={<Amount value={result.weekendAllocation} full />}
+        sub="Weekend allowance, pre-carved. Resets Monday."
+      />
+    )
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      style={{
-        minWidth: '44px',
-        minHeight: '44px',
-        display: 'grid',
-        placeItems: 'center',
-        background: 'var(--bg-2)',
-        border: '1px solid var(--border-2)',
-        borderRadius: 'var(--space-2)',
-        color: 'var(--ink-2)',
-        cursor: 'pointer',
-      }}
-    >
-      <Icon name={icon} />
-    </button>
+    <StatTile
+      label="Safe to spend today"
+      value={
+        <>
+          <Amount value={result.todayCeiling} full />
+          <span
+            style={{
+              fontSize: 'var(--text-body)',
+              color: 'var(--ink-3)',
+              fontWeight: 500,
+            }}
+          >
+            {' '}
+            /day
+          </span>
+        </>
+      }
+      sub={
+        <>
+          <Amount value={result.remainingPool} full tone="muted" /> left ·{' '}
+          {result.remainingWorkdays} workday
+          {result.remainingWorkdays !== 1 ? 's' : ''} to go
+        </>
+      }
+    />
   )
+}
+
+const navBtnStyle: React.CSSProperties = {
+  width: 44,
+  height: 44,
+  background: 'var(--bg-2)',
+  border: '1px solid var(--border-2)',
+  borderRadius: 12,
+  color: 'var(--ink-2)',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+
+const iconBtnStyle: React.CSSProperties = {
+  width: 44,
+  height: 44,
+  background: 'var(--bg-2)',
+  border: '1px solid var(--border-2)',
+  borderRadius: 12,
+  color: 'var(--ink-2)',
+  cursor: 'pointer',
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}
+
+const pillStyle: React.CSSProperties = {
+  display: 'inline-block',
+  marginTop: 3,
+  fontSize: 11,
+  fontWeight: 600,
+  color: 'var(--accent-text)',
+  background: 'var(--accent-surface)',
+  border: '1px solid var(--accent-border)',
+  borderRadius: 999,
+  padding: '2px 10px',
+}
+
+const pillButtonStyle: React.CSSProperties = {
+  cursor: 'pointer',
+  fontFamily: 'var(--font-ui)',
 }
 
 function segmentStyle(active: boolean): React.CSSProperties {
   return {
     flex: 1,
-    minHeight: '44px',
     border: 'none',
-    borderRadius: 'var(--space-2)',
+    borderRadius: 8,
     cursor: 'pointer',
     fontSize: 'var(--text-caption)',
     fontFamily: 'var(--font-ui)',
     fontWeight: active ? 600 : 400,
+    padding: 'var(--space-2) 0',
     background: active ? 'var(--accent)' : 'var(--bg-2)',
     color: active ? 'var(--on-accent)' : 'var(--ink-2)',
   }
 }
 
-const pillStyle: React.CSSProperties = {
-  position: 'relative',
-  zIndex: 1,
-  marginTop: 'var(--space-1)',
-  minHeight: 'var(--space-5)',
-  paddingBlock: 'var(--space-4)',
-  border: '1px solid var(--accent-border)',
-  borderRadius: '50%',
-  paddingInline: 'var(--space-3)',
-  background: 'var(--accent-surface)',
-  color: 'var(--accent-text)',
-  fontSize: 'var(--text-caption)',
-  lineHeight: 'var(--leading-caption)',
+const searchInputStyle: React.CSSProperties = {
+  background: 'var(--bg-2)',
+  border: '1px solid var(--border-2)',
+  borderRadius: 8,
+  color: 'var(--ink-1)',
+  padding: '9px 12px',
+  fontSize: 13,
+  outline: 'none',
+  width: '100%',
   fontFamily: 'var(--font-ui)',
-  cursor: 'pointer',
+  boxSizing: 'border-box',
 }

@@ -27,6 +27,15 @@ export function formatRpFull(value: number): string {
   return `${sign}Rp ${dotSep(Math.abs(value))}`
 }
 
+// Live-format a money input as the user types: strip everything but digits,
+// then regroup into dot-separated thousands. Empty stays empty. Output always
+// parses cleanly via parseRpInput, so no decimals or manual separators needed.
+export function formatRpInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+  if (!digits) return ''
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 // Parses a user-typed rupiah amount to an integer, strictly.
 // Accepts plain digit strings ("25000") and digit strings whose "." or ","
 // appear ONLY as 3-digit group separators. The separator must be consistent

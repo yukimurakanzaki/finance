@@ -9,12 +9,14 @@ import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY")
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")
+const MINIMAX_API_KEY = Deno.env.get("MINIMAX_API_KEY")
 
 // Model routing table — model id → { provider, apiModel }
-const MODEL_ROUTES: Record<string, { provider: "google" | "anthropic"; apiModel: string }> = {
+const MODEL_ROUTES: Record<string, { provider: "google" | "anthropic" | "minimax"; apiModel: string }> = {
   "gemini-2.5-flash": { provider: "google", apiModel: "gemini-2.5-flash" },
   "gemini-2.5-pro": { provider: "google", apiModel: "gemini-2.5-pro" },
   "claude-sonnet-4-20250514": { provider: "anthropic", apiModel: "claude-sonnet-4-20250514" },
+  "minimax-m3": { provider: "minimax", apiModel: "MiniMax-M3" },
 }
 
 const MAX_TOKENS_CAP = 8000
@@ -28,10 +30,28 @@ const admin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 )
 
+// Audit D2: CORS tightened from "*" to a known-origin allowlist. "Tolerable
+// while verify_jwt gates the call" per the original audit, but with the proxy
+// out of MVP-gated scope the blast radius is real. Local dev origins + the
+// production app origin(s) are sufficient. To allow a new origin, add it here
+// AND in the Vercel env.
+const ALLOWED_ORIGINS = new Set<string>([
+  "http://localhost:5173",           // Vite dev
+  "http://localhost:4173",           // Vite preview
+  "http://127.0.0.1:5173",           // Vite dev (alternate host)
+  "http://127.0.0.1:4173",           // Vite preview (alternate host)
+  "https://fi-dashboard.vercel.app", // production — TODO: confirm real domain
+])
+
 function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? ""
+  // Echo the request origin verbatim only if it's in the allowlist; never
+  // reflect arbitrary origins.
+  const allowOrigin = ALLOWED_ORIGINS.has(origin) ? origin : ""
   const requested = req.headers.get("Access-Control-Request-Headers")
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Vary": "Origin",
     "Access-Control-Allow-Headers":
       requested ?? "authorization, x-client-info, apikey, content-type, x-supabase-api-version",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -281,6 +301,42 @@ async function callAnthropic(
   return data
 }
 
+async function callMinimax(
+  apiModel: string,
+  maxTokens: number,
+  system: string | undefined,
+  tools: unknown[] | undefined,
+  messages: any[],
+): Promise<any> {
+  if (!MINIMAX_API_KEY) throw new Error("Server missing MINIMAX_API_KEY secret")
+
+  const body: Record<string, unknown> = {
+    model: apiModel,
+    max_tokens: maxTokens,
+    messages,
+  }
+  if (system) body.system = system
+  if (tools && tools.length > 0) body.tools = tools
+
+  const res = await fetch("https://api.minimax.io/anthropic/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "Authorization": `Bearer ${MINIMAX_API_KEY}`,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    console.error("Minimax API error", res.status, JSON.stringify(data))
+    throw new Error(data.error?.message || `Minimax API error (${res.status})`)
+  }
+
+  return data
+}
+
 // ===== HANDLER =====
 
 Deno.serve(async (req: Request) => {
@@ -341,8 +397,11 @@ Deno.serve(async (req: Request) => {
   try {
     result = route.provider === "google"
       ? await callGemini(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
+      : route.provider === "minimax"
+      ? await callMinimax(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
       : await callAnthropic(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
   } catch (err) {
+    console.error("Proxy error", modelId, String(err))
     result = { error: `Proxy error: ${String(err)}` }
     status = "api_error"
     httpStatus = 502

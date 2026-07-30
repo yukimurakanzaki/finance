@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { Btn } from '@components/FormField'
 import { db } from '@db/db'
 import type { Account, Category } from '@db/types'
-import { Btn } from '@components/FormField'
+import { useEffect, useState } from 'react'
 
 const LANE_LABELS: Record<string, string> = {
   income_producing: 'income_producing — money that earns (salary, dividends)',
@@ -12,7 +12,10 @@ const LANE_LABELS: Record<string, string> = {
 
 function buildPrompt(accounts: Account[], categories: Category[]): string {
   const accountLines = accounts
-    .map((a) => `  • id "${a.id}" → ${a.name} (${a.institution}, ${a.account_type})`)
+    .map(
+      (a) =>
+        `  • id "${a.id}" → ${a.name} (${a.institution}, ${a.account_type})`,
+    )
     .join('\n')
 
   const categoryLines =
@@ -42,9 +45,13 @@ function buildPrompt(accounts: Account[], categories: Category[]): string {
 • account_id  – string ID from my account list below (must match exactly)
 • category    – category name from my list below, or "" if unknown
 • suggested_lane – one of:
-${Object.values(LANE_LABELS).map((l) => `    • "${l.split(' ')[0]}"`).join('\n')}
+${Object.values(LANE_LABELS)
+  .map((l) => `    • "${l.split(' ')[0]}"`)
+  .join('\n')}
     Details:
-${Object.values(LANE_LABELS).map((l) => `      ${l}`).join('\n')}
+${Object.values(LANE_LABELS)
+  .map((l) => `      ${l}`)
+  .join('\n')}
 • note        – optional short description (can be "")
 
 === MY ACCOUNTS ===
@@ -87,16 +94,35 @@ export function ImportPromptSheet() {
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // fallback: select the textarea
-      const el = document.getElementById('import-prompt-text') as HTMLTextAreaElement | null
+      const el = document.getElementById(
+        'import-prompt-text',
+      ) as HTMLTextAreaElement | null
       el?.select()
     }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
-      <div style={{ fontSize: 'var(--text-section)', color: 'var(--ink-2)', lineHeight: 1.5 }}>
-        Copy this prompt, paste it into Claude, then add your bank transactions at the bottom.
-        Claude will reply with a JSON array you can import here.
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-3)',
+        height: '100%',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 'var(--text-section)',
+          color: 'var(--ink-2)',
+          lineHeight: 1.5,
+        }}
+      >
+        Advanced path for large or multi-month imports. Most statement imports
+        are faster done directly in the AI Manager chat (paste a screenshot
+        there) — use this only when you have more transactions than fit in a
+        chat message. Copy this prompt, paste it into a separate Claude session,
+        then add your bank transactions at the bottom. Claude will reply with a
+        JSON array you can import here.
       </div>
 
       <textarea
@@ -108,9 +134,8 @@ export function ImportPromptSheet() {
           minHeight: 260,
           background: 'var(--bg-2)',
           border: '1px solid var(--border-1)',
-          borderRadius: 'var(--space-2)',
-          paddingBlock: 'var(--space-3)',
-          paddingInline: 'var(--space-3)',
+          borderRadius: 10,
+          padding: 'var(--space-3) var(--space-4)',
           fontSize: 'var(--text-caption)',
           fontFamily: 'var(--font-mono)',
           color: 'var(--ink-1)',
@@ -122,8 +147,15 @@ export function ImportPromptSheet() {
       />
 
       {accounts.length === 0 && (
-        <div style={{ fontSize: 'var(--text-caption)', color: '#f59e0b', lineHeight: 1.5 }}>
-          No active accounts found. Add accounts first so the prompt includes your real account IDs.
+        <div
+          style={{
+            fontSize: 'var(--text-caption)',
+            color: 'var(--amber-text)',
+            lineHeight: 1.5,
+          }}
+        >
+          No active accounts found. Add accounts first so the prompt includes
+          your real account IDs.
         </div>
       )}
 

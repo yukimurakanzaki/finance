@@ -1,5 +1,10 @@
 import type { Allowance, RecurringItem, Transaction } from '@db/types'
-import { workdaysRemaining, weeksInMonth } from '@lib/dates'
+import {
+  isoWeekEnd,
+  isoWeekStart,
+  workdaysRemaining,
+  weeksInMonth,
+} from '@lib/dates'
 
 // A transaction draws down the personal safe-to-spend pool only if it is a
 // plain outgoing spend: not a transfer, not pass-through, and not tagged as a
@@ -98,4 +103,33 @@ export function computeSafeToSpend(
     isNegativePool,
     isAmber,
   }
+}
+
+// The whole derivation from a raw ledger: filter this week's draws, total them,
+// compute. Shared by the AI context block and the check_affordability tool so a
+// verdict can never disagree with the numbers the same turn just quoted — a
+// chat/app mismatch is the fastest way to lose earned trust.
+export function safeToSpendFromLedger(
+  allowance: Allowance | undefined,
+  activeRecurringItems: RecurringItem[],
+  allTxns: Transaction[],
+  today: Date,
+): SafeToSpendResult | null {
+  if (!allowance || allowance.monthly_amount <= 0) return null
+
+  const spendThisWeek = allTxns
+    .filter(
+      (t) =>
+        isWeekDraw(t) &&
+        t.date >= isoWeekStart(today) &&
+        t.date <= isoWeekEnd(today),
+    )
+    .reduce((s, t) => s + t.amount, 0)
+
+  return computeSafeToSpend({
+    allowance,
+    activeRecurringItems,
+    spendThisWeek,
+    today,
+  })
 }

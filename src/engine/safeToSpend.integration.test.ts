@@ -18,6 +18,7 @@ const allowance: Allowance = {
   id: 'local',
   monthly_amount: 8_000_000,
   weekend_allocation: 1_000_000,
+  onboarding_snoozed_until: null,
   updated_at: '',
 }
 
@@ -173,7 +174,13 @@ describe('Safe-to-Spend integration: full DB→engine path', () => {
   })
 
   it('zero allowance returns null (null state)', async () => {
-    await db.allowance.put({ id: 'local', monthly_amount: 0, weekend_allocation: 0, updated_at: '' })
+    await db.allowance.put({
+      id: 'local',
+      monthly_amount: 0,
+      weekend_allocation: 0,
+      onboarding_snoozed_until: null,
+      updated_at: '',
+    })
     await db.transactions.bulkPut([
       txn({ id: 't-coffee', date: '2026-07-07', amount: 50_000, title: 'Kopi' }),
     ])
