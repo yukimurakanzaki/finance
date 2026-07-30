@@ -177,6 +177,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const anchor = new Date(`${today}T12:00:00`)
     anchor.setDate(anchor.getDate() - 1)
     const anchorDay = anchor.toISOString().slice(0, 10)
+    const existing = await accountsRepo.getAll()
+    const duplicate = existing.some(
+      (a) =>
+        a.name.trim().toLowerCase() === accountName.trim().toLowerCase() &&
+        a.institution.trim().toLowerCase() === accountInstitution.trim().toLowerCase(),
+    )
+    if (duplicate) return
     await accountsRepo.create({
       name: accountName,
       institution: accountInstitution,
