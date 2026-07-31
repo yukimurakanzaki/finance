@@ -88,6 +88,14 @@ export interface Transaction {
   // committed payments live in the recurring bucket and are excluded from the
   // personal safe-to-spend pool draw. null for ordinary discretionary spend.
   recurring_item_id: string | null
+  // D1 — this row is a balance correction, not real spending: the user told us
+  // what the account actually holds and we booked the gap. It moves the account
+  // balance and net worth, but is excluded from the safe-to-spend draw, the
+  // daily leftover ledger, the category breakdown and Report actuals.
+  // Optional, not required: rows written before this field existed carry
+  // undefined, so every reader tests truthiness — never `=== false`. Clearing
+  // it (by giving the row a category) turns it into an ordinary transaction.
+  is_adjustment?: boolean
   created_at: string
 }
 
@@ -123,6 +131,33 @@ export interface RecurringItem {
   note: string | null
   created_at: string
   deleted_at?: string | null
+}
+
+// D1 — append-only audit of every balance correction. One row per correction,
+// pointing at the adjustment transaction it created, so "who changed this and
+// when" has an answer in a two-member household. Never edited in place: an undo
+// appends a reverting row carrying `reverts_id`.
+//
+export interface BalanceCorrection {
+  id?: string
+  account_id: string
+  /** The adjustment transaction this correction wrote; null on a reverting row. */
+  transaction_id: string | null
+  /** Set on a reverting row: the correction it undoes. */
+  reverts_id: string | null
+  previous_balance: number
+  new_balance: number
+  as_of_date: string
+  note: string | null
+  /**
+   * Who made it. Never written by this client: SEC-2 requires attribution to
+   * come from the authenticated session, so the column is left off the pushed
+   * row entirely and the cloud's `default auth.uid()` stamps it. Populated on
+   * rows that come back from a pull. An explicit null would defeat that
+   * default, which is why the repo omits the key rather than setting it.
+   */
+  created_by?: string | null
+  created_at: string
 }
 
 export interface Allowance {

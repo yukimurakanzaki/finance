@@ -1,0 +1,174 @@
+<!doctype html>
+<!--
+  One-shot seeder. Open this file in the same browser profile that has the
+  `fi-dashboard-v2` IndexedDB (Chrome / Edge with your real financial data).
+  It calls the same `seedRecurringFromLogIfNeeded()` the dev app's boot effect
+  would call, then shows the result. After it succeeds you can close this tab.
+
+  Usage:
+    1. Make sure `npm run dev` is running and you have opened
+       http://localhost:5173 at least once (so the DB exists). OR run this
+       file standalone — it will create the DB if missing.
+    2. Open this file in your browser:
+         file:///C:/Users/USER/Finance/scripts/seed-recurring-browser.html
+    3. Click "Seed now".
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Seed recurring bills</title>
+    <style>
+      body { font: 14px/1.4 system-ui; padding: 24px; max-width: 640px; }
+      pre { background: #111; color: #eee; padding: 12px; border-radius: 6px; overflow:auto; }
+      button { padding: 10px 16px; font-size: 14px; }
+      .ok { color: #2a7; }
+      .err { color: #c33; }
+    </style>
+  </head>
+  <body>
+    <h1>Seed recurring bills</h1>
+    <p>
+      Inserts two monthly bills into <code>fi-dashboard-v2.recurringItems</code>:
+      Jessica Susanto (20k) and Jepriyanto (100k). Idempotent — guarded by
+      the <code>seeded:recurring-from-log</code> app setting.
+    </p>
+    <button id="run">Seed now</button>
+    <pre id="out">Click "Seed now"…</pre>
+
+    <script type="module">
+      import { seedRecurringFromLogIfNeeded } from '/src/import/seedRecurringFromLog.ts'
+      // The above import path only works if served by Vite. For file:// usage
+      // we instead inline the same logic via Dexie loaded from the running dev
+      // server (Vite serves deps in dev mode). If dev isn't running, fall back
+      // to a raw IDB write via the native IDB API below.
+      //
+      // Strategy: open `fi-dashboard-v2` via raw indexedDB (no Dexie) and add
+      // the two records + the seed flag. This works whether or not Vite is
+      // running, because it's just IDB on the page's origin.
+      const SEED_FLAG_KEY = 'seeded:recurring-from-log'
+
+      const CANDIDATES = [
+        {
+          name: 'Transfer Bulanan - Jessica Susanto',
+          matchNote: 'Personal Transfer - Jessica Susanto - Review purpose',
+          matchAmount: 20000,
+        },
+        {
+          name: 'Transfer Bulanan - Jepriyanto',
+          matchNote: 'Personal Transfer - Jepriyanto - Review purpose',
+          matchAmount: 100000,
+        },
+      ]
+
+      function nextDueFor(c) {
+        const txns = window.__seedLog || []
+        const hits = txns
+          .filter((r) => r.direction === 'out' && (r.note || '').trim() === c.matchNote && r.amount === c.matchAmount)
+          .map((r) => r.date).sort()
+        const last = hits.at(-1)
+        if (!last) return new Date().toISOString().slice(0, 10)
+        const d = new Date(last + 'T00:00:00Z')
+        d.setUTCMonth(d.getUTCMonth() + 1)
+        return d.toISOString().slice(0, 10)
+      }
+
+      function openDb() {
+        return new Promise((resolve, reject) => {
+          const req = indexedDB.open('fi-dashboard-v2')
+          req.onupgradeneeded = () => {
+            // First-time open: create the stores Dexie expects.
+            const db = req.result
+            if (!db.objectStoreNames.contains('recurringItems')) {
+              db.createObjectStore('recurringItems', { keyPath: 'id' })
+            }
+            if (!db.objectStoreNames.contains('appSettings')) {
+              db.createObjectStore('appSettings', { keyPath: 'key' })
+            }
+          }
+          req.onsuccess = () => resolve(req.result)
+          req.onerror = () => reject(req.error)
+        })
+      }
+
+      async function run() {
+        const out = document.getElementById('out')
+        out.textContent = 'Opening fi-dashboard-v2…'
+        try {
+          const db = await openDb()
+          const now = new Date().toISOString()
+          const tx = db.transaction(['recurringItems', 'appSettings'], 'readwrite')
+          const rStore = tx.objectStore('recurringItems')
+          const sStore = tx.objectStore('appSettings')
+
+          // Load transaction log from bundled JSON if served, else rely on
+          // window.__seedLog that the app may set on window.
+          let log = window.__seedLog || []
+          if (!log.length) {
+            try {
+              const res = await fetch('/data/transactions-jan-jun-2026.json')
+              if (res.ok) log = await res.json()
+            } catch {}
+          }
+
+          const existing = await new Promise((res, rej) => {
+            const r = rStore.getAll()
+            r.onsuccess = () => res(r.result || [])
+            r.onerror = () => rej(r.error)
+          })
+          const existingKeys = new Set(existing.map((r) => `${r.name}|${r.amount}|${r.cadence}`))
+
+          let inserted = 0, skipped = 0
+          for (const c of CANDIDATES) {
+            const key = `${c.name}|${c.matchAmount}|monthly`
+            if (existingKeys.has(key)) { skipped++; continue }
+            const cands = log.filter((r) => (r.note || '').trim() === c.matchNote && r.amount === c.matchAmount).map((r) => r.date).sort()
+            const last = cands.at(-1) || new Date().toISOString().slice(0, 10)
+            const d = new Date(last + 'T00:00:00Z')
+            d.setUTCMonth(d.getUTCMonth() + 1)
+            const row = {
+              id: crypto.randomUUID(),
+              name: c.name,
+              amount: c.matchAmount,
+              cadence: 'monthly',
+              kind: 'other',
+              lane: 'protected_living',
+              is_protected: false,
+              is_active: true,
+              next_due: d.toISOString().slice(0, 10),
+              end_date: null,
+              note: 'Auto-seeded from monthly transaction log',
+              created_at: now,
+              updated_at: now,
+            }
+            await new Promise((res, rej) => {
+              const r = rStore.add(row)
+              r.onsuccess = () => res()
+              r.onerror = () => rej(r.error)
+            })
+            inserted++
+          }
+          await new Promise((res, rej) => {
+            const r = sStore.put({ key: SEED_FLAG_KEY, value: 'true', updated_at: now })
+            r.onsuccess = () => res()
+            r.onerror = () => rej(r.error)
+          })
+          await new Promise((res) => { tx.oncomplete = res })
+
+          const all = await new Promise((res, rej) => {
+            const r = db.transaction('recurringItems').objectStore('recurringItems').getAll()
+            r.onsuccess = () => res(r.result || [])
+            r.onerror = () => rej(r.error)
+          })
+          out.className = 'ok'
+          out.textContent = `Done.\nInserted: ${inserted}\nSkipped: ${skipped}\nrecurringItems now:\n` +
+            all.map((r) => `  - ${r.name} | ${r.amount} | ${r.cadence} | next: ${r.next_due}`).join('\n')
+        } catch (e) {
+          out.className = 'err'
+          out.textContent = 'Failed: ' + (e && e.message ? e.message : String(e))
+        }
+      }
+
+      document.getElementById('run').addEventListener('click', run)
+    </script>
+  </body>
+</html>

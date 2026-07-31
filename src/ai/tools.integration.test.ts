@@ -15,7 +15,7 @@ import 'fake-indexeddb/auto'
 import { db } from '@db/db'
 import type { Allowance, RecurringItem } from '@db/types'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { executeReadTool, executeWriteTool } from './tools'
+import { describeWriteLive, executeReadTool, executeWriteTool } from './tools'
 
 const ACC_ID = 'acc-gopay'
 
@@ -309,9 +309,14 @@ describe('Tool Contract: invalid input rejected before persistence', () => {
     expect(res.error).toContain('nonexistent')
   })
 
-  it('update_account_balance rejects bank accounts (derive from transactions)', async () => {
+  // D1 reverses the old behaviour here. This tool used to refuse bank accounts
+  // outright ("Bank balances derive from transactions"), which left the most
+  // common account type with no correction path at all. It now books the same
+  // adjustment transaction the Set-true-balance sheet writes, for every type.
+  const BANK = '22222222-2222-4222-8222-222222222222'
+  async function addBankAccount() {
     await db.accounts.add({
-      id: 'acc-bca',
+      id: BANK,
       name: 'BCA',
       institution: 'BCA',
       account_type: 'bank',
@@ -323,14 +328,68 @@ describe('Tool Contract: invalid input rejected before persistence', () => {
       last_balance_updated_at: null,
       created_at: '',
     })
+  }
+
+  it('update_account_balance corrects a bank account by booking an adjustment', async () => {
+    await addBankAccount()
     const res = JSON.parse(
       await executeWriteTool('update_account_balance', {
-        account_id: 'acc-bca',
+        account_id: BANK,
         new_balance: 5_000_000,
       }),
     )
+
+    expect(res.saved).toBe(true)
+    const adjustments = (await db.transactions.toArray()).filter((t) => t.is_adjustment)
+    expect(adjustments).toHaveLength(1)
+    expect(adjustments[0]).toMatchObject({
+      account_id: BANK,
+      amount: 5_000_000,
+      direction: 'in',
+      is_adjustment: true,
+    })
+  })
+
+  it('update_account_balance leaves the onboarding anchor alone', async () => {
+    await addBankAccount()
+    await executeWriteTool('update_account_balance', {
+      account_id: BANK,
+      new_balance: 5_000_000,
+    })
+    const acc = await db.accounts.get(BANK)
+    expect(acc?.manual_balance_override).toBeNull()
+  })
+
+  it('update_account_balance reports a no-op instead of writing one', async () => {
+    await addBankAccount()
+    const res = JSON.parse(
+      await executeWriteTool('update_account_balance', {
+        account_id: BANK,
+        new_balance: 0,
+      }),
+    )
     expect(res.error).toBeDefined()
-    expect(res.error).toContain('Bank balances')
+    expect(await db.transactions.count()).toBe(0)
+  })
+
+  // SEC-5b — the flag that hides a row from every spending signal must not be
+  // reachable from model output. A statement image that talks the model into
+  // setting it would otherwise produce spending nobody can see.
+  it('log_transactions ignores an is_adjustment field in its input', async () => {
+    await addBankAccount()
+    await executeWriteTool('log_transactions', {
+      transactions: [
+        {
+          date: '2026-07-10',
+          amount: 50_000,
+          direction: 'out',
+          account_id: BANK,
+          is_adjustment: true,
+        },
+      ],
+    })
+    const [logged] = await db.transactions.toArray()
+    expect(logged?.is_adjustment).toBeFalsy()
   })
 
   it('delete_memory rejects unknown memory id', async () => {
@@ -443,5 +502,65 @@ describe('Failure Contract: failed tool call causes no mutation', () => {
     expect(res.errors).toHaveLength(1)
     const all = await db.transactions.toArray()
     expect(all).toHaveLength(1)
+  })
+})
+
+// SEC-5 — the confirmation card is the gate between model output and a written
+// balance. "Set to Rp 5.000.000" alone doesn't tell the user how far the ledger
+// is about to move; the delta does, and that is what makes a wrong figure
+// (including one talked into the model by a pasted statement) obvious.
+describe('describeWriteLive — balance correction confirm card', () => {
+  const BANK2 = '33333333-3333-4333-8333-333333333333'
+
+  beforeEach(async () => {
+    await db.accounts.add({
+      id: BANK2,
+      name: 'BCA',
+      institution: 'BCA',
+      account_type: 'bank',
+      lane: 'protected_living',
+      currency: 'IDR',
+      is_protected: false,
+      is_active: true,
+      manual_balance_override: null,
+      last_balance_updated_at: null,
+      created_at: '',
+    })
+    await db.transactions.add({
+      id: '44444444-4444-4444-8444-444444444444',
+      date: '2026-07-01',
+      amount: 690_000,
+      title: null,
+      direction: 'in',
+      account_id: BANK2,
+      category_id: null,
+      lane: 'protected_living',
+      source: 'manual',
+      note: null,
+      original_amount: null,
+      overridden_amount: null,
+      override_note: null,
+      overridden_at: null,
+      is_transfer: false,
+      transfer_pair_id: null,
+      recurring_item_id: null,
+      created_at: '',
+    })
+  })
+
+  it('shows the account, the before and after, and the signed delta', async () => {
+    const [line] = await describeWriteLive('update_account_balance', {
+      account_id: BANK2,
+      new_balance: 412_000,
+    })
+    expect(line).toContain('BCA')
+    expect(line).toContain('690.000')
+    expect(line).toContain('412.000')
+    expect(line).toContain('278.000')
+  })
+
+  it('falls back to the plain summary for other tools', async () => {
+    const lines = await describeWriteLive('save_memory', { content: 'pays on the 25th' })
+    expect(lines[0]).toContain('pays on the 25th')
   })
 })

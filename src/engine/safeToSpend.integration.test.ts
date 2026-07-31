@@ -181,6 +181,42 @@ describe('Safe-to-Spend integration: full DB→engine path', () => {
     expect(r).toBeNull()
   })
 
+  // D1 — a balance correction is a transaction (is_adjustment), and it must
+  // never draw the personal pool. If it did, correcting the ledger would cost
+  // the user their daily allowance, and nobody would ever correct anything.
+  it('an adjustment transaction is not a week draw', () => {
+    expect(isWeekDraw(txn({ is_adjustment: true }))).toBe(false)
+  })
+
+  it('a legacy row without is_adjustment is still a week draw', () => {
+    // Rows written before the field existed (cloud pulls from another device,
+    // restored pre-field backups) carry undefined — same convention as
+    // recurring_item_id. Truthiness, never === false.
+    const legacy = txn({})
+    delete (legacy as Partial<Transaction>).is_adjustment
+    expect(isWeekDraw(legacy)).toBe(true)
+  })
+
+  it('an adjustment in the current week does not move safe-to-spend', async () => {
+    await db.transactions.bulkPut([
+      txn({ id: 't-coffee', date: '2026-07-07', amount: 50_000, title: 'Kopi' }),
+    ])
+    const before = await computeFromDB(TUE)
+
+    await db.transactions.put(
+      txn({
+        id: 't-correction',
+        date: '2026-07-07',
+        amount: 278_000,
+        title: 'Balance correction',
+        is_adjustment: true,
+      }),
+    )
+    const after = await computeFromDB(TUE)
+
+    expect(after).toEqual(before)
+  })
+
   it('deterministic: same data + same date produces identical result', async () => {
     await db.transactions.bulkPut([
       txn({ id: 't-coffee', date: '2026-07-07', amount: 50_000, title: 'Kopi' }),

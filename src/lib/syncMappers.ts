@@ -14,6 +14,7 @@ export const CLOUD_TABLE: Record<SyncTable, string> = {
   recurringItems: 'recurring_items',
   incomeEvents: 'income_events',
   transactions: 'transactions',
+  balanceCorrections: 'balance_corrections',
   milestones: 'milestones',
   netWorthSnapshots: 'net_worth_snapshots',
   allowance: 'allowances',
@@ -88,6 +89,7 @@ export function fromCloudRow(table: SyncTable, row: Record<string, unknown>): Re
 // numeric fields (or an explicit []) instead of silently inheriting the bug.
 export const NUMERIC: Record<SyncTable, readonly string[]> = {
   transactions: ['amount', 'original_amount', 'overridden_amount'],
+  balanceCorrections: ['previous_balance', 'new_balance'],
   accounts: ['manual_balance_override'],
   assets: ['value', 'quantity_grams', 'price_per_gram', 'fx_amount'],
   envelopes: ['target_amount'],

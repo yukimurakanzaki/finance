@@ -13,6 +13,7 @@ import type {
   Milestone,
   Assumptions,
   AppSetting,
+  BalanceCorrection,
   ChatMessage,
   ChatSession,
   ChatMemory,
@@ -35,6 +36,9 @@ export const SYNC_TABLES = [
   'recurringItems',
   'incomeEvents',
   'transactions',
+  // After transactions: a correction row references the adjustment transaction
+  // it created, and hydrate/push walk this list parents-first.
+  'balanceCorrections',
   'milestones',
   'netWorthSnapshots',
   'allowance',
@@ -58,6 +62,7 @@ class FIDatabase extends Dexie {
   incomeEvents!: Table<IncomeEvent, string>
   milestones!: Table<Milestone, string>
   assumptions!: Table<Assumptions, string>
+  balanceCorrections!: Table<BalanceCorrection, string>
   appSettings!: Table<AppSetting, string>
   chatSessions!: Table<ChatSession, string>
   chatMessages!: Table<ChatMessage, string>
@@ -242,6 +247,22 @@ class FIDatabase extends Dexie {
           }
         }
       })
+
+    // v13: D1 balance corrections — the append-only audit trail behind
+    // "Set true balance". Synced: the cloud `balance_corrections` table and its
+    // household-scoped RLS policy ship alongside this.
+    //
+    // No updated_at index, unlike the v7 tables: pushTable filters dirty rows
+    // in memory rather than querying that index, so adding one would cost
+    // writes and buy nothing.
+    //
+    // transactions.is_adjustment needs no version of its own, for the same
+    // reason recurring_item_id didn't (see the note above v12): it isn't
+    // indexed, and every reader treats missing/undefined as "not an
+    // adjustment", so a full-table backfill would only slow startup.
+    this.version(13).stores({
+      balanceCorrections: 'id, account_id, transaction_id, as_of_date, created_at',
+    })
   }
 }
 

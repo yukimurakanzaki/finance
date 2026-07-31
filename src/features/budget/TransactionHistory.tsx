@@ -67,8 +67,12 @@ export function TransactionHistory() {
     })
   }, [txns, showTransfers, search, accountMap])
 
-  const totalOut = filtered.filter((t) => t.direction === 'out').reduce((s, t) => s + t.amount, 0)
-  const totalIn = filtered.filter((t) => t.direction === 'in').reduce((s, t) => s + t.amount, 0)
+  // Corrections stay visible in the list below — they are part of the ledger —
+  // but they are not spending or income, so they stay out of these two totals
+  // (D1). Transfers already work this way, gated on the showTransfers toggle.
+  const counted = filtered.filter((t) => !t.is_adjustment)
+  const totalOut = counted.filter((t) => t.direction === 'out').reduce((s, t) => s + t.amount, 0)
+  const totalIn = counted.filter((t) => t.direction === 'in').reduce((s, t) => s + t.amount, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -143,17 +147,21 @@ export function TransactionHistory() {
               }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: 'var(--ink-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {t.note || accountMap.get(t.account_id) || '—'}
+                  {t.title || t.note || accountMap.get(t.account_id) || '—'}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>
                   {t.date} · {accountMap.get(t.account_id) ?? '?'}
                   {t.is_transfer && ' · transfer'}
+                  {/* D1 — reads as bookkeeping, not spending. */}
+                  {t.is_adjustment && ' · correction, not counted as spending'}
                 </div>
               </div>
             </div>
             <div style={{
               fontSize: 13, fontFamily: 'var(--font-mono)', flexShrink: 0, marginLeft: 10,
-              color: t.direction === 'in' ? 'var(--engine)' : 'var(--ink-1)',
+              color: t.is_adjustment
+                ? 'var(--ink-3)'
+                : t.direction === 'in' ? 'var(--engine)' : 'var(--ink-1)',
             }}>
               {t.direction === 'in' ? '+' : '−'}{formatRp(t.amount)}
             </div>

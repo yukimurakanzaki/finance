@@ -16,6 +16,8 @@ import { refreshAssetPrices } from '@lib/marketPrices'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { useAccountBalances } from '../../hooks/useAccountBalances'
+import { useLongPress } from '../../hooks/useLongPress'
+import { BalanceCorrectionSheet } from './BalanceCorrectionSheet'
 import { AccountForm } from './AccountForm'
 import { AssetForm } from './AssetForm'
 
@@ -32,12 +34,16 @@ export function AssetsScreen() {
 
   const [accountFormOpen, setAccountFormOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | undefined>()
+  // D1 — the account whose balance is being corrected. Long-pressing a balance
+  // opens this directly; tap still opens the edit form.
+  const [correcting, setCorrecting] = useState<Account | undefined>()
   const [assetFormOpen, setAssetFormOpen] = useState(false)
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>()
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
 
   const hasAutoAssets = assets?.some((a) => a.auto_price !== null) ?? false
+  const correctPress = useLongPress((a: Account) => setCorrecting(a))
 
   async function handleRefreshPrices() {
     setRefreshing(true)
@@ -57,6 +63,9 @@ export function AssetsScreen() {
     setAccountFormOpen(true)
   }
   function openEditAccount(a: Account) {
+    // The press that just opened the correction sheet still dispatches a click,
+    // which would stack the edit form on top of it.
+    if (correctPress.consumedClick()) return
     setEditingAccount(a)
     setAccountFormOpen(true)
   }
@@ -112,6 +121,8 @@ export function AssetsScreen() {
             <Row
               key={acc.id}
               onClick={() => openEditAccount(acc)}
+              {...correctPress.handlers(acc)}
+              title="Tap to edit · long-press to set the true balance"
               primary={acc.name}
               caption={
                 <span
@@ -307,6 +318,13 @@ export function AssetsScreen() {
         onClose={() => setAssetFormOpen(false)}
         editing={editingAsset}
       />
+      {correcting && (
+        <BalanceCorrectionSheet
+          open
+          onClose={() => setCorrecting(undefined)}
+          account={correcting}
+        />
+      )}
     </Screen>
   )
 }

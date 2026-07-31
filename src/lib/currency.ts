@@ -45,12 +45,24 @@ export function formatRpInput(raw: string): string {
 // group — returns null so forms surface their "Enter a valid amount" error
 // instead of silently mis-parsing.
 export function parseRpInput(raw: string): number | null {
+  const n = parseRpStrict(raw)
+  return n === null || n <= 0 ? null : n
+}
+
+// Same strict grammar, but zero is legal. A balance of Rp 0 is a real
+// statement about an account — "it's empty" — where an amount of Rp 0 is a
+// mistake. Used by the balance-correction sheet (D1), where refusing zero
+// would repeat the O1 bug of conflating "empty" with "never set".
+export function parseRpBalance(raw: string): number | null {
+  return parseRpStrict(raw)
+}
+
+function parseRpStrict(raw: string): number | null {
   const s = raw.trim()
   if (!s) return null
   // Plain digits, or grouped thousands with a single consistent separator.
   if (!/^\d+$/.test(s) && !/^\d+([.,])\d{3}(?:\1\d{3})*$/.test(s))
     return null
   const n = Number(s.replace(/[.,]/g, ''))
-  if (!Number.isFinite(n) || n <= 0) return null
-  return n
+  return Number.isFinite(n) ? n : null
 }
