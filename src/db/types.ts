@@ -97,6 +97,13 @@ export interface Transaction {
   // it (by giving the row a category) turns it into an ordinary transaction.
   is_adjustment?: boolean
   created_at: string
+  /**
+   * Stamped by the Dexie `creating`/`updating` hooks on every synced table and
+   * used as the watermark the push filters on. Optional because no caller sets
+   * it by hand — declared so the rare write that must stamp it explicitly (a
+   * `.modify()`, which bypasses those hooks) can be type-checked.
+   */
+  updated_at?: string
 }
 
 export interface Category {
@@ -178,6 +185,13 @@ export interface BalanceCorrection {
    */
   created_by?: string | null
   created_at: string
+  /**
+   * Stamped by the Dexie `creating`/`updating` hooks on every synced table and
+   * used as the watermark the push filters on. Optional because no caller sets
+   * it by hand — declared so the rare write that must stamp it explicitly (a
+   * `.modify()`, which bypasses those hooks) can be type-checked.
+   */
+  updated_at?: string
 }
 
 export interface Allowance {

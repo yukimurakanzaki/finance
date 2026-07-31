@@ -1,5 +1,6 @@
 import { BottomSheet } from '@components/BottomSheet'
 import { Btn, Field, Input, Select } from '@components/FormField'
+import { parseQuantity, parseRpInput } from '@lib/currency'
 import { assetsRepo } from '@db/repositories/assets.repo'
 import type { Asset, AssetType, Lane } from '@db/types'
 import { todayISO } from '@lib/dates'
@@ -9,7 +10,7 @@ import {
   goldPerGramIDR,
   idrPerUnit,
 } from '@lib/marketPrices'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface Props {
   open: boolean
@@ -58,13 +59,23 @@ export function AssetForm({ open, onClose, editing }: Props) {
   )
   const [saving, setSaving] = useState(false)
   const [fetchNote, setFetchNote] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // Disarm the delete confirm when the sheet closes: the component stays
+  // mounted, so without this it reopens already armed and one stray tap
+  // deletes. Same reason TransactionForm does it.
+  useEffect(() => {
+    if (!open) setConfirmDelete(false)
+  }, [open])
 
   const isGold = assetType === 'gold'
   const isCurrency = assetType === 'currency'
+  // parseQuantity, not the money parsers: grams are a physical quantity where
+  // 10.5 must stay 10.5. Stripping the separator made it 105 — a tenfold
+  // overstatement of the holding, and of net worth with it.
   const computedGoldValue =
     isGold && !autoGold && grams && pricePerGram
-      ? Number(grams.replace(/[.,]/g, '')) *
-        Number(pricePerGram.replace(/[.,]/g, ''))
+      ? (parseQuantity(grams) ?? 0) * (parseRpInput(pricePerGram) ?? 0)
       : null
 
   async function handleSave() {
@@ -73,12 +84,9 @@ export function AssetForm({ open, onClose, editing }: Props) {
     setFetchNote(null)
     const today = todayISO()
 
-    let computedValue =
-      computedGoldValue ?? (Number(value.replace(/[.,]/g, '')) || 0)
-    let perGram = pricePerGram
-      ? Number(pricePerGram.replace(/[.,]/g, ''))
-      : null
-    const gramsNum = grams ? Number(grams.replace(/[.,]/g, '')) : null
+    let computedValue = computedGoldValue ?? (parseRpInput(value) ?? 0)
+    let perGram = pricePerGram ? parseRpInput(pricePerGram) : null
+    const gramsNum = grams ? parseQuantity(grams) : null
     const fxAmountNum = fxAmount ? Number(fxAmount.replace(/,/g, '.')) : null
 
     // Auto-priced assets: fetch live price now so the value is right immediately
@@ -161,7 +169,7 @@ export function AssetForm({ open, onClose, editing }: Props) {
             <Field label="Weight (grams)">
               <Input
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 mono
                 value={grams}
                 onChange={(e) => setGrams(e.target.value)}
@@ -279,6 +287,34 @@ export function AssetForm({ open, onClose, editing }: Props) {
         <Btn onClick={handleSave} disabled={saving || !name} fullWidth>
           {saving ? 'Saving…' : editing ? 'Save changes' : 'Add asset'}
         </Btn>
+
+        {/* D2 — assets had no delete path at all before this: create and edit,
+            forever. Two-step confirm rather than window.confirm, matching the
+            pattern TransactionForm already uses. */}
+        {editing?.id && (
+          <Btn
+            variant="danger"
+            fullWidth
+            onClick={async () => {
+              if (!confirmDelete) {
+                setConfirmDelete(true)
+                return
+              }
+              await assetsRepo.remove(editing.id as string)
+              onClose()
+            }}
+          >
+            {confirmDelete
+              ? `Delete "${editing.name}" — tap again to confirm`
+              : 'Delete asset'}
+          </Btn>
+        )}
+        {confirmDelete && (
+          <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>
+            It leaves your net worth from today. Past net-worth snapshots are
+            unchanged.
+          </div>
+        )}
       </div>
     </BottomSheet>
   )

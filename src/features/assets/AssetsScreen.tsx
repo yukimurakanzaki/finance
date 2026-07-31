@@ -9,6 +9,7 @@ import {
   StatTile,
 } from '@components/ui'
 import { db } from '@db/db'
+import { accountsRepo } from '@db/repositories/accounts.repo'
 import type { Account, Asset } from '@db/types'
 import { formatRp } from '@lib/currency'
 import { todayISO } from '@lib/dates'
@@ -22,9 +23,11 @@ import { AccountForm } from './AccountForm'
 import { AssetForm } from './AssetForm'
 
 export function AssetsScreen() {
-  const accounts = useLiveQuery(() =>
-    db.accounts.filter((a) => a.is_active).toArray(),
-  )
+  const allAccounts = useLiveQuery(() => db.accounts.toArray())
+  const accounts = allAccounts?.filter((a) => a.is_active)
+  // D2 — deactivated accounts stay reachable instead of vanishing: hiding one
+  // is not the same as deleting it, and there was previously no way back.
+  const inactiveAccounts = allAccounts?.filter((a) => !a.is_active) ?? []
   const assets = useLiveQuery(() => db.assets.toArray())
   const lastRefreshed = useLiveQuery(() =>
     db.appSettings.get('prices_last_refreshed_at'),
@@ -41,6 +44,7 @@ export function AssetsScreen() {
   const [editingAsset, setEditingAsset] = useState<Asset | undefined>()
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [showInactive, setShowInactive] = useState(false)
 
   const hasAutoAssets = assets?.some((a) => a.auto_price !== null) ?? false
   const correctPress = useLongPress((a: Account) => setCorrecting(a))
@@ -308,6 +312,41 @@ export function AssetsScreen() {
         </div>
       </section>
 
+      {inactiveAccounts.length > 0 && (
+        <section
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-2)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowInactive((v) => !v)}
+            style={inactiveToggleStyle}
+          >
+            {showInactive ? '▾' : '▸'} Inactive ({inactiveAccounts.length})
+          </button>
+          {showInactive &&
+            inactiveAccounts.map((acc) => (
+              <Row
+                key={acc.id}
+                primary={acc.name}
+                caption={`${acc.institution} · hidden from totals`}
+                right={
+                  <button
+                    type="button"
+                    onClick={() => accountsRepo.reactivate(acc.id as string)}
+                    style={reactivateStyle}
+                  >
+                    Reactivate
+                  </button>
+                }
+              />
+            ))}
+        </section>
+      )}
+
       <AccountForm
         open={accountFormOpen}
         onClose={() => setAccountFormOpen(false)}
@@ -356,4 +395,26 @@ const refreshBtnStyle: React.CSSProperties = {
   color: 'var(--ink-2)',
   cursor: 'pointer',
   fontFamily: 'var(--font-ui)',
+}
+
+const inactiveToggleStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 'var(--space-2) 0',
+  textAlign: 'left',
+  fontFamily: 'var(--font-ui)',
+  fontSize: 'var(--text-caption)',
+  color: 'var(--ink-3)',
+  cursor: 'pointer',
+}
+
+const reactivateStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 'var(--space-2) var(--space-3)',
+  fontFamily: 'var(--font-ui)',
+  fontSize: 'var(--text-caption)',
+  fontWeight: 600,
+  color: 'var(--amber-text)',
+  cursor: 'pointer',
 }
