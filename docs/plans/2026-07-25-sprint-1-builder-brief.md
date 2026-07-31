@@ -18,13 +18,11 @@ Read this whole brief before writing code. Read the plan sections named in each 
    ```bash
    npx tsc --noEmit && npx vitest run
    ```
-   **Current baseline, re-measured 2026-07-31 at `a81e4f2`: 256 tests — 255 passing, 1 failing.** A task is not done if the passing count goes down or the failing count goes up.
+   **Current baseline, re-measured 2026-07-31 at `0f7e8c7`: 256 tests, 256 passing, 0 failing, 30 files.** A task is not done if the passing count goes down or anything fails.
 
-   **That one failure is pre-existing and is not yours.** It is `src/engine/dailyLeftover.test.ts > computeDailyLeftover > a future date returns isProjected: true and equals the last real day's leftover` — expects `1000000`, gets `900000`. It is already red on `main` before you start. Do not "fix" it as a side effect of your task, and do not let it block you — report it unchanged.
+   You should get that number from a plain `npx vitest run` with no flags. If you see a much larger count (434 was the figure before this was cleaned up), your checkout has a stale git worktree under `.claude/worktrees/` making vitest collect a second copy of every test file. Run `git worktree list` — it should show only the repo root.
 
-   **If you see a much larger test count, your checkout is dirty.** A stale git worktree under `.claude/worktrees/` makes vitest collect a second copy of every test file — it inflated the count to 434 and produced a duplicate second failure. Run `git worktree list` before trusting any number.
-
-   *An earlier revision of this brief claimed 545 passing / 0 failing. That figure never matched `main` and has been corrected here; if a previous session quoted 545 at you, ignore it.*
+   *Two earlier revisions of this brief were wrong about this number. One claimed 545 passing / 0 failing, which never matched `main` at all. The next said 255 passing / 1 failing, which was true at `a81e4f2` but has since been fixed in `0f7e8c7` — `dailyLeftover.test.ts` was reading the real system clock, so its projection test failed on the last day of any month. The clock is now pinned. If a previous session quoted either figure at you, ignore it and re-measure.*
 6. **One task, one commit.** Commit message names the task id.
 7. **Reuse before writing.** Helpers that already exist and must not be reimplemented:
    - `deriveBalance(account, txns)` — `src/lib/balances.ts`
