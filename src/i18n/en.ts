@@ -150,6 +150,8 @@ export const en: Translations = {
       digital_wallet: 'Digital wallet',
       cash: 'Cash',
     },
+    overdrawn: 'Overdrawn',
+    overdrawnSince: (date: string) => `Overdrawn since ${date}`,
     assetTypes: {
       investment_rdpu: 'RDPU',
       investment_equity: 'Equity',

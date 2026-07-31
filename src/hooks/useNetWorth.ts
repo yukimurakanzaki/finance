@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
 import type { Lane, NetWorthSnapshot } from '@db/types'
 import { todayISO } from '@lib/dates'
-import { deriveBalance } from '@lib/balances'
+import { deriveBalance, splitOverdraft } from '@lib/balances'
 
 const STALE_DAYS = 35
 const GOLD_STALE_DAYS = 30
@@ -31,8 +31,15 @@ export function useNetWorth() {
       pass_through: 0,
     }
 
+    // An overdrawn account contributes zero to its own lane and its shortfall to
+    // debt_liability, which `total` below already subtracts (FR-3.3). Same split
+    // the AI context applies, so the two can't disagree about net worth.
     for (const acc of accounts) {
-      byLane[acc.lane] += deriveBalance(acc, allTxns)
+      const { assetPortion, overdraftLiability } = splitOverdraft(
+        deriveBalance(acc, allTxns),
+      )
+      byLane[acc.lane] += assetPortion
+      byLane.debt_liability += overdraftLiability
     }
 
     for (const asset of assets) {

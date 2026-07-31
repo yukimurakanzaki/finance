@@ -154,6 +154,10 @@ export interface Translations {
       digital_wallet: string
       cash: string
     }
+    // T3 / FR-3.5. `overdrawnSince` takes the date the balance crossed zero;
+    // `overdrawn` is the dateless fallback when the crossing predates the ledger.
+    overdrawn: string
+    overdrawnSince: (date: string) => string
     // Keys mirror the `AssetType` union in db/types.ts.
     assetTypes: {
       investment_rdpu: string
