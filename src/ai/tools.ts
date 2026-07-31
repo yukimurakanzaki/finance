@@ -8,6 +8,10 @@ import {
 import type { Cadence, Lane, RecurringKind } from '@db/types'
 import { computeAffordability } from '@engine/affordability'
 import { isActualFlow, safeToSpendFromLedger } from '@engine/safeToSpend'
+import {
+  correctionsRepo,
+  type CorrectBalanceResult,
+} from '@db/repositories/corrections.repo'
 import { formatRpFull } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { resolveRecurringItemId } from '@lib/recurringMatch'
@@ -250,12 +254,19 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.ToolUnion[] = [
   {
     name: 'update_account_balance',
     description:
-      'Set the balance of a digital wallet or cash account (bank balances derive from transactions and cannot be set directly). Requires confirmation.',
+      "Correct an account's balance to what it actually holds, for any account type including banks. Use when the user says the app's figure is wrong and they don't want to reconstruct the missing transactions. The gap is booked as a dated balance correction: it moves the balance and net worth but never counts as spending or income, and can be given a category later. Do NOT use it to record a purchase — use log_transactions for that. Requires confirmation.",
     input_schema: {
       type: 'object',
       properties: {
         account_id: { type: 'string' },
-        new_balance: { type: 'number', description: 'New balance in IDR' },
+        new_balance: {
+          type: 'number',
+          description: 'What the account actually holds now, in IDR',
+        },
+        note: {
+          type: 'string',
+          description: "Optional short note, e.g. \"cash I forgot to log\"",
+        },
       },
       required: ['account_id', 'new_balance'],
     },
@@ -631,21 +642,36 @@ async function updateAccountBalance(input: ToolInput): Promise<string> {
   const id = String(input['account_id'])
   const account = await db.accounts.get(id)
   if (!account) return JSON.stringify({ error: `No account with id ${id}` })
-  if (account.account_type === 'bank') {
-    return JSON.stringify({
-      error:
-        'Bank balances derive from transactions. Log a correcting transaction instead.',
-    })
-  }
-  await db.accounts.update(id, {
-    manual_balance_override: Number(input['new_balance']),
-    last_balance_updated_at: now(),
+
+  // D1 — every account type, bank included, corrects the same way the
+  // Set-true-balance sheet does: book the gap as an adjustment transaction
+  // through the shared repository. This tool used to refuse bank accounts,
+  // which left the most common type with no correction path at all.
+  const result = await correctionsRepo.correctBalance({
+    accountId: id,
+    actualBalance: Number(input['new_balance']),
+    note: typeof input['note'] === 'string' ? input['note'] : null,
   })
+
+  if (!result.ok) return JSON.stringify({ error: correctionError(result, account.name) })
+
   return JSON.stringify({
     saved: true,
     account: account.name,
     new_balance: input['new_balance'],
+    booked_as: 'balance correction (not counted as spending)',
   })
+}
+
+function correctionError(
+  result: Exclude<CorrectBalanceResult, { ok: true }>,
+  accountName: string,
+): string {
+  if (result.reason === 'before_anchor')
+    return `${accountName}'s starting balance was set on ${result.anchorDate}; a correction must be dated after that.`
+  if (result.reason === 'future_date')
+    return 'A correction cannot be dated in the future.'
+  return `${accountName} already shows that balance — nothing to correct.`
 }
 
 async function saveMemory(input: ToolInput): Promise<string> {
@@ -684,6 +710,33 @@ async function createCustomSkill(input: ToolInput): Promise<string> {
 }
 
 // ---------- Human-readable summaries for the confirmation card ----------
+
+// SEC-5 — the confirm card is the gate between model output and a written
+// balance, so for a correction it has to show how far the ledger is about to
+// move, not just where it lands. "Set to Rp 5.000.000" hides a wrong figure;
+// "Rp 690.000 → Rp 5.000.000 (+Rp 4.310.000)" makes it obvious. Needs a DB
+// read, hence the async twin of describeWrite rather than a wider signature
+// change on every other tool's summary.
+export async function describeWriteLive(
+  name: string,
+  input: ToolInput,
+): Promise<string[]> {
+  if (name !== 'update_account_balance') return describeWrite(name, input)
+
+  const account = await db.accounts.get(String(input['account_id']))
+  if (!account?.id) return describeWrite(name, input)
+
+  const actualBalance = Number(input['new_balance'])
+  const plan = await correctionsRepo.preview({ accountId: account.id, actualBalance })
+  if (!plan.ok) return [`${account.name}: ${correctionError(plan, account.name)}`]
+
+  const before = actualBalance - plan.delta
+  const sign = plan.delta < 0 ? '−' : '+'
+  return [
+    `${account.name}: ${formatRpFull(before)} → ${formatRpFull(actualBalance)} ` +
+      `(${sign}${formatRpFull(Math.abs(plan.delta))}, booked as a correction — not spending)`,
+  ]
+}
 
 export function describeWrite(name: string, input: ToolInput): string[] {
   switch (name) {
