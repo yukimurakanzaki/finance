@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie'
+import { scrubNumericStrings } from '@lib/syncMappers'
 import type {
   Account,
   Asset,
@@ -235,6 +236,49 @@ class FIDatabase extends Dexie {
     // no longer draws the personal pool) needs NO schema version: it is not
     // indexed, and readers treat missing/undefined as untagged (isWeekDraw),
     // so a full-table backfill upgrade would only slow startup for nothing.
+
+    // v13: scrub string-typed numeric fields from synced tables. Before
+    // `coerceNumeric` lived in `fromCloudRow`, a cloud pull could land a
+    // Postgres bigint (returned as a string over the wire) into a Dexie
+    // number column, and the next sync push would 400 on the same bigint
+    // column. Walk every synced table once, coerce in place, and reset the
+    // push watermark for any table where at least one row was touched so
+    // the corrected values re-upload to the cloud on the next sync cycle.
+    // Runs once per device, no-op when no rows match.
+    //
+    // Authored as v12 on `sprint1/t4-import-reliability`, which branched
+    // before Sprint 1 Task 1 claimed v12 for `onboarding_snoozed_until`.
+    // Renumbered to 13 on cherry-pick: two `.version(12)` blocks merge
+    // without a git conflict but break the upgrade chain at runtime.
+    this.version(13)
+      .stores({})
+      .upgrade((tx) =>
+        // `.modify()` does NOT bypass the 'updating' hook — it fires per row and
+        // restamps updated_at. The original branch assumed otherwise, which made
+        // this upgrade rewrite the watermark on every row it walked: a scrubbed
+        // local row would then beat a NEWER cloud row on last-write-wins. Same
+        // hazard v12's backfill guards against, so use the same guard. The
+        // re-push is driven by the watermark rewind below, never by updated_at.
+        withoutRestamp(async () => {
+          for (const name of SYNC_TABLES) {
+            let touched = 0
+            await tx
+              .table(name)
+              .toCollection()
+              .modify((row: Record<string, unknown>) => {
+                if (scrubNumericStrings(name as SyncTable, row)) touched++
+              })
+            if (touched > 0) {
+              // Force a re-push of this table by rewinding its push watermark.
+              // updated_at is deliberately left untouched (see above), so the
+              // watermark is the only thing that can re-select these rows.
+              await tx
+                .table('syncMeta')
+                .put({ key: `pushed:${name}`, value: '1970-01-01T00:00:00.000Z' })
+            }
+          }
+        }),
+      )
   }
 }
 
