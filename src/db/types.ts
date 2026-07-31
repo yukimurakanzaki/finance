@@ -133,6 +133,35 @@ export interface RecurringItem {
   deleted_at?: string | null
 }
 
+// D1 — append-only audit of every balance correction. One row per correction,
+// pointing at the adjustment transaction it created, so "who changed this and
+// when" has an answer in a two-member household. Never edited in place: an undo
+// appends a reverting row carrying `reverts_id`.
+//
+// ponytail: local-only for now — not in SYNC_TABLES, because the cloud
+// `balance_corrections` table and its RLS policy don't exist yet. The
+// corrections themselves are ordinary transactions, so they already sync; only
+// this audit trail stays on-device until the Supabase migration lands.
+export interface BalanceCorrection {
+  id?: string
+  account_id: string
+  /** The adjustment transaction this correction wrote; null on a reverting row. */
+  transaction_id: string | null
+  /** Set on a reverting row: the correction it undoes. */
+  reverts_id: string | null
+  previous_balance: number
+  new_balance: number
+  as_of_date: string
+  note: string | null
+  /**
+   * Who made it. Stays null on-device: SEC-2 requires this to be derived from
+   * the authenticated session server-side, never accepted from the client, or
+   * a member could forge attribution.
+   */
+  author_member_id: string | null
+  created_at: string
+}
+
 export interface Allowance {
   id?: string
   monthly_amount: number

@@ -13,6 +13,7 @@ import type {
   Milestone,
   Assumptions,
   AppSetting,
+  BalanceCorrection,
   ChatMessage,
   ChatSession,
   ChatMemory,
@@ -58,6 +59,7 @@ class FIDatabase extends Dexie {
   incomeEvents!: Table<IncomeEvent, string>
   milestones!: Table<Milestone, string>
   assumptions!: Table<Assumptions, string>
+  balanceCorrections!: Table<BalanceCorrection, string>
   appSettings!: Table<AppSetting, string>
   chatSessions!: Table<ChatSession, string>
   chatMessages!: Table<ChatMessage, string>
@@ -242,6 +244,20 @@ class FIDatabase extends Dexie {
           }
         }
       })
+
+    // v13: D1 balance corrections — the append-only audit trail behind
+    // "Set true balance". Local-only for now (absent from SYNC_TABLES): the
+    // corrections themselves are ordinary adjustment transactions and sync
+    // with everything else, but the cloud `balance_corrections` table and its
+    // RLS policy don't exist yet.
+    //
+    // transactions.is_adjustment needs no version of its own, for the same
+    // reason recurring_item_id didn't (see the note above v12): it isn't
+    // indexed, and every reader treats missing/undefined as "not an
+    // adjustment", so a full-table backfill would only slow startup.
+    this.version(13).stores({
+      balanceCorrections: 'id, account_id, transaction_id, as_of_date, created_at',
+    })
   }
 }
 
