@@ -67,8 +67,12 @@ export function TransactionHistory() {
     })
   }, [txns, showTransfers, search, accountMap])
 
-  const totalOut = filtered.filter((t) => t.direction === 'out').reduce((s, t) => s + t.amount, 0)
-  const totalIn = filtered.filter((t) => t.direction === 'in').reduce((s, t) => s + t.amount, 0)
+  // Corrections stay visible in the list below — they are part of the ledger —
+  // but they are not spending or income, so they stay out of these two totals
+  // (D1). Transfers already work this way, gated on the showTransfers toggle.
+  const counted = filtered.filter((t) => !t.is_adjustment)
+  const totalOut = counted.filter((t) => t.direction === 'out').reduce((s, t) => s + t.amount, 0)
+  const totalIn = counted.filter((t) => t.direction === 'in').reduce((s, t) => s + t.amount, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

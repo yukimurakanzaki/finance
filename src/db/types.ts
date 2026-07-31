@@ -88,6 +88,14 @@ export interface Transaction {
   // committed payments live in the recurring bucket and are excluded from the
   // personal safe-to-spend pool draw. null for ordinary discretionary spend.
   recurring_item_id: string | null
+  // D1 — this row is a balance correction, not real spending: the user told us
+  // what the account actually holds and we booked the gap. It moves the account
+  // balance and net worth, but is excluded from the safe-to-spend draw, the
+  // daily leftover ledger, the category breakdown and Report actuals.
+  // Optional, not required: rows written before this field existed carry
+  // undefined, so every reader tests truthiness — never `=== false`. Clearing
+  // it (by giving the row a category) turns it into an ordinary transaction.
+  is_adjustment?: boolean
   created_at: string
 }
 

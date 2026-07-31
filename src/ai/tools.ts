@@ -7,7 +7,7 @@ import {
 } from '@db/repositories/transactions.repo'
 import type { Cadence, Lane, RecurringKind } from '@db/types'
 import { computeAffordability } from '@engine/affordability'
-import { safeToSpendFromLedger } from '@engine/safeToSpend'
+import { isActualFlow, safeToSpendFromLedger } from '@engine/safeToSpend'
 import { formatRpFull } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { resolveRecurringItemId } from '@lib/recurringMatch'
@@ -425,11 +425,15 @@ async function queryTransactions(input: ToolInput): Promise<string> {
   const accName = new Map(accounts.map((a) => [a.id, a.name]))
   const catName = new Map(categories.map((c) => [c.id, c.name]))
 
-  const totalIn = rows
-    .filter((t) => t.direction === 'in' && !t.is_transfer)
+  // Same actuals definition the Report screen uses (isActualFlow): transfers
+  // and balance corrections are not spend or income. A chat reply quoting a
+  // different total than the screen is the fastest way to lose earned trust.
+  const actuals = rows.filter(isActualFlow)
+  const totalIn = actuals
+    .filter((t) => t.direction === 'in')
     .reduce((s, t) => s + t.amount, 0)
-  const totalOut = rows
-    .filter((t) => t.direction === 'out' && !t.is_transfer)
+  const totalOut = actuals
+    .filter((t) => t.direction === 'out')
     .reduce((s, t) => s + t.amount, 0)
 
   rows.sort((a, b) => b.date.localeCompare(a.date))

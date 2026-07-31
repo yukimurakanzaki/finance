@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '@db/db'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
 import type { Transaction } from '@db/types'
+import { isActualFlow } from '@engine/safeToSpend'
 
 // Use a fixed month to avoid date-determinism issues.
 const YM = '2026-07'
@@ -34,14 +35,17 @@ const txn = (over: Partial<Transaction>): Transaction => ({
   ...over,
 })
 
-// Replicates ReportScreen.tsx aggregation logic.
+// Replicates ReportScreen.tsx aggregation logic — through the same shared
+// predicate the screen uses, so this test pins real code rather than a copy of
+// it that can drift.
 async function computeActuals(yearMonth: string) {
   const monthTxns = await transactionsRepo.getByMonth(yearMonth)
-  const income = monthTxns
-    .filter((t) => t.direction === 'in' && !t.is_transfer)
+  const actuals = monthTxns.filter(isActualFlow)
+  const income = actuals
+    .filter((t) => t.direction === 'in')
     .reduce((s, t) => s + t.amount, 0)
-  const expenses = monthTxns
-    .filter((t) => t.direction === 'out' && !t.is_transfer)
+  const expenses = actuals
+    .filter((t) => t.direction === 'out')
     .reduce((s, t) => s + t.amount, 0)
   return { income, expenses, net: income - expenses, count: monthTxns.length }
 }
@@ -201,5 +205,35 @@ describe('Report actuals: T1 transfer-exclusion regression', () => {
     // pass-through counted in actuals (current behavior — documented)
     expect(income).toBe(3_000_000)
     expect(expenses).toBe(3_050_000)
+  })
+
+  // D1 — a balance correction states what an account really holds. It moves the
+  // balance, but it is not money the household spent or earned, so it must not
+  // land in the month's actuals or in the by-category breakdown those actuals
+  // reconcile against.
+  it('a balance correction does not inflate expenses', async () => {
+    await db.transactions.bulkPut([
+      txn({ id: 't-coffee', date: '2026-07-07', amount: 50_000, title: 'Kopi' }),
+      txn({ id: 't-fix', date: '2026-07-09', amount: 278_000, title: 'Balance correction', is_adjustment: true }),
+    ])
+    const { expenses } = await computeActuals(YM)
+    expect(expenses).toBe(50_000)
+  })
+
+  it('a positive balance correction does not inflate income', async () => {
+    await db.transactions.bulkPut([
+      txn({ id: 't-salary', date: '2026-07-25', amount: 12_000_000, direction: 'in', title: 'Gaji' }),
+      txn({ id: 't-fix', date: '2026-07-09', amount: 400_000, direction: 'in', title: 'Balance correction', is_adjustment: true }),
+    ])
+    const { income } = await computeActuals(YM)
+    expect(income).toBe(12_000_000)
+  })
+
+  it('a legacy row without is_adjustment still counts as an actual', async () => {
+    const legacy = txn({ id: 't-legacy', date: '2026-07-07', amount: 60_000 })
+    delete (legacy as Partial<Transaction>).is_adjustment
+    await db.transactions.bulkPut([legacy])
+    const { expenses } = await computeActuals(YM)
+    expect(expenses).toBe(60_000)
   })
 })
