@@ -64,6 +64,8 @@ export function BalanceCorrectionSheet({ open, onClose, account }: Props) {
           {account.name}
         </div>
 
+        <DuplicateWarning accountId={accountId} />
+
         <DerivedRow accountId={accountId} asOfDate={asOfDate} />
 
         <Field label="Actual balance (Rp)">
@@ -137,6 +139,38 @@ export function BalanceCorrectionSheet({ open, onClose, account }: Props) {
   )
 }
 
+// Edge case 7 — two devices corrected this account offline and both
+// adjustments applied, so the balance is off by the whole duplicate. The app
+// can't know which one the user meant, so it says what happened and offers to
+// undo one. Never auto-merges.
+function DuplicateWarning({ accountId }: { accountId: string }) {
+  const groups =
+    useLiveQuery(() => correctionsRepo.duplicatesFor(accountId), [accountId]) ?? []
+  const group = groups[0]
+  if (!group) return null
+
+  const extra = group.ids.length - 1
+  return (
+    <div style={duplicateStyle} role="alert">
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+        {group.ids.length} corrections for {group.as_of_date}
+      </div>
+      <div>
+        Each one started from {formatRpFull(group.previous_balance)}, so they were
+        made without seeing each other — probably the same correction from two
+        devices. This balance is currently off by {extra} of them.
+      </div>
+      <button
+        type="button"
+        onClick={() => correctionsRepo.revert(group.ids[group.ids.length - 1] as string)}
+        style={undoStyle}
+      >
+        Undo the newest one
+      </button>
+    </div>
+  )
+}
+
 // What the app thinks the account held on the chosen date — the number the
 // user is disagreeing with.
 function DerivedRow({ accountId, asOfDate }: { accountId: string; asOfDate: string }) {
@@ -206,6 +240,16 @@ const captionStyle: React.CSSProperties = {
 const errorStyle: React.CSSProperties = {
   ...captionStyle,
   color: 'var(--amber-text)',
+}
+
+const duplicateStyle: React.CSSProperties = {
+  fontSize: 'var(--text-caption)',
+  lineHeight: 'var(--leading-caption)',
+  color: 'var(--ink-2)',
+  background: 'var(--bg-2)',
+  border: '1px solid var(--amber)',
+  borderRadius: 'var(--space-2)',
+  padding: 'var(--space-3)',
 }
 
 const undoStyle: React.CSSProperties = {

@@ -1,6 +1,10 @@
 import { deriveBalance } from '@lib/balances'
 import { todayISO } from '@lib/dates'
 import { planCorrection, type CorrectionPlan } from '@engine/balanceCorrection'
+import {
+  findDuplicateCorrections,
+  type DuplicateGroup,
+} from '@engine/correctionDuplicates'
 import { db } from '../db'
 import type { Account, BalanceCorrection, Transaction } from '../types'
 
@@ -32,6 +36,15 @@ export const correctionsRepo = {
 
   latestFor: async (accountId: string): Promise<BalanceCorrection | undefined> =>
     (await correctionsRepo.byAccount(accountId))[0],
+
+  /**
+   * Corrections on this account that collide — the offline-duplicate case
+   * (edge case 7). Reported, never auto-merged: the app cannot know which of
+   * two competing corrections the user meant.
+   */
+  async duplicatesFor(accountId: string): Promise<DuplicateGroup[]> {
+    return findDuplicateCorrections(await correctionsRepo.byAccount(accountId))
+  },
 
   /**
    * The balance the app derives for an account on a given day — what the sheet

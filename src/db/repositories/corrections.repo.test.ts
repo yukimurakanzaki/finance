@@ -276,3 +276,51 @@ describe('correctionsRepo.categorise', () => {
     expect(await balanceOf()).toBe(412_000)
   })
 })
+
+// Edge case 7 — the collision two offline devices can create.
+describe('correctionsRepo.duplicatesFor', () => {
+  async function twoOfflineDevicesCorrect() {
+    // Both devices saw 690.000 and each booked its own adjustment to 412.000.
+    // The account is now 278.000 too low, and nothing in the sync layer can
+    // tell that these were meant to be the same correction.
+    await correctionsRepo.correctBalance({
+      accountId: ACC,
+      actualBalance: 412_000,
+      asOfDate: '2026-07-31',
+    })
+    await db.balanceCorrections.add({
+      id: 'from-other-device',
+      account_id: ACC,
+      transaction_id: 'txn-from-other-device',
+      reverts_id: null,
+      previous_balance: 690_000,
+      new_balance: 412_000,
+      as_of_date: '2026-07-31',
+      note: null,
+      created_at: '2026-07-31T23:00:00.000Z',
+    })
+  }
+
+  it('reports the collision for the account', async () => {
+    await twoOfflineDevicesCorrect()
+    const groups = await correctionsRepo.duplicatesFor(ACC)
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.ids).toHaveLength(2)
+  })
+
+  it('stops reporting it once one side is undone', async () => {
+    await twoOfflineDevicesCorrect()
+    const groups = await correctionsRepo.duplicatesFor(ACC)
+    await correctionsRepo.revert(groups[0]?.ids[1] as string)
+    expect(await correctionsRepo.duplicatesFor(ACC)).toEqual([])
+  })
+
+  it('reports nothing for an account with one correction', async () => {
+    await correctionsRepo.correctBalance({
+      accountId: ACC,
+      actualBalance: 412_000,
+      asOfDate: '2026-07-31',
+    })
+    expect(await correctionsRepo.duplicatesFor(ACC)).toEqual([])
+  })
+})
