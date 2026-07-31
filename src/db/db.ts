@@ -252,25 +252,33 @@ class FIDatabase extends Dexie {
     // without a git conflict but break the upgrade chain at runtime.
     this.version(13)
       .stores({})
-      .upgrade(async (tx) => {
-        for (const name of SYNC_TABLES) {
-          let touched = 0
-          await tx
-            .table(name)
-            .toCollection()
-            .modify((row: Record<string, unknown>) => {
-              if (scrubNumericStrings(name as SyncTable, row)) touched++
-            })
-          if (touched > 0) {
-            // Force a re-push of this table by rewinding its push watermark.
-            // Dexie's `.modify()` bypasses our `updating` hook, so `updated_at`
-            // is unchanged and the watermark would otherwise skip the row.
+      .upgrade((tx) =>
+        // `.modify()` does NOT bypass the 'updating' hook — it fires per row and
+        // restamps updated_at. The original branch assumed otherwise, which made
+        // this upgrade rewrite the watermark on every row it walked: a scrubbed
+        // local row would then beat a NEWER cloud row on last-write-wins. Same
+        // hazard v12's backfill guards against, so use the same guard. The
+        // re-push is driven by the watermark rewind below, never by updated_at.
+        withoutRestamp(async () => {
+          for (const name of SYNC_TABLES) {
+            let touched = 0
             await tx
-              .table('syncMeta')
-              .put({ key: `pushed:${name}`, value: '1970-01-01T00:00:00.000Z' })
+              .table(name)
+              .toCollection()
+              .modify((row: Record<string, unknown>) => {
+                if (scrubNumericStrings(name as SyncTable, row)) touched++
+              })
+            if (touched > 0) {
+              // Force a re-push of this table by rewinding its push watermark.
+              // updated_at is deliberately left untouched (see above), so the
+              // watermark is the only thing that can re-select these rows.
+              await tx
+                .table('syncMeta')
+                .put({ key: `pushed:${name}`, value: '1970-01-01T00:00:00.000Z' })
+            }
           }
-        }
-      })
+        }),
+      )
   }
 }
 
