@@ -3,7 +3,7 @@
 // anchor sits, decide whether a correction can be written and what it looks
 // like. No DB, no clock — the caller supplies `today`.
 import { describe, expect, it } from 'vitest'
-import { planCorrection } from './balanceCorrection'
+import { adjustmentAfterEdit, planCorrection } from './balanceCorrection'
 
 const base = {
   derivedBalance: 690_000,
@@ -99,5 +99,20 @@ describe('planCorrection', () => {
 
   it('resulting balance equals the entered balance when nothing follows it', () => {
     expect(planCorrection(base)).toMatchObject({ resultingBalance: 412_000 })
+  })
+})
+
+describe('adjustmentAfterEdit', () => {
+  it('a correction that gains a category stops being one', () => {
+    expect(adjustmentAfterEdit(true, 'cat-food')).toBe(false)
+  })
+
+  it('a correction edited without naming a category stays one', () => {
+    expect(adjustmentAfterEdit(true, null)).toBe(true)
+  })
+
+  it('an ordinary transaction never becomes one', () => {
+    expect(adjustmentAfterEdit(undefined, null)).toBe(false)
+    expect(adjustmentAfterEdit(false, 'cat-food')).toBe(false)
   })
 })

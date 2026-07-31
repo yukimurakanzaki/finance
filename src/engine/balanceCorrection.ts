@@ -49,6 +49,23 @@ export type CorrectionPlan =
   | { ok: false; reason: 'no_change' | 'future_date' }
   | { ok: false; reason: 'before_anchor'; anchorDate: string }
 
+/**
+ * FR-1.10 — whether a row is still a correction after being edited.
+ *
+ * Naming what the money went on is exactly the moment a correction stops being
+ * one: it becomes ordinary spending, counts in category totals, and draws the
+ * pool if it falls in the current week. Lives here rather than inline in the
+ * form because the form's edit path merges a partial record — omitting the
+ * flag leaves a categorised correction still invisible to every spending
+ * signal, which is the failure this function exists to make impossible.
+ */
+export function adjustmentAfterEdit(
+  wasAdjustment: boolean | undefined,
+  categoryId: string | null,
+): boolean {
+  return Boolean(wasAdjustment) && !categoryId
+}
+
 // Dates are YYYY-MM-DD and compare lexicographically — no Date arithmetic, no
 // timezone to get wrong (the convention the whole engine already follows).
 export function planCorrection(input: CorrectionInput): CorrectionPlan {

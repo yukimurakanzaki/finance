@@ -5,6 +5,7 @@ import { transactionsRepo } from '@db/repositories/transactions.repo'
 import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { BottomSheet } from '@components/BottomSheet'
 import { Field, Input, Select, Btn } from '@components/FormField'
+import { adjustmentAfterEdit } from '@engine/balanceCorrection'
 import { parseRpInput } from '@lib/currency'
 import { WalletPicker } from './WalletPicker'
 import type { Account, RecurringItem, Transaction } from '@db/types'
@@ -132,6 +133,11 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
           original_amount: null, overridden_amount: null, override_note: null,
           overridden_at: null, is_transfer: false, transfer_pair_id: null,
           recurring_item_id: mode === 'out' ? recurringItemId || null : null,
+          // D1/FR-1.10 — a balance correction that finally gets a category
+          // becomes ordinary spending. Without this the merge would leave
+          // is_adjustment set and the row would stay invisible to every
+          // spending signal even after the user named what it was.
+          is_adjustment: adjustmentAfterEdit(editing?.is_adjustment, category_id),
         }
         if (editing) await db.transactions.update(editing.id as string, record)
         else await transactionsRepo.add(record)
@@ -163,6 +169,26 @@ export function TransactionForm({ open, onClose, mode, defaultDate, editing }: P
   return (
     <BottomSheet open={open} onClose={onClose} title={editing ? `Edit — ${titles[mode]}` : titles[mode]} height="85dvh">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* D1/FR-1.10 — editing a correction. Say what naming a category does
+            before they do it: this row is currently invisible to spending, and
+            a category makes it count, including against this week's pool. */}
+        {editing?.is_adjustment && (
+          <div
+            style={{
+              fontSize: 'var(--text-caption)',
+              lineHeight: 'var(--leading-caption)',
+              color: 'var(--ink-2)',
+              background: 'var(--bg-2)',
+              borderRadius: 'var(--space-2)',
+              padding: 'var(--space-3)',
+            }}
+          >
+            This is a balance correction — right now it isn't counted as
+            spending. {categoryName.trim()
+              ? 'Saving it with a category makes it ordinary spending from now on.'
+              : 'Give it a category if you remember what it was for.'}
+          </div>
+        )}
         <Field label="Date">
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>

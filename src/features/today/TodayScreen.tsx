@@ -399,19 +399,23 @@ export function TodayScreen() {
             caption={
               txn.is_transfer
                 ? 'Transfer'
-                : [
-                    catName.get(txn.category_id ?? ''),
-                    accName.get(txn.account_id),
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')
+                : // D1 — a correction restates a balance; it must not read as
+                  // spending in the one list the user checks most.
+                  txn.is_adjustment
+                  ? `Correction · not counted as spending · ${accName.get(txn.account_id) ?? ''}`
+                  : [
+                      catName.get(txn.category_id ?? ''),
+                      accName.get(txn.account_id),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
             }
             right={
               <Amount
                 value={txn.direction === 'in' ? txn.amount : -txn.amount}
                 full
                 tone={
-                  txn.is_transfer
+                  txn.is_transfer || txn.is_adjustment
                     ? 'muted'
                     : txn.direction === 'in'
                       ? 'positive'

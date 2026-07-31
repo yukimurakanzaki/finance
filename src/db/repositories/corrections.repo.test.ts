@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@db/db'
 import { correctionsRepo } from './corrections.repo'
 import { deriveBalance } from '@lib/balances'
+import { isWeekDraw } from '@engine/safeToSpend'
 import type { Account, Transaction } from '@db/types'
 
 const ACC = '11111111-1111-4111-8111-111111111111'
@@ -239,5 +240,39 @@ describe('correctionsRepo.preview', () => {
       asOfDate: '2026-07-05',
     })
     expect(plan).toEqual({ ok: false, reason: 'before_anchor', anchorDate: '2026-07-12' })
+  })
+})
+
+// FR-1.10 — "I remembered: it was groceries." Giving a correction a category
+// converts it into an ordinary transaction, which from then on counts in
+// category totals and, if it falls in the current week, draws the pool.
+describe('correctionsRepo.categorise', () => {
+  const CAT = '55555555-5555-4555-8555-555555555555'
+
+  it('clears is_adjustment so the row counts as spending again', async () => {
+    const res = await correctionsRepo.correctBalance({
+      accountId: ACC,
+      actualBalance: 412_000,
+      asOfDate: '2026-07-31',
+    })
+    if (!res.ok) throw new Error('correction refused')
+
+    await correctionsRepo.categorise(res.transaction_id, CAT)
+
+    const txn = await db.transactions.get(res.transaction_id)
+    expect(txn?.is_adjustment).toBe(false)
+    expect(txn?.category_id).toBe(CAT)
+    expect(isWeekDraw(txn as Transaction)).toBe(true)
+  })
+
+  it('leaves the balance untouched — only its classification changes', async () => {
+    const res = await correctionsRepo.correctBalance({
+      accountId: ACC,
+      actualBalance: 412_000,
+      asOfDate: '2026-07-31',
+    })
+    if (!res.ok) throw new Error('correction refused')
+    await correctionsRepo.categorise(res.transaction_id, CAT)
+    expect(await balanceOf()).toBe(412_000)
   })
 })

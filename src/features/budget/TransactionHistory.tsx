@@ -147,17 +147,21 @@ export function TransactionHistory() {
               }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: 'var(--ink-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {t.note || accountMap.get(t.account_id) || '—'}
+                  {t.title || t.note || accountMap.get(t.account_id) || '—'}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>
                   {t.date} · {accountMap.get(t.account_id) ?? '?'}
                   {t.is_transfer && ' · transfer'}
+                  {/* D1 — reads as bookkeeping, not spending. */}
+                  {t.is_adjustment && ' · correction, not counted as spending'}
                 </div>
               </div>
             </div>
             <div style={{
               fontSize: 13, fontFamily: 'var(--font-mono)', flexShrink: 0, marginLeft: 10,
-              color: t.direction === 'in' ? 'var(--engine)' : 'var(--ink-1)',
+              color: t.is_adjustment
+                ? 'var(--ink-3)'
+                : t.direction === 'in' ? 'var(--engine)' : 'var(--ink-1)',
             }}>
               {t.direction === 'in' ? '+' : '−'}{formatRp(t.amount)}
             </div>

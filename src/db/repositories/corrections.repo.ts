@@ -134,6 +134,24 @@ export const correctionsRepo = {
     return { ok: true, transaction_id, correction_id, resultingBalance: plan.resultingBalance }
   },
 
+  /**
+   * FR-1.10 — "I remembered: it was groceries." Naming what a correction was
+   * for turns it back into an ordinary transaction: it keeps its amount, date
+   * and account (so the balance doesn't move), but from now on it counts in
+   * category totals and, if it falls in the current week, draws the personal
+   * pool. Callers must warn about that before committing.
+   *
+   * `false`, not a delete: the field is optional and readers test truthiness,
+   * so either works — but an explicit false records that this row was
+   * deliberately reclassified rather than never flagged.
+   */
+  categorise: (transactionId: string, categoryId: string) =>
+    db.transactions.update(transactionId, {
+      category_id: categoryId,
+      is_adjustment: false,
+      title: null,
+    }),
+
   // Undo: drop the adjustment transaction and append a reverting audit row.
   // History is append-only (SEC-3) — the original row is never edited or
   // deleted, so a member cannot erase evidence that a correction happened.
