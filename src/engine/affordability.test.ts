@@ -14,6 +14,8 @@ const sts = (remainingPool: number): SafeToSpendResult => ({
   personalPool: 999_999,
   personalSubTotal: 999_999,
   weekendAllocation: 999_999,
+  monthlyDiscretionary: 999_999,
+  weeks: 999_999,
   weekPool: 999_999,
   spentThisWeek: 999_999,
   remainingPool,

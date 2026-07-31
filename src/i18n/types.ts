@@ -67,6 +67,32 @@ export interface Translations {
 
   // Budget Screen
   budget: {
+    // Explain My Number (plan §5). `rows` keys match ExplainRow.id in
+    // src/engine/explain.ts — adding a row there needs a label here.
+    explain: {
+      openLabel: string
+      title: string
+      youSetThis: string
+      weCalculated: string
+      alreadyExcludedTitle: string
+      alreadyExcludedNote: string
+      flooredNote: string
+      clampedNote: string
+      rows: {
+        allowance: string
+        weekendAllocation: string
+        discretionary: string
+        weeks: string
+        weekPool: string
+        spentThisWeek: string
+        remainingPool: string
+        remainingWorkdays: string
+        todayCeiling: string
+        payYourselfFirst: string
+        householdBills: string
+        personalSubs: string
+      }
+    }
     title: string
     subtitle: string
     safeToSpend: string
