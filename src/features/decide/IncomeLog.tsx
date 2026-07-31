@@ -3,14 +3,19 @@ import { Btn, Field, Input } from '@components/FormField'
 import { Card, SectionHeader } from '@components/ui'
 import { db } from '@db/db'
 import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
-import { formatRp } from '@lib/currency'
+import { formatRp, parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
+import { salaryAfterRemoving } from '@engine/incomeSeries'
+import type { IncomeEvent } from '@db/types'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLongPress } from '../../hooks/useLongPress'
 import { useState } from 'react'
 
 export function IncomeLog() {
   const [open, setOpen] = useState(false)
+  // D3 — incomeEventsRepo.update existed and nothing ever called it: a mistyped
+  // salary could only be deleted and retyped. Tapping a card now edits it.
+  const [editing, setEditing] = useState<IncomeEvent | null>(null)
   const events = useLiveQuery(() => incomeEventsRepo.getAllDesc()) ?? []
   const longPress = useLongPress(
     ({ id, label }: { id: string; label: string }) => {
@@ -32,7 +37,10 @@ export function IncomeLog() {
         trailing={
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              setEditing(null)
+              setOpen(true)
+            }}
             style={{
               fontSize: 'var(--text-caption)',
               color: 'var(--amber-text)',
@@ -70,11 +78,18 @@ export function IncomeLog() {
             key={ev.id}
             padding="var(--space-3) var(--space-4)"
             interactive
+            onClick={() => {
+              // The press that just deleted this row still fires a click, which
+              // would open the editor on the row that no longer exists.
+              if (longPress.consumedClick()) return
+              setEditing(ev)
+              setOpen(true)
+            }}
             {...longPress.handlers({
               id: ev.id!,
               label: `${formatRp(ev.take_home_net)} · ${ev.date}`,
             })}
-            title="Long-press to delete"
+            title="Tap to edit · long-press to delete"
           >
             <div
               style={{
@@ -157,10 +172,13 @@ export function IncomeLog() {
       <BottomSheet
         open={open}
         onClose={() => setOpen(false)}
-        title="Log income / raise"
-        height="75dvh"
+        title={editing ? 'Edit income' : 'Log income / raise'}
+        height="80dvh"
       >
-        <AddIncomeForm
+        <IncomeForm
+          key={editing?.id ?? 'new'}
+          editing={editing}
+          events={events}
           onDone={() => setOpen(false)}
           prevNet={events[0]?.take_home_net ?? null}
         />
@@ -169,43 +187,85 @@ export function IncomeLog() {
   )
 }
 
-function AddIncomeForm({
+function IncomeForm({
+  editing,
+  events,
   onDone,
   prevNet,
 }: {
+  editing: IncomeEvent | null
+  events: IncomeEvent[]
   onDone: () => void
   prevNet: number | null
 }) {
-  const [gross, setGross] = useState('')
-  const [net, setNet] = useState('')
-  const [note, setNote] = useState('')
-  const [date, setDate] = useState(todayISO())
+  const [gross, setGross] = useState(editing ? String(editing.gross) : '')
+  const [net, setNet] = useState(editing ? String(editing.take_home_net) : '')
+  const [note, setNote] = useState(editing?.note ?? '')
+  const [date, setDate] = useState(editing?.date ?? todayISO())
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const parseNum = (s: string) => Number(s.replace(/[.,]/g, ''))
-  const netNum = parseNum(net)
-  const grossNum = parseNum(gross)
-  const delta = prevNet !== null && netNum > 0 ? netNum - prevNet : null
+  // parseRpInput, not a bare separator strip: "12.5" became 125 and silently
+  // corrupted the figure the whole FI projection is built on (PAIN-POINTS T5).
+  const netNum = parseRpInput(net)
+  const grossNum = parseRpInput(gross)
+  const delta =
+    prevNet !== null && netNum !== null && !editing ? netNum - prevNet : null
+
+  // The pipe/lifestyle split is recomputed from the currently active
+  // pay-yourself-first items, the same way it is on create — so the user sees
+  // what the edit will actually store, not what it stored last time.
+  const pipeTotal =
+    useLiveQuery(async () => {
+      const active = await db.recurringItems
+        .filter((r) => r.is_active && r.kind === 'pay_yourself_first')
+        .toArray()
+      return active.reduce((s, r) => s + r.amount, 0)
+    }) ?? 0
+
+  // Deleting the newest raise re-bases the FI projection and the savings rate.
+  const fallback = editing?.id
+    ? salaryAfterRemoving(events, editing.id)
+    : undefined
 
   async function handleSave() {
-    if (!net || !gross) return
+    if (netNum === null || grossNum === null) return
     setSaving(true)
-    const activeRecurring = await db.recurringItems
-      .filter((r) => r.is_active && r.kind === 'pay_yourself_first')
-      .toArray()
-    const pipeTotal = activeRecurring.reduce((s, r) => s + r.amount, 0)
 
-    await incomeEventsRepo.create({
-      date,
-      gross: grossNum,
-      take_home_net: netNum,
-      delta_vs_prev: delta,
-      routed_to_pipe: pipeTotal,
-      routed_to_lifestyle: netNum - pipeTotal,
-      note: note || null,
-      source: 'manual',
-    })
+    if (editing?.id) {
+      await incomeEventsRepo.update(editing.id, {
+        date,
+        gross: grossNum,
+        take_home_net: netNum,
+        routed_to_pipe: pipeTotal,
+        routed_to_lifestyle: netNum - pipeTotal,
+        note: note || null,
+      })
+    } else {
+      await incomeEventsRepo.create({
+        date,
+        gross: grossNum,
+        take_home_net: netNum,
+        // The repo re-answers the whole series on write; this is only the
+        // optimistic value for the row being inserted.
+        delta_vs_prev: delta,
+        routed_to_pipe: pipeTotal,
+        routed_to_lifestyle: netNum - pipeTotal,
+        note: note || null,
+        source: 'manual',
+      })
+    }
     setSaving(false)
+    onDone()
+  }
+
+  async function handleDelete() {
+    if (!editing?.id) return
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      return
+    }
+    await incomeEventsRepo.remove(editing.id)
     onDone()
   }
 
@@ -247,7 +307,7 @@ function AddIncomeForm({
         />
       </Field>
 
-      {delta !== null && netNum > 0 && (
+      {delta !== null && netNum !== null && netNum > 0 && (
         <div
           style={{
             fontSize: 'var(--text-caption)',
@@ -267,9 +327,41 @@ function AddIncomeForm({
         />
       </Field>
 
-      <Btn onClick={handleSave} disabled={saving || !net || !gross} fullWidth>
-        {saving ? 'Saving…' : 'Save income event'}
+      {(net !== '' && netNum === null) || (gross !== '' && grossNum === null) ? (
+        <div style={{ fontSize: 'var(--text-caption)', color: 'var(--amber-text)' }}>
+          Enter whole rupiah — e.g. 12.000.000, not 12,5.
+        </div>
+      ) : null}
+
+      {netNum !== null && (
+        <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>
+          Pipe {formatRp(pipeTotal)}/mo · lifestyle{' '}
+          {formatRp(Math.max(0, netNum - pipeTotal))}/mo
+        </div>
+      )}
+
+      <Btn
+        onClick={handleSave}
+        disabled={saving || netNum === null || grossNum === null}
+        fullWidth
+      >
+        {saving ? 'Saving…' : editing ? 'Save changes' : 'Save income event'}
       </Btn>
+
+      {editing?.id && (
+        <>
+          <Btn variant="danger" onClick={handleDelete} fullWidth>
+            {confirmDelete ? 'Tap again to delete' : 'Delete this income event'}
+          </Btn>
+          {confirmDelete && (
+            <div style={{ fontSize: 'var(--text-caption)', color: 'var(--ink-3)' }}>
+              {fallback
+                ? `Your current salary becomes ${formatRp(fallback.take_home_net)}/mo (${fallback.date}).`
+                : 'This is your only income event — the FI projection will have no salary to work from.'}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
