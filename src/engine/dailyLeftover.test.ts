@@ -5,10 +5,9 @@ import { computeDailyLeftover } from './dailyLeftover'
 
 // Tomorrow, relative to the real system clock — always genuinely in the
 // future, so the isProjected assertions below don't rely on a fixed date that
-// eventually becomes "the past" as the repo ages. (Edge case: if the test
-// happens to run on the last day of a month, "tomorrow" falls in the next
-// month, and the transactions dated "today" fall outside that next month's
-// window — an intentional, documented limitation of this quick helper.)
+// eventually becomes "the past" as the repo ages. Only ever used for the
+// isProjected flag, which is month-agnostic; any assertion about `leftover`
+// uses fixed dates instead, or it breaks every month-end.
 function tomorrow(): string {
   const d = new Date(`${todayISO()}T12:00:00`)
   d.setDate(d.getDate() + 1)
@@ -83,22 +82,25 @@ describe('computeDailyLeftover', () => {
     expect(r.leftover).toBe(1_000_000)
   })
 
-  it("a future date returns isProjected: true and equals the last real day's leftover", () => {
-    const today = todayISO()
-    const transactions = [txn({ date: today, amount: 100_000 })]
-    const lastRealDay = computeDailyLeftover({
-      monthlyAmount: 1_000_000,
-      transactions,
-      asOfDate: today,
-    })
-    const projected = computeDailyLeftover({
-      monthlyAmount: 1_000_000,
-      transactions,
-      asOfDate: tomorrow(),
-    })
-    expect(projected.isProjected).toBe(true)
-    expect(lastRealDay.isProjected).toBe(false)
-    expect(projected.leftover).toBe(lastRealDay.leftover)
+  it('a future date returns isProjected: true, today returns false', () => {
+    const transactions = [txn({ date: todayISO(), amount: 100_000 })]
+    const opts = { monthlyAmount: 1_000_000, transactions }
+    expect(computeDailyLeftover({ ...opts, asOfDate: todayISO() }).isProjected).toBe(false)
+    expect(computeDailyLeftover({ ...opts, asOfDate: tomorrow() }).isProjected).toBe(true)
+  })
+
+  // Projecting forward inside a month just carries the running total — nothing
+  // new is subtracted. Fixed dates, no system clock: the previous version of
+  // this assertion compared today against tomorrow and so failed every time the
+  // suite ran on the last day of a month, when "tomorrow" is a different month
+  // with its own window (dailyLeftover.ts: no carry-over between months).
+  it("a later day in the same month equals the last spending day's leftover", () => {
+    const transactions = [txn({ date: '2026-03-10', amount: 100_000 })]
+    const opts = { monthlyAmount: 1_000_000, transactions }
+    const spendingDay = computeDailyLeftover({ ...opts, asOfDate: '2026-03-10' })
+    const later = computeDailyLeftover({ ...opts, asOfDate: '2026-03-25' })
+    expect(spendingDay.leftover).toBe(900_000)
+    expect(later.leftover).toBe(spendingDay.leftover)
   })
 
   it('a past date within the month returns isProjected: false', () => {
