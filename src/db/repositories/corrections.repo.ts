@@ -33,7 +33,26 @@ export const correctionsRepo = {
   latestFor: async (accountId: string): Promise<BalanceCorrection | undefined> =>
     (await correctionsRepo.byAccount(accountId))[0],
 
-  async correctBalance(input: CorrectBalanceInput): Promise<CorrectBalanceResult> {
+  /**
+   * The balance the app derives for an account on a given day — what the sheet
+   * shows as "App shows", and the figure the user is disagreeing with.
+   */
+  async derivedAsOf(accountId: string, asOfDate: string): Promise<number> {
+    const account = await db.accounts.get(accountId)
+    if (!account) throw new Error(`Account ${accountId} not found`)
+    const txns = await db.transactions.where('account_id').equals(accountId).toArray()
+    return deriveBalance(
+      account,
+      txns.filter((t) => t.date <= asOfDate),
+    )
+  },
+
+  /**
+   * What `correctBalance` would do, without doing it. The sheet's live delta
+   * preview and validation run through this, so what the user is shown and
+   * what gets written can never come from two different calculations.
+   */
+  async preview(input: CorrectBalanceInput): Promise<CorrectionPlan> {
     const asOfDate = input.asOfDate ?? todayISO()
     const account = await db.accounts.get(input.accountId)
     if (!account) throw new Error(`Account ${input.accountId} not found`)
@@ -43,23 +62,31 @@ export const correctionsRepo = {
       .equals(input.accountId)
       .toArray()
 
-    // The balance as the app derives it *on the correction's own date* — not
-    // today's. The user is telling us what the account held on `asOfDate`, so
-    // the gap has to be measured there; transactions after it then replay on
-    // top exactly as deriveBalance already does.
-    const derivedBalance = deriveBalance(
-      account,
-      accountTxns.filter((t) => t.date <= asOfDate),
-    )
-    const plan = planCorrection({
-      derivedBalance,
+    return planCorrection({
+      // The balance as the app derives it *on the correction's own date* — not
+      // today's. The user is telling us what the account held on `asOfDate`, so
+      // the gap has to be measured there; transactions after it then replay on
+      // top exactly as deriveBalance already does.
+      derivedBalance: deriveBalance(
+        account,
+        accountTxns.filter((t) => t.date <= asOfDate),
+      ),
       actualBalance: input.actualBalance,
       asOfDate,
       today: todayISO(),
       anchorDate: anchorOf(account),
       laterFlow: netFlowAfter(accountTxns, asOfDate),
     })
+  },
+
+  async correctBalance(input: CorrectBalanceInput): Promise<CorrectBalanceResult> {
+    const asOfDate = input.asOfDate ?? todayISO()
+    const account = await db.accounts.get(input.accountId)
+    if (!account) throw new Error(`Account ${input.accountId} not found`)
+
+    const plan = await correctionsRepo.preview({ ...input, asOfDate })
     if (!plan.ok) return plan
+    const derivedBalance = input.actualBalance - plan.delta
 
     const transaction_id = crypto.randomUUID()
     const correction_id = crypto.randomUUID()

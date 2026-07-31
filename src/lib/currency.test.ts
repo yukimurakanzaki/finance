@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatRp, parseRpInput } from './currency'
+import { formatRp, parseRpBalance, parseRpInput } from './currency'
 
 describe('formatRp (Indonesian abbreviations)', () => {
   it('millions use jt (juta)', () => {
@@ -49,5 +49,23 @@ describe('parseRpInput (strict, decimal-safe)', () => {
     expect(parseRpInput('0')).toBeNull()
     expect(parseRpInput('abc')).toBeNull()
     expect(parseRpInput('12a')).toBeNull()
+  })
+})
+
+describe('parseRpBalance', () => {
+  it('accepts zero — an empty account is a real balance', () => {
+    expect(parseRpBalance('0')).toBe(0)
+  })
+
+  it('accepts grouped thousands like parseRpInput', () => {
+    expect(parseRpBalance('412.000')).toBe(412_000)
+  })
+
+  it('still rejects an ambiguous decimal', () => {
+    expect(parseRpBalance('12.5')).toBeNull()
+  })
+
+  it('rejects empty input', () => {
+    expect(parseRpBalance('')).toBeNull()
   })
 })

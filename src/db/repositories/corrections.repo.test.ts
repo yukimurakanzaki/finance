@@ -216,3 +216,28 @@ describe('correctionsRepo.revert', () => {
     expect(still).toMatchObject({ previous_balance: 690_000, new_balance: 412_000 })
   })
 })
+
+describe('correctionsRepo.preview', () => {
+  it('returns the plan the write would use, without writing anything', async () => {
+    const plan = await correctionsRepo.preview({
+      accountId: ACC,
+      actualBalance: 412_000,
+      asOfDate: '2026-07-31',
+    })
+    expect(plan).toMatchObject({ ok: true, amount: 278_000, direction: 'out' })
+    expect(await db.transactions.count()).toBe(2)
+    expect(await db.balanceCorrections.count()).toBe(0)
+  })
+
+  it('reports the anchor collision before the user hits save', async () => {
+    await db.accounts.put(
+      account({ manual_balance_override: 500_000, last_balance_updated_at: '2026-07-12' }),
+    )
+    const plan = await correctionsRepo.preview({
+      accountId: ACC,
+      actualBalance: 412_000,
+      asOfDate: '2026-07-05',
+    })
+    expect(plan).toEqual({ ok: false, reason: 'before_anchor', anchorDate: '2026-07-12' })
+  })
+})
