@@ -121,7 +121,26 @@ export function AssetsScreen() {
                     {acc.institution} ·{' '}
                     {t.assets.accountTypes[acc.account_type]}
                   </span>
-                  <LanePill lane={acc.lane} size="xs" />
+                  <span
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <LanePill lane={acc.lane} size="xs" />
+                    {/* FR-3.5 / NFR-3.1: amber, not red — an overdraft is a
+                        state, not an error. States the date when the ledger
+                        knows it, the bare fact when it doesn't. */}
+                    {accountBalances?.overdrawnSince.has(acc.id as string) && (
+                      <Badge tone="warning">
+                        {(() => {
+                          const since = accountBalances.overdrawnSince.get(
+                            acc.id as string,
+                          )
+                          return since
+                            ? t.assets.overdrawnSince(since)
+                            : t.assets.overdrawn
+                        })()}
+                      </Badge>
+                    )}
+                  </span>
                 </span>
               }
               right={
