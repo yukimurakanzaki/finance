@@ -1,31 +1,58 @@
-# Backlog — Everything Still Unbuilt
+# Backlog — Phases 1–4 (all delivered)
 
-**Status as of 2026-07-13.** This is a ready-to-execute ticket list distilled from
-`PAIN-POINTS.md` (the analysis) and the project's build history so far. Use this
-document, not `PAIN-POINTS.md` directly, when handing work to a builder — it tells
-you exactly what's left, in what order, and with enough scope per ticket that a
-smaller/local model (Claude Code running a MiniMax backend) can execute one without
-re-deriving context. `PAIN-POINTS.md` stays the source of truth for *why*; this
-file is the *what's left, in what order*.
+> **Status as of 2026-07-31: everything in this document has shipped.**
+> This file is now a **historical record**, not a queue. It was written on
+> 2026-07-13, when Phases 3 and 4 were still unbuilt; every ticket below has since
+> been built and merged. The scope text is kept verbatim as the record of what was
+> asked for, with each section marked with the PR that delivered it.
+>
+> **The live queue is `docs/plans/2026-07-25-sprint-1-builder-brief.md`** (Sprint 1,
+> 1 of 5 tasks done). Do not hand tickets out of this file.
+
+This was a ready-to-execute ticket list distilled from `PAIN-POINTS.md` (the
+analysis) and the project's build history. `PAIN-POINTS.md` stays the source of
+truth for *why*; this file was the *what's left, in what order*.
 
 ## Where things stand
+
+Verified against `git log` and the source tree on 2026-07-31 at `a81e4f2`.
 
 | # | What | State | Where |
 |---|------|-------|-------|
 | — | Elicitation: pain points + design audit + Calm Ledger direction | ✅ Merged | PR #12 |
 | Phase 1 | Trust & safety fixes (T1, T2, T3, T5, O1, S1) | ✅ Merged | PR #13 |
-| Phase 2 | Design primitives (`src/components/ui/*`, tokens, lint guard) | 🟡 Open, awaiting your review | PR #14 |
-| Phase 3 | Today screen rebuild (standing strip, daily leftover ledger, unified transaction surface, one-action FAB, icons, slim AppBar) | 📋 Fully specified, **not yet built** | `PHASE-3-HANDOFF.md` (in PR #14's branch) |
-| Phase 4 | Remaining screens migrate to the primitives | 📋 Not yet broken into tickets | **This document, §B** |
-| Standalone | Everything in PAIN-POINTS.md not folded into a phase | 📋 Not yet broken into tickets | **This document, §C** |
+| Phase 2 | Design primitives (`src/components/ui/*`, tokens, lint guard) | ✅ Merged | PR #14 |
+| Phase 3 | Today screen rebuild (standing strip, daily leftover ledger, unified transaction surface, one-action FAB, icons, slim AppBar) | ✅ Merged | PR #23 |
+| Phase 4 | Remaining screens migrate to the primitives (§B, B1–B6) | ✅ All six merged | PR #24–#29 |
+| Standalone | C1 — recurring-item tagging for AI & import (§C) | ✅ Merged | PR #31 |
 
-**Recommended order:** merge PR #14 → build Phase 3 (already has its own complete
-brief, use it as-is) → then work this document's §B and §C tickets, which have no
-dependencies on each other and can go in parallel across sessions if you want.
+Style-token debt tracked by `scripts/check-style-tokens.mjs`: **507 → 120** across
+Phases 2–4.
+
+### Shipped since this document was written, and never in it
+
+| What | Where |
+|------|-------|
+| Settings & Today migration audits (M3-001/002/003) | PR #19–#22 |
+| AI Manager routed to MiniMax (Anthropic-compatible `/v1/messages`) | PR #32–#34 |
+| `computeAffordability` engine + `check_affordability` tool | PR #35 |
+| Sprint 1 Task 1 — Dexie `version(12)`, `onboarding_snoozed_until` | PR #37 |
+| i18n en/id module wired into 14 screens; market-price cache fallback | PR #40, #41 |
+
+### Still open
+
+Sprint 1 Tasks 2–5 — see `docs/plans/2026-07-25-sprint-1-builder-brief.md`.
+Verified absent from the source tree on 2026-07-31: no `splitOverdraft`, no
+Explain-My-Number component, no onboarding logic in `src/ai/context.ts` (the
+`onboarding_snoozed_until` field Task 1 added is currently an unused stub), and
+`create_account` predates the sprint (PR #3), so Task 4's own scope is untouched.
 
 ---
 
 ## How to hand a ticket to a builder
+
+*The tickets below are all delivered, but this process still applies to Sprint 1
+and anything after it — it's the part of this document worth keeping.*
 
 Every ticket below is written to the same standard as `PHASE-3-HANDOFF.md`. When
 you pick one:
@@ -59,7 +86,12 @@ you pick one:
 
 ---
 
-## §A — Phase 3 (next up, already fully specified)
+## §A — Phase 3 — ✅ Shipped, PR #23
+
+*Delivered: standing strip, Daily Leftover Ledger (`src/engine/dailyLeftover.ts`),
+unified transaction surface, one-action FAB. Note that
+`src/engine/dailyLeftover.test.ts` currently has one failing test on `main` — see
+the Sprint 1 brief's baseline section.*
 
 Don't re-derive this — `PHASE-3-HANDOFF.md` in the repo root is a complete,
 self-contained brief (repo conventions, exact current primitive APIs, the full
@@ -71,7 +103,7 @@ by the time you run this.
 
 ---
 
-## §B — Phase 4: remaining screens (one ticket per screen)
+## §B — Phase 4: remaining screens — ✅ All six shipped, PR #24–#29
 
 Per the roadmap: same treatment Phase 3 gives Today — `<Screen>`/`<Card>`/`<Row>`/
 `<StatTile>`/`<Amount>`/`<SectionHeader>`/`<Icon>` instead of raw inline literals,
@@ -79,7 +111,7 @@ lowering `scripts/style-tokens-baseline.json`'s count as each screen migrates.
 Zero behavior change unless a ticket explicitly says otherwise — these are
 restyles, not rewrites, except where a listed pain point requires a real fix.
 
-### B1 — Assets screen
+### B1 — Assets screen — ✅ PR #24 (baseline 499 → 465)
 
 **Scope:** Migrate `src/features/assets/AssetsScreen.tsx`, `AccountForm.tsx`,
 `AssetForm.tsx` to the primitives. Account and asset rows become `<Row>`s (tap to
@@ -90,7 +122,11 @@ transfer/status badges on Today's transaction rows first, and reuse that instead
 of inventing a second one).
 **No functional changes required.** Pure visual migration.
 
-### B2 — Budget screen (weekly/monthly/yearly + history sheet)
+### B2 — Budget screen — ✅ PR #25 (465 → 389)
+
+*Both folded-in fixes verified: the O3 weekend-allocation figure is rendered at
+`GaugeCard.tsx:39-47`, and the empty state at `SafeToSpendScreen.tsx:44` now points
+at More → Allowance.*
 
 **Scope:** Migrate `src/features/budget/BudgetScreen.tsx`,
 `weekly/SafeToSpendScreen.tsx`, `weekly/GaugeCard.tsx`, `weekly/Waterfall.tsx`,
@@ -114,7 +150,10 @@ Also fix, while you're in these files:
 (`src/engine/dailyLeftover.ts`), do NOT duplicate that here — this ticket is about
 the existing weekly gauge only, which is unrelated math.
 
-### B3 — Report screen
+### B3 — Report screen — ✅ PR #26 (389 → 352)
+
+*Includes the F4 per-category spend breakdown — the one substantive feature in
+Phase 4.*
 
 **Scope:** Migrate `src/features/report/ReportScreen.tsx` and
 `src/features/home/HomeScreen.tsx` + `NWChart.tsx` to the primitives. The "This
@@ -134,7 +173,11 @@ Also fix, while you're in this file:
   and `db.categories`, similar to how `ReportScreen.tsx` already aggregates
   income/expense totals for the month.
 
-### B4 — More + Decide
+### B4 — More + Decide — ✅ PR #27 (352 → 227)
+
+*All five folded-in items delivered. S2 shipped the per-row exclude and the visible
+skip count; per-field category/account/date overrides were scoped out as a
+follow-up, as the ticket allowed.*
 
 **Scope:** Migrate `src/features/more/MoreScreen.tsx` and its sheets
 (`AllowanceEditor.tsx`, `RecurringRegister.tsx`, `PinSetup.tsx`,
@@ -182,7 +225,9 @@ Also address, while you're in these files (each is small; do all four together):
   action in the app). Standardizing sign-out is lower priority — note it, don't
   block the ticket on it.
 
-### B5 — Chat / Manager
+### B5 — Chat / Manager — ✅ PR #28 (227 → 146)
+
+*M1 shipped as a hand-rolled renderer (`src/lib/markdown.tsx`), no new dependency.*
 
 **Scope:** Migrate `src/features/chat/ChatScreen.tsx`, `SessionList.tsx`,
 `ModelPicker.tsx`, `SkillPicker.tsx` to the primitives where it doesn't conflict
@@ -219,7 +264,7 @@ Also fix, while you're in this file:
   path more prominent. Pick one, document which and why — don't silently leave
   both equally prominent.
 
-### B6 — Onboarding
+### B6 — Onboarding — ✅ PR #29 (146 → 132; combined tree recomputed at 120)
 
 **Scope:** Migrate `src/features/onboarding/OnboardingWizard.tsx` to the
 primitives (the 4-step wizard's fields/buttons).
@@ -237,12 +282,15 @@ Also fix, while you're in this file:
 
 ---
 
-## §C — Standalone item already flagged in a merged PR, not yet built
+## §C — Standalone item — ✅ Shipped, PR #31
 
 This one isn't in PAIN-POINTS.md as a fresh finding — it's a **known gap** the
 Phase 1 PR (#13) explicitly called out and deferred:
 
-### C1 — AI chat & reconcile import can't tag `recurring_item_id`
+### C1 — AI chat & reconcile import can't tag `recurring_item_id` — ✅ PR #31
+
+*Delivered via `src/lib/recurringMatch.ts` (`resolveRecurringItemId`), which the
+Sprint 1 brief now lists as a helper to reuse rather than reimplement.*
 
 **Context:** Phase 1 added `Transaction.recurring_item_id` (nullable) so a logged
 expense can be marked as paying a committed recurring item, keeping it from

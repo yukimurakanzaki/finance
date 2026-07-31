@@ -1,14 +1,30 @@
 import type { Transaction } from '@db/types'
 import { todayISO } from '@lib/dates'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computeDailyLeftover } from './dailyLeftover'
 
-// Tomorrow, relative to the real system clock — always genuinely in the
-// future, so the isProjected assertions below don't rely on a fixed date that
-// eventually becomes "the past" as the repo ages. (Edge case: if the test
-// happens to run on the last day of a month, "tomorrow" falls in the next
-// month, and the transactions dated "today" fall outside that next month's
-// window — an intentional, documented limitation of this quick helper.)
+// The clock is pinned mid-month for the whole suite. `todayISO()` reads
+// `new Date()`, so this fully determines what the engine considers "today".
+//
+// Mid-month specifically: the projection assertion below compares a future day
+// against the last real day, and that invariant only holds *within* one
+// calendar month — computeDailyLeftover scopes to the month of `asOfDate`, so
+// crossing a month boundary legitimately resets the ledger to a fresh
+// allowance. Running on the last day of a month used to push "tomorrow" into
+// the next month and fail the suite for that one day.
+const PINNED_TODAY = '2026-07-15'
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(`${PINNED_TODAY}T12:00:00`))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+// Tomorrow relative to the pinned clock — genuinely in the future for
+// isProjected, and guaranteed to stay in the same month as PINNED_TODAY.
 function tomorrow(): string {
   const d = new Date(`${todayISO()}T12:00:00`)
   d.setDate(d.getDate() + 1)
