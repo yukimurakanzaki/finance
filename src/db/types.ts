@@ -138,10 +138,6 @@ export interface RecurringItem {
 // when" has an answer in a two-member household. Never edited in place: an undo
 // appends a reverting row carrying `reverts_id`.
 //
-// ponytail: local-only for now — not in SYNC_TABLES, because the cloud
-// `balance_corrections` table and its RLS policy don't exist yet. The
-// corrections themselves are ordinary transactions, so they already sync; only
-// this audit trail stays on-device until the Supabase migration lands.
 export interface BalanceCorrection {
   id?: string
   account_id: string
@@ -154,11 +150,13 @@ export interface BalanceCorrection {
   as_of_date: string
   note: string | null
   /**
-   * Who made it. Stays null on-device: SEC-2 requires this to be derived from
-   * the authenticated session server-side, never accepted from the client, or
-   * a member could forge attribution.
+   * Who made it. Never written by this client: SEC-2 requires attribution to
+   * come from the authenticated session, so the column is left off the pushed
+   * row entirely and the cloud's `default auth.uid()` stamps it. Populated on
+   * rows that come back from a pull. An explicit null would defeat that
+   * default, which is why the repo omits the key rather than setting it.
    */
-  author_member_id: string | null
+  created_by?: string | null
   created_at: string
 }
 

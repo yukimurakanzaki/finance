@@ -36,6 +36,9 @@ export const SYNC_TABLES = [
   'recurringItems',
   'incomeEvents',
   'transactions',
+  // After transactions: a correction row references the adjustment transaction
+  // it created, and hydrate/push walk this list parents-first.
+  'balanceCorrections',
   'milestones',
   'netWorthSnapshots',
   'allowance',
@@ -246,10 +249,12 @@ class FIDatabase extends Dexie {
       })
 
     // v13: D1 balance corrections — the append-only audit trail behind
-    // "Set true balance". Local-only for now (absent from SYNC_TABLES): the
-    // corrections themselves are ordinary adjustment transactions and sync
-    // with everything else, but the cloud `balance_corrections` table and its
-    // RLS policy don't exist yet.
+    // "Set true balance". Synced: the cloud `balance_corrections` table and its
+    // household-scoped RLS policy ship alongside this.
+    //
+    // No updated_at index, unlike the v7 tables: pushTable filters dirty rows
+    // in memory rather than querying that index, so adding one would cost
+    // writes and buy nothing.
     //
     // transactions.is_adjustment needs no version of its own, for the same
     // reason recurring_item_id didn't (see the note above v12): it isn't

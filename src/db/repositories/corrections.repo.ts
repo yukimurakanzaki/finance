@@ -126,7 +126,6 @@ export const correctionsRepo = {
         new_balance: input.actualBalance,
         as_of_date: asOfDate,
         note: input.note ?? null,
-        author_member_id: null,
         created_at: now(),
       })
     })
@@ -170,7 +169,6 @@ export const correctionsRepo = {
         new_balance: source.previous_balance,
         as_of_date: source.as_of_date,
         note: null,
-        author_member_id: null,
         // Strictly after the row it reverts. Two writes can land in the same
         // millisecond, and history is read newest-first — a tie would order by
         // random UUID and show the undo above or below its own cause at random.
