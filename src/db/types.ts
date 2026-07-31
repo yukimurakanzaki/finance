@@ -138,6 +138,26 @@ export interface RecurringItem {
 // when" has an answer in a two-member household. Never edited in place: an undo
 // appends a reverting row carrying `reverts_id`.
 //
+// The watermark sync engine has no delete channel: it pushes rows whose
+// updated_at moved, so a row deleted locally just stops being pushed. The cloud
+// copy survives, every other device keeps it forever, and a fresh hydrate pulls
+// it straight back onto this one. Every delete in the app had this shape.
+//
+// A deletion log fixes it without tombstoning the rows themselves. The local
+// row is genuinely removed — so the ~55 places that read db.transactions need
+// no "and not deleted" clause, and none of them can forget one — and this small
+// synced record carries the fact of the deletion to the other devices.
+//
+// `id` is deliberately the deleted row's own id: deleting twice writes the same
+// record instead of a second one.
+export interface Deletion {
+  id?: string
+  /** Local Dexie table the row lived in, e.g. 'transactions'. */
+  table_name: string
+  row_id: string
+  created_at: string
+}
+
 export interface BalanceCorrection {
   id?: string
   account_id: string

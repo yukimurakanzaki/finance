@@ -6,6 +6,7 @@ import {
   type DuplicateGroup,
 } from '@engine/correctionDuplicates'
 import { db } from '../db'
+import { deletionsRepo } from './deletions.repo'
 import type { Account, BalanceCorrection, Transaction } from '../types'
 
 const now = () => new Date().toISOString()
@@ -171,8 +172,12 @@ export const correctionsRepo = {
     const source = await db.balanceCorrections.get(correctionId)
     if (!source) throw new Error(`Correction ${correctionId} not found`)
 
-    await db.transaction('rw', db.transactions, db.balanceCorrections, async () => {
-      if (source.transaction_id) await db.transactions.delete(source.transaction_id)
+    // Tombstoned, not hard-deleted: an undo that quietly comes back on the next
+    // hydrate is worse than no undo at all.
+    if (source.transaction_id) {
+      await deletionsRepo.remove('transactions', source.transaction_id)
+    }
+    await db.transaction('rw', db.balanceCorrections, async () => {
       await db.balanceCorrections.add({
         id: crypto.randomUUID(),
         account_id: source.account_id,

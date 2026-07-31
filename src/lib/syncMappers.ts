@@ -23,6 +23,7 @@ export const CLOUD_TABLE: Record<SyncTable, string> = {
   chatMessages: 'chat_messages',
   chatMemories: 'chat_memories',
   chatCustomSkills: 'chat_custom_skills',
+  deletions: 'deletions',
 }
 
 // Singleton local tables map to a natural cloud key instead of an `id` uuid.
@@ -120,6 +121,7 @@ export const NUMERIC: Record<SyncTable, readonly string[]> = {
   categories: [],
   chatMemories: [],
   chatCustomSkills: [],
+  deletions: [],
 }
 
 function coerceNumeric(table: SyncTable, row: Record<string, unknown>): Record<string, unknown> {

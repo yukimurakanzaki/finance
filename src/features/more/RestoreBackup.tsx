@@ -112,6 +112,8 @@ export function RestoreBackup({ onDone }: { onDone: () => void }) {
           db.milestones,
           db.assumptions,
           db.appSettings,
+          db.balanceCorrections,
+          db.deletions,
         ],
         async () => {
           await db.accounts.clear()
@@ -126,6 +128,12 @@ export function RestoreBackup({ onDone }: { onDone: () => void }) {
           await db.milestones.clear()
           await db.assumptions.clear()
           await db.appSettings.clear()
+          await db.balanceCorrections.clear()
+          // Tombstones are cleared too, and deliberately not restored from the
+          // backup. Leaving them would let a stale "this row was deleted"
+          // record delete the very rows the user just restored, on the next
+          // sync cycle. The restored snapshot is the truth here.
+          await db.deletions.clear()
 
           if (d.accounts?.length)
             await db.accounts.bulkAdd(
