@@ -18,7 +18,13 @@ Read this whole brief before writing code. Read the plan sections named in each 
    ```bash
    npx tsc --noEmit && npx vitest run
    ```
-   Current baseline: **545 tests passing, 0 failing.** A task is not done if that number goes down.
+   **Current baseline, re-measured 2026-07-31 at `a81e4f2`: 256 tests — 255 passing, 1 failing.** A task is not done if the passing count goes down or the failing count goes up.
+
+   **That one failure is pre-existing and is not yours.** It is `src/engine/dailyLeftover.test.ts > computeDailyLeftover > a future date returns isProjected: true and equals the last real day's leftover` — expects `1000000`, gets `900000`. It is already red on `main` before you start. Do not "fix" it as a side effect of your task, and do not let it block you — report it unchanged.
+
+   **If you see a much larger test count, your checkout is dirty.** A stale git worktree under `.claude/worktrees/` makes vitest collect a second copy of every test file — it inflated the count to 434 and produced a duplicate second failure. Run `git worktree list` before trusting any number.
+
+   *An earlier revision of this brief claimed 545 passing / 0 failing. That figure never matched `main` and has been corrected here; if a previous session quoted 545 at you, ignore it.*
 6. **One task, one commit.** Commit message names the task id.
 7. **Reuse before writing.** Helpers that already exist and must not be reimplemented:
    - `deriveBalance(account, txns)` — `src/lib/balances.ts`
@@ -30,9 +36,14 @@ Read this whole brief before writing code. Read the plan sections named in each 
 
 ---
 
-## Task 1 — Dexie `version(12)`
+## Task 1 — Dexie `version(12)` — ✅ DONE, merged in PR #37
 
-**Do this first. Every other task with a schema need waits on it.**
+**Already shipped** (commits `7718127`, `9d90b16`, `65ba8e8`). Do not rebuild it —
+`version(12)` and `Allowance.onboarding_snoozed_until` are on `main`, with
+`src/db/db.version12.test.ts` covering the upgrade. Kept below as the record of
+what was asked. Tasks 2–5 are the open work.
+
+~~Do this first. Every other task with a schema need waits on it.~~
 
 - Add `version(12)` in `src/db/db.ts` with `allowance.onboarding_snoozed_until: string | null`.
 - Add the field to the `Allowance` interface in `src/db/types.ts`.
@@ -117,7 +128,7 @@ Read plan §7, **including correction C-5.**
 
 - Acceptance test from the task exists and passes
 - `npx tsc --noEmit` clean
-- `npx vitest run` ≥ 545 passing, 0 failing
+- `npx vitest run` ≥ 255 passing, with no failure other than the known pre-existing `dailyLeftover` one (see ground rule 5)
 - No new dependency
 - No change to `PERSONA` or `PROMPT_VERSION`
 - Commit message names the task id
