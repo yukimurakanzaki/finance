@@ -3,9 +3,10 @@ import { Card, Screen } from '@components/ui'
 import { supabase, supabaseConfigured } from '@lib/supabaseClient'
 import { type ApiMessage, useChatStore } from '@stores/chatStore'
 import type { Session } from '@supabase/supabase-js'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_MODEL, getModelLabel } from '../../ai/models'
-import { describeWrite } from '../../ai/tools'
+import { describeWrite, describeWriteLive } from '../../ai/tools'
 import { ContextWindowIndicator } from './ContextWindowIndicator'
 import { ModelPicker } from './ModelPicker'
 import { SessionList } from './SessionList'
@@ -915,7 +916,15 @@ function ConfirmCard({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  const lines = writes.flatMap((w) => describeWrite(w.name, w.input))
+  // The richer per-tool summary needs a DB read (a balance correction shows
+  // before → after → delta, SEC-5). Fall back to the synchronous summary for
+  // the first paint so the card never renders empty while that resolves.
+  const live = useLiveQuery(
+    async () =>
+      (await Promise.all(writes.map((w) => describeWriteLive(w.name, w.input)))).flat(),
+    [writes],
+  )
+  const lines = live ?? writes.flatMap((w) => describeWrite(w.name, w.input))
   return (
     <Card style={{ alignSelf: 'stretch', border: '1px solid var(--amber)' }}>
       <div

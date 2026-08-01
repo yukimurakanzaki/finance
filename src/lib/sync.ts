@@ -1,4 +1,5 @@
-import { db, SYNC_TABLES, syncControl, type SyncTable } from '@db/db'
+import { SYNC_TABLES, type SyncTable, db, syncControl } from '@db/db'
+import { deletionsRepo } from '@db/repositories/deletions.repo'
 import { migrateLegacyIds } from '@lib/legacyIdMigration'
 import { supabase } from '@lib/supabaseClient'
 import {
@@ -20,10 +21,16 @@ const EPOCH = '1970-01-01T00:00:00.000Z'
 // Untyped view of the client for the generic sync path (dynamic table names).
 type LooseQuery = {
   select: (cols: string) => LooseQuery
-  upsert: (rows: unknown, opts: { onConflict: string }) => Promise<{ error: { message: string } | null }>
+  upsert: (
+    rows: unknown,
+    opts: { onConflict: string },
+  ) => Promise<{ error: { message: string } | null }>
   eq: (col: string, val: string) => LooseQuery
   gt: (col: string, val: string) => LooseQuery
-  order: (col: string, opts: { ascending: boolean }) => Promise<{ data: unknown; error: { message: string } | null }>
+  order: (
+    col: string,
+    opts: { ascending: boolean },
+  ) => Promise<{ data: unknown; error: { message: string } | null }>
 }
 const sb = () => supabase as unknown as { from: (t: string) => LooseQuery }
 
@@ -35,10 +42,16 @@ async function setMeta(key: string, value: string): Promise<void> {
   await db.syncMeta.put({ key, value })
 }
 
-async function pushTable(table: SyncTable, householdId: string, userId: string): Promise<number> {
+async function pushTable(
+  table: SyncTable,
+  householdId: string,
+  userId: string,
+): Promise<number> {
   const since = await getMeta(`pushed:${table}`)
   const local = await db.table(table).toArray()
-  const dirty = local.filter((r) => isSyncable(table, r) && (r.updated_at ?? EPOCH) > since)
+  const dirty = local.filter(
+    (r) => isSyncable(table, r) && (r.updated_at ?? EPOCH) > since,
+  )
   if (dirty.length === 0) return 0
 
   const cloudRows = dirty.map((r) => toCloudRow(table, r, householdId, userId))
@@ -51,9 +64,17 @@ async function pushTable(table: SyncTable, householdId: string, userId: string):
   return dirty.length
 }
 
-async function pullTable(table: SyncTable, householdId: string, userId: string): Promise<number> {
+async function pullTable(
+  table: SyncTable,
+  householdId: string,
+  userId: string,
+): Promise<number> {
   const since = await getMeta(`pulled:${table}`)
-  let query = sb().from(CLOUD_TABLE[table]).select('*').eq('household_id', householdId).gt('updated_at', since)
+  let query = sb()
+    .from(CLOUD_TABLE[table])
+    .select('*')
+    .eq('household_id', householdId)
+    .gt('updated_at', since)
   // allowance is per-member: only pull this user's own row (it collapses to one
   // local singleton), otherwise a member would inherit another member's allowance.
   if (table === 'allowance') query = query.eq('member_id', userId)
@@ -70,7 +91,10 @@ async function pullTable(table: SyncTable, householdId: string, userId: string):
   } finally {
     syncControl.applyingRemote = false
   }
-  await setMeta(`pulled:${table}`, maxUpdatedAt(remote as Array<{ updated_at?: string }>, since))
+  await setMeta(
+    `pulled:${table}`,
+    maxUpdatedAt(remote as Array<{ updated_at?: string }>, since),
+  )
   return remote.length
 }
 
@@ -78,14 +102,18 @@ async function pullTable(table: SyncTable, householdId: string, userId: string):
 let syncing = false
 
 /** One full sync cycle: push then pull every table. Safe to call repeatedly. */
-export async function syncNow(householdId: string, userId: string): Promise<void> {
+export async function syncNow(
+  householdId: string,
+  userId: string,
+): Promise<void> {
   if (syncing) return
   syncing = true
   try {
     // Re-key any pre-cloud rows (numeric ids from a restored backup) to UUIDs
     // so they become pushable. No-op on devices without legacy rows.
     const migrated = await migrateLegacyIds()
-    if (migrated > 0) console.info(`sync: re-keyed ${migrated} legacy rows to UUIDs`)
+    if (migrated > 0)
+      console.info(`sync: re-keyed ${migrated} legacy rows to UUIDs`)
     // A push failure on one table (e.g. a local row the server rejects) must not
     // block pulls for every table — otherwise a single bad row wedges the device
     // permanently behind the cloud. Collect push errors but always run pulls.
@@ -99,8 +127,17 @@ export async function syncNow(householdId: string, userId: string): Promise<void
       }
     }
     for (const table of SYNC_TABLES) await pullTable(table, householdId, userId)
+    // After every table has been pulled, never between: a tombstone applied
+    // mid-loop would delete a row that its own table's pull then re-inserts.
+    // Cheap and idempotent — deleting an absent row is a no-op — so it runs
+    // over the whole log each cycle rather than tracking what it has applied.
+    // Runs even if a push above failed, same reasoning as the per-table catch:
+    // one bad table shouldn't block a step every other table depends on.
+    await deletionsRepo.apply()
     if (pushErrors.length > 0) {
-      throw new Error(`sync: ${pushErrors.length} table(s) failed to push: ${pushErrors.join('; ')}`)
+      throw new Error(
+        `sync: ${pushErrors.length} table(s) failed to push: ${pushErrors.join('; ')}`,
+      )
     }
   } finally {
     syncing = false

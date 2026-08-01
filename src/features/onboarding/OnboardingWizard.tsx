@@ -8,7 +8,7 @@ import { recurringRepo } from '@db/repositories/recurringItems.repo'
 import { settingsRepo } from '@db/repositories/settings.repo'
 import type { AccountType, AssetType, Lane, RecurringKind } from '@db/types'
 import { useI18n } from '@i18n/index'
-import { parseRpInput } from '@lib/currency'
+import { formatRpInput, parseRpInput } from '@lib/currency'
 import { todayISO } from '@lib/dates'
 import { useEffect, useRef, useState } from 'react'
 
@@ -172,8 +172,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   async function createFirstAccount(
     today: string,
     openingBalance: number | null,
-  ) {
-    if (!accountName) return
+  ): Promise<string | null> {
+    if (!accountName) return null
     const anchor = new Date(`${today}T12:00:00`)
     anchor.setDate(anchor.getDate() - 1)
     const anchorDay = anchor.toISOString().slice(0, 10)
@@ -181,10 +181,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const duplicate = existing.some(
       (a) =>
         a.name.trim().toLowerCase() === accountName.trim().toLowerCase() &&
-        a.institution.trim().toLowerCase() === accountInstitution.trim().toLowerCase(),
+        a.institution.trim().toLowerCase() ===
+          accountInstitution.trim().toLowerCase(),
     )
-    if (duplicate) return
-    await accountsRepo.create({
+    // Explicit null, not a bare return: the declared Promise<string | null>
+    // return type and the `accountId !== null` rollback check at both call
+    // sites both need a real null here, not undefined.
+    if (duplicate) return null
+    return accountsRepo.create({
       name: accountName,
       institution: accountInstitution,
       account_type: accountType,
@@ -217,8 +221,20 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (!validated.ok) return
     setFinishError(null)
     setSaving(true)
-    await createFirstAccount(todayISO(), validated.openingBalance)
-    await finishCommon()
+    let accountId: string | null = null
+    try {
+      accountId = await createFirstAccount(todayISO(), validated.openingBalance)
+      await finishCommon()
+    } catch (err) {
+      console.error('[onboarding] quick-finish failed, rolling back', err)
+      // Same rollback contract as handleFinish: finishCommon can throw AFTER
+      // the account exists, and the retry would then create a second one.
+      if (accountId !== null) await accountsRepo.remove(accountId)
+      setFinishError(
+        `Couldn't save — ${err instanceof Error ? err.message : 'unknown error'}. Try again.`,
+      )
+      setSaving(false)
+    }
   }
 
   async function handleFinish() {
@@ -253,24 +269,58 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setSaving(true)
     const today = todayISO()
 
-    if (takeHomeN !== null) {
-      await incomeEventsRepo.create({
-        date: today,
-        gross: grossN ?? 0,
-        take_home_net: takeHomeN,
-        delta_vs_prev: null,
-        routed_to_pipe: pipeNs.reduce<number>((s, n) => s + (n ?? 0), 0),
-        routed_to_lifestyle: monthlyN ?? 0,
-        note: 'Onboarding',
-        source: 'seed',
-      })
+    // Track every row we add so a mid-write failure can roll back. Without
+    // this, a single thrown `await accountsRepo.create(...)` after several
+    // successes would leave the user with a half-written setup, a wizard that
+    // never re-appears (setup_complete unset but stale rows present), and
+    // no clean recovery short of clearing IndexedDB. PAIN-POINTS §Reliability.
+    const written: {
+      incomeIds: string[]
+      recurringIds: string[]
+      accountIds: string[]
+    } = {
+      incomeIds: [],
+      recurringIds: [],
+      accountIds: [],
     }
 
-    for (const [i, pipe] of pipes.entries()) {
-      if (pipe.name && pipe.amount) {
-        await recurringRepo.create({
-          name: pipe.name,
-          amount: pipeNs[i] ?? 0,
+    try {
+      if (takeHomeN !== null) {
+        const id = await incomeEventsRepo.create({
+          date: today,
+          gross: grossN ?? 0,
+          take_home_net: takeHomeN,
+          delta_vs_prev: null,
+          routed_to_pipe: pipeNs.reduce<number>((s, n) => s + (n ?? 0), 0),
+          routed_to_lifestyle: monthlyN ?? 0,
+          note: 'Onboarding',
+          source: 'seed',
+        })
+        written.incomeIds.push(id)
+      }
+
+      for (const [i, pipe] of pipes.entries()) {
+        if (pipe.name && pipe.amount) {
+          const id = await recurringRepo.create({
+            name: pipe.name,
+            amount: pipeNs[i] ?? 0,
+            cadence: 'monthly',
+            kind: 'pay_yourself_first' as RecurringKind,
+            lane: 'income_producing' as Lane,
+            is_protected: true,
+            is_active: true,
+            next_due: today,
+            end_date: null,
+            note: null,
+          })
+          written.recurringIds.push(id)
+        }
+      }
+
+      if (dplkN !== null) {
+        const id = await recurringRepo.create({
+          name: 'DPLK',
+          amount: dplkN,
           cadence: 'monthly',
           kind: 'pay_yourself_first' as RecurringKind,
           lane: 'income_producing' as Lane,
@@ -280,33 +330,34 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           end_date: null,
           note: null,
         })
+        written.recurringIds.push(id)
       }
-    }
 
-    if (dplkN !== null) {
-      await recurringRepo.create({
-        name: 'DPLK',
-        amount: dplkN,
-        cadence: 'monthly',
-        kind: 'pay_yourself_first' as RecurringKind,
-        lane: 'income_producing' as Lane,
-        is_protected: true,
-        is_active: true,
-        next_due: today,
-        end_date: null,
-        note: null,
-      })
-    }
+      if (monthlyN !== null) {
+        await allowanceRepo.set({
+          monthly_amount: monthlyN,
+          weekend_allocation: weekendN ?? 0,
+        })
+      }
 
-    if (monthlyN !== null) {
-      await allowanceRepo.set({
-        monthly_amount: monthlyN,
-        weekend_allocation: weekendN ?? 0,
-      })
-    }
+      const accountId = await createFirstAccount(today, openingBalance)
+      if (accountId !== null) written.accountIds.push(accountId)
 
-    await createFirstAccount(today, openingBalance)
-    await finishCommon()
+      await finishCommon()
+    } catch (err) {
+      console.error('[onboarding] finish failed, rolling back', err, written)
+      // Best-effort rollback. Order doesn't matter — these are independent rows.
+      await Promise.allSettled([
+        ...written.incomeIds.map((id) => incomeEventsRepo.remove(id)),
+        ...written.recurringIds.map((id) => recurringRepo.remove(id)),
+        ...written.accountIds.map((id) => accountsRepo.remove(id)),
+      ])
+      // setup_complete stays unset, draft stays on disk — user retries.
+      setFinishError(
+        `Couldn't save — ${err instanceof Error ? err.message : 'unknown error'}. Your data was rolled back; try again.`,
+      )
+      setSaving(false)
+    }
   }
 
   // Don't render until we've tried to restore the draft
@@ -440,7 +491,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   mono
                   placeholder={`${t.forms.egPrefix}3.500.000`}
                   value={startingBalance}
-                  onChange={(e) => setStartingBalance(e.target.value)}
+                  onChange={(e) =>
+                    setStartingBalance(formatRpInput(e.target.value))
+                  }
                 />
               </Field>
               <div
@@ -486,7 +539,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   inputMode="numeric"
                   placeholder={`${t.forms.egPrefix}15.000.000`}
                   value={gross}
-                  onChange={(e) => setGross(e.target.value)}
+                  onChange={(e) => setGross(formatRpInput(e.target.value))}
                   mono
                 />
               </Field>
@@ -496,7 +549,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   inputMode="numeric"
                   placeholder={`${t.forms.egPrefix}12.500.000`}
                   value={takeHome}
-                  onChange={(e) => setTakeHome(e.target.value)}
+                  onChange={(e) => setTakeHome(formatRpInput(e.target.value))}
                   mono
                 />
               </Field>
@@ -614,7 +667,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   inputMode="numeric"
                   mono
                   value={dplk}
-                  onChange={(e) => setDplk(e.target.value)}
+                  onChange={(e) => setDplk(formatRpInput(e.target.value))}
                   placeholder={`${t.forms.egPrefix}500.000`}
                 />
               </Field>
@@ -653,7 +706,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   mono
                   placeholder={`${t.forms.egPrefix}2.500.000`}
                   value={monthly}
-                  onChange={(e) => setMonthly(e.target.value)}
+                  onChange={(e) => setMonthly(formatRpInput(e.target.value))}
                 />
               </Field>
               <Field label={t.onboarding.weekendAllocationMonthly}>
@@ -663,7 +716,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   mono
                   placeholder={`${t.forms.egPrefix}800.000`}
                   value={weekend}
-                  onChange={(e) => setWeekend(e.target.value)}
+                  onChange={(e) => setWeekend(formatRpInput(e.target.value))}
                 />
               </Field>
               <div
@@ -729,7 +782,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   mono
                   placeholder={`${t.forms.egPrefix}3.500.000`}
                   value={startingBalance}
-                  onChange={(e) => setStartingBalance(e.target.value)}
+                  onChange={(e) =>
+                    setStartingBalance(formatRpInput(e.target.value))
+                  }
                 />
               </Field>
               <div

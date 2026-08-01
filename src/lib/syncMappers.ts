@@ -3,7 +3,8 @@ import type { SyncTable } from '@db/db'
 // Pure mapping logic between local Dexie rows and cloud rows. No IO — unit-tested
 // in syncMappers.test.ts. sync.ts wires these to Dexie + Supabase.
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Local Dexie table name -> cloud table name.
 export const CLOUD_TABLE: Record<SyncTable, string> = {
@@ -14,6 +15,7 @@ export const CLOUD_TABLE: Record<SyncTable, string> = {
   recurringItems: 'recurring_items',
   incomeEvents: 'income_events',
   transactions: 'transactions',
+  balanceCorrections: 'balance_corrections',
   milestones: 'milestones',
   netWorthSnapshots: 'net_worth_snapshots',
   allowance: 'allowances',
@@ -22,6 +24,7 @@ export const CLOUD_TABLE: Record<SyncTable, string> = {
   chatMessages: 'chat_messages',
   chatMemories: 'chat_memories',
   chatCustomSkills: 'chat_custom_skills',
+  deletions: 'deletions',
 }
 
 // Singleton local tables map to a natural cloud key instead of an `id` uuid.
@@ -43,8 +46,14 @@ export function isSyncable(table: SyncTable, row: { id?: string }): boolean {
 }
 
 /** Later of the batch's updated_at values and the current watermark. */
-export function maxUpdatedAt(rows: Array<{ updated_at?: string }>, since: string): string {
-  return rows.reduce((mx, r) => (r.updated_at && r.updated_at > mx ? r.updated_at : mx), since)
+export function maxUpdatedAt(
+  rows: Array<{ updated_at?: string }>,
+  since: string,
+): string {
+  return rows.reduce(
+    (mx, r) => (r.updated_at && r.updated_at > mx ? r.updated_at : mx),
+    since,
+  )
 }
 
 /** Strip local-only fields and stamp the cloud tenancy columns. */
@@ -66,7 +75,10 @@ export function toCloudRow(
 }
 
 /** Cloud row -> local Dexie row (singletons collapse to the fixed local id). */
-export function fromCloudRow(table: SyncTable, row: Record<string, unknown>): Record<string, unknown> {
+export function fromCloudRow(
+  table: SyncTable,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
   const coerced = coerceNumeric(table, row)
   if (SINGLETON[table]) {
     const { household_id: _h, member_id: _m, ...rest } = coerced
@@ -88,6 +100,7 @@ export function fromCloudRow(table: SyncTable, row: Record<string, unknown>): Re
 // numeric fields (or an explicit []) instead of silently inheriting the bug.
 export const NUMERIC: Record<SyncTable, readonly string[]> = {
   transactions: ['amount', 'original_amount', 'overridden_amount'],
+  balanceCorrections: ['previous_balance', 'new_balance'],
   accounts: ['manual_balance_override'],
   assets: ['value', 'quantity_grams', 'price_per_gram', 'fx_amount'],
   envelopes: ['target_amount'],
@@ -118,9 +131,13 @@ export const NUMERIC: Record<SyncTable, readonly string[]> = {
   categories: [],
   chatMemories: [],
   chatCustomSkills: [],
+  deletions: [],
 }
 
-function coerceNumeric(table: SyncTable, row: Record<string, unknown>): Record<string, unknown> {
+function coerceNumeric(
+  table: SyncTable,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
   const fields = NUMERIC[table]
   if (!fields || fields.length === 0) return row
   const out = { ...row }
@@ -137,7 +154,10 @@ function coerceNumeric(table: SyncTable, row: Record<string, unknown>): Record<s
 // Shared helper: scrub any already-corrupted local rows where a numeric field
 // arrived as a string from a prior pull (before `coerceNumeric` existed in
 // `fromCloudRow`). Used by the Dexie v12 upgrade and by tests.
-export function scrubNumericStrings(table: SyncTable, row: Record<string, unknown>): boolean {
+export function scrubNumericStrings(
+  table: SyncTable,
+  row: Record<string, unknown>,
+): boolean {
   const fields = NUMERIC[table]
   if (!fields || fields.length === 0) return false
   let changed = false

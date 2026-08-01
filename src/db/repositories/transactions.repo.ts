@@ -5,6 +5,7 @@ import {
 } from '@lib/recurringMatch'
 import type { ValidImportRow } from '../../import/schema'
 import { db } from '../db'
+import { deletionsRepo } from './deletions.repo'
 import type {
   AssetType,
   Lane,
@@ -87,19 +88,25 @@ export const transactionsRepo = {
     })
   },
 
-  deleteWithPair: (id: string) =>
-    db.transaction('rw', db.transactions, async () => {
-      const t = await db.transactions.get(id)
-      if (!t) return
-      if (t.transfer_pair_id) {
-        await db.transactions
-          .where('transfer_pair_id')
-          .equals(t.transfer_pair_id)
-          .delete()
-      } else {
-        await db.transactions.delete(id)
-      }
-    }),
+  // Routed through deletionsRepo so the delete carries a tombstone: without
+  // one it never reaches the other devices, and comes back here on the next
+  // full hydrate.
+  deleteWithPair: async (id: string) => {
+    const t = await db.transactions.get(id)
+    if (!t) return
+    if (t.transfer_pair_id) {
+      const legs = await db.transactions
+        .where('transfer_pair_id')
+        .equals(t.transfer_pair_id)
+        .toArray()
+      await deletionsRepo.removeMany(
+        'transactions',
+        legs.map((l) => l.id as string),
+      )
+    } else {
+      await deletionsRepo.remove('transactions', id)
+    }
+  },
 
   override: async (id: string, overrideAmount: number, note: string | null) =>
     db.transaction('rw', db.transactions, async () => {

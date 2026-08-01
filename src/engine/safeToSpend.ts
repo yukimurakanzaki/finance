@@ -19,8 +19,26 @@ export function isWeekDraw(t: Transaction): boolean {
     // Falsy check, not === null: rows written before the field existed (cloud
     // pulls from another device, restored pre-field backups) carry undefined
     // and must still count as ordinary discretionary draws.
-    !t.recurring_item_id
+    !t.recurring_item_id &&
+    // D1 — a balance correction states what the account really holds; it is
+    // bookkeeping, not spending. Same falsy-check reasoning as above.
+    !t.is_adjustment
   )
+}
+
+// A row representing real money entering or leaving the household this period:
+// not an internal transfer between own accounts (T1), and not a balance
+// correction (D1), which restates what an account holds without anyone having
+// earned or spent anything. This is the "actuals" definition — Report totals,
+// the by-category breakdown those totals reconcile against, and the AI's
+// monthly summary all filter through it so a screen and a chat reply can never
+// quote different numbers for the same month.
+//
+// Deliberately NOT the same question as isWeekDraw: this one keeps committed
+// recurring payments and pass-through rows, which are real flows even though
+// they don't draw the personal pool.
+export function isActualFlow(t: Transaction): boolean {
+  return !t.is_transfer && !t.is_adjustment
 }
 
 export interface SafeToSpendInput {

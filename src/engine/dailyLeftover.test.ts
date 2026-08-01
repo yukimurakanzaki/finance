@@ -99,22 +99,32 @@ describe('computeDailyLeftover', () => {
     expect(r.leftover).toBe(1_000_000)
   })
 
-  it("a future date returns isProjected: true and equals the last real day's leftover", () => {
-    const today = todayISO()
-    const transactions = [txn({ date: today, amount: 100_000 })]
-    const lastRealDay = computeDailyLeftover({
-      monthlyAmount: 1_000_000,
-      transactions,
-      asOfDate: today,
+  it('a future date returns isProjected: true, today returns false', () => {
+    const transactions = [txn({ date: todayISO(), amount: 100_000 })]
+    const opts = { monthlyAmount: 1_000_000, transactions }
+    expect(
+      computeDailyLeftover({ ...opts, asOfDate: todayISO() }).isProjected,
+    ).toBe(false)
+    expect(
+      computeDailyLeftover({ ...opts, asOfDate: tomorrow() }).isProjected,
+    ).toBe(true)
+  })
+
+  // Projecting forward inside a month just carries the running total — nothing
+  // new is subtracted. Fixed dates, no system clock: the previous version of
+  // this assertion compared today against tomorrow and so failed every time the
+  // suite ran on the last day of a month, when "tomorrow" is a different month
+  // with its own window (dailyLeftover.ts: no carry-over between months).
+  it("a later day in the same month equals the last spending day's leftover", () => {
+    const transactions = [txn({ date: '2026-03-10', amount: 100_000 })]
+    const opts = { monthlyAmount: 1_000_000, transactions }
+    const spendingDay = computeDailyLeftover({
+      ...opts,
+      asOfDate: '2026-03-10',
     })
-    const projected = computeDailyLeftover({
-      monthlyAmount: 1_000_000,
-      transactions,
-      asOfDate: tomorrow(),
-    })
-    expect(projected.isProjected).toBe(true)
-    expect(lastRealDay.isProjected).toBe(false)
-    expect(projected.leftover).toBe(lastRealDay.leftover)
+    const later = computeDailyLeftover({ ...opts, asOfDate: '2026-03-25' })
+    expect(spendingDay.leftover).toBe(900_000)
+    expect(later.leftover).toBe(spendingDay.leftover)
   })
 
   it('a past date within the month returns isProjected: false', () => {

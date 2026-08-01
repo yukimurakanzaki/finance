@@ -88,7 +88,22 @@ export interface Transaction {
   // committed payments live in the recurring bucket and are excluded from the
   // personal safe-to-spend pool draw. null for ordinary discretionary spend.
   recurring_item_id: string | null
+  // D1 — this row is a balance correction, not real spending: the user told us
+  // what the account actually holds and we booked the gap. It moves the account
+  // balance and net worth, but is excluded from the safe-to-spend draw, the
+  // daily leftover ledger, the category breakdown and Report actuals.
+  // Optional, not required: rows written before this field existed carry
+  // undefined, so every reader tests truthiness — never `=== false`. Clearing
+  // it (by giving the row a category) turns it into an ordinary transaction.
+  is_adjustment?: boolean
   created_at: string
+  /**
+   * Stamped by the Dexie `creating`/`updating` hooks on every synced table and
+   * used as the watermark the push filters on. Optional because no caller sets
+   * it by hand — declared so the rare write that must stamp it explicitly (a
+   * `.modify()`, which bypasses those hooks) can be type-checked.
+   */
+  updated_at?: string
 }
 
 export interface Category {
@@ -125,6 +140,60 @@ export interface RecurringItem {
   deleted_at?: string | null
 }
 
+// D1 — append-only audit of every balance correction. One row per correction,
+// pointing at the adjustment transaction it created, so "who changed this and
+// when" has an answer in a two-member household. Never edited in place: an undo
+// appends a reverting row carrying `reverts_id`.
+//
+// The watermark sync engine has no delete channel: it pushes rows whose
+// updated_at moved, so a row deleted locally just stops being pushed. The cloud
+// copy survives, every other device keeps it forever, and a fresh hydrate pulls
+// it straight back onto this one. Every delete in the app had this shape.
+//
+// A deletion log fixes it without tombstoning the rows themselves. The local
+// row is genuinely removed — so the ~55 places that read db.transactions need
+// no "and not deleted" clause, and none of them can forget one — and this small
+// synced record carries the fact of the deletion to the other devices.
+//
+// `id` is deliberately the deleted row's own id: deleting twice writes the same
+// record instead of a second one.
+export interface Deletion {
+  id?: string
+  /** Local Dexie table the row lived in, e.g. 'transactions'. */
+  table_name: string
+  row_id: string
+  created_at: string
+}
+
+export interface BalanceCorrection {
+  id?: string
+  account_id: string
+  /** The adjustment transaction this correction wrote; null on a reverting row. */
+  transaction_id: string | null
+  /** Set on a reverting row: the correction it undoes. */
+  reverts_id: string | null
+  previous_balance: number
+  new_balance: number
+  as_of_date: string
+  note: string | null
+  /**
+   * Who made it. Never written by this client: SEC-2 requires attribution to
+   * come from the authenticated session, so the column is left off the pushed
+   * row entirely and the cloud's `default auth.uid()` stamps it. Populated on
+   * rows that come back from a pull. An explicit null would defeat that
+   * default, which is why the repo omits the key rather than setting it.
+   */
+  created_by?: string | null
+  created_at: string
+  /**
+   * Stamped by the Dexie `creating`/`updating` hooks on every synced table and
+   * used as the watermark the push filters on. Optional because no caller sets
+   * it by hand — declared so the rare write that must stamp it explicitly (a
+   * `.modify()`, which bypasses those hooks) can be type-checked.
+   */
+  updated_at?: string
+}
+
 export interface Allowance {
   id?: string
   monthly_amount: number
@@ -155,6 +224,7 @@ export interface IncomeEvent {
   note: string | null
   source: 'manual' | 'seed'
   created_at: string
+  deleted_at?: string | null
 }
 
 export interface Milestone {

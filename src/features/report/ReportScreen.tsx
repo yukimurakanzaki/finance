@@ -8,6 +8,7 @@ import {
 } from '@components/ui'
 import { db } from '@db/db'
 import { transactionsRepo } from '@db/repositories/transactions.repo'
+import { isActualFlow } from '@engine/safeToSpend'
 import { HomeScreen } from '@features/home/HomeScreen'
 import { todayISO } from '@lib/dates'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -20,18 +21,18 @@ export function ReportScreen() {
     useLiveQuery(() => transactionsRepo.getByMonth(ym), [ym]) ?? []
   const categories = useLiveQuery(() => db.categories.toArray()) ?? []
 
-  // Same "actuals" expense definition this screen has always used (T1 fix,
-  // PAIN-POINTS.md): transactionsRepo.getByMonth excludes transfers by default,
-  // the `!t.is_transfer` filter below is kept as a belt-and-suspenders no-op so
-  // this reads identically to the pre-migration version. F4's per-category
-  // breakdown below groups this exact `expenseTxns` array — see
-  // categoryBreakdown.ts — so the per-category sums reconcile with `expenses`.
-  const income = monthTxns
-    .filter((t) => t.direction === 'in' && !t.is_transfer)
+  // Same "actuals" definition this screen has always used (T1 fix,
+  // PAIN-POINTS.md), now expressed through the shared `isActualFlow` predicate:
+  // transfers out (getByMonth already drops them; this is belt-and-suspenders)
+  // and balance corrections out (D1 — they restate a balance, nobody spent
+  // anything). F4's per-category breakdown below groups this exact
+  // `expenseTxns` array — see categoryBreakdown.ts — so the per-category sums
+  // reconcile with `expenses` no matter what the filter excludes.
+  const actuals = monthTxns.filter(isActualFlow)
+  const income = actuals
+    .filter((t) => t.direction === 'in')
     .reduce((s, t) => s + t.amount, 0)
-  const expenseTxns = monthTxns.filter(
-    (t) => t.direction === 'out' && !t.is_transfer,
-  )
+  const expenseTxns = actuals.filter((t) => t.direction === 'out')
   const expenses = expenseTxns.reduce((s, t) => s + t.amount, 0)
 
   const catName = useMemo(
