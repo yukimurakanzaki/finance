@@ -1,4 +1,5 @@
 import { db, SYNC_TABLES, syncControl, type SyncTable } from '@db/db'
+import { deletionsRepo } from '@db/repositories/deletions.repo'
 import { migrateLegacyIds } from '@lib/legacyIdMigration'
 import { supabase } from '@lib/supabaseClient'
 import {
@@ -88,6 +89,11 @@ export async function syncNow(householdId: string, userId: string): Promise<void
     if (migrated > 0) console.info(`sync: re-keyed ${migrated} legacy rows to UUIDs`)
     for (const table of SYNC_TABLES) await pushTable(table, householdId, userId)
     for (const table of SYNC_TABLES) await pullTable(table, householdId, userId)
+    // After every table has been pulled, never between: a tombstone applied
+    // mid-loop would delete a row that its own table's pull then re-inserts.
+    // Cheap and idempotent — deleting an absent row is a no-op — so it runs
+    // over the whole log each cycle rather than tracking what it has applied.
+    await deletionsRepo.apply()
   } finally {
     syncing = false
   }

@@ -97,6 +97,13 @@ export interface Transaction {
   // it (by giving the row a category) turns it into an ordinary transaction.
   is_adjustment?: boolean
   created_at: string
+  /**
+   * Stamped by the Dexie `creating`/`updating` hooks on every synced table and
+   * used as the watermark the push filters on. Optional because no caller sets
+   * it by hand — declared so the rare write that must stamp it explicitly (a
+   * `.modify()`, which bypasses those hooks) can be type-checked.
+   */
+  updated_at?: string
 }
 
 export interface Category {
@@ -138,6 +145,26 @@ export interface RecurringItem {
 // when" has an answer in a two-member household. Never edited in place: an undo
 // appends a reverting row carrying `reverts_id`.
 //
+// The watermark sync engine has no delete channel: it pushes rows whose
+// updated_at moved, so a row deleted locally just stops being pushed. The cloud
+// copy survives, every other device keeps it forever, and a fresh hydrate pulls
+// it straight back onto this one. Every delete in the app had this shape.
+//
+// A deletion log fixes it without tombstoning the rows themselves. The local
+// row is genuinely removed — so the ~55 places that read db.transactions need
+// no "and not deleted" clause, and none of them can forget one — and this small
+// synced record carries the fact of the deletion to the other devices.
+//
+// `id` is deliberately the deleted row's own id: deleting twice writes the same
+// record instead of a second one.
+export interface Deletion {
+  id?: string
+  /** Local Dexie table the row lived in, e.g. 'transactions'. */
+  table_name: string
+  row_id: string
+  created_at: string
+}
+
 export interface BalanceCorrection {
   id?: string
   account_id: string
@@ -158,6 +185,13 @@ export interface BalanceCorrection {
    */
   created_by?: string | null
   created_at: string
+  /**
+   * Stamped by the Dexie `creating`/`updating` hooks on every synced table and
+   * used as the watermark the push filters on. Optional because no caller sets
+   * it by hand — declared so the rare write that must stamp it explicitly (a
+   * `.modify()`, which bypasses those hooks) can be type-checked.
+   */
+  updated_at?: string
 }
 
 export interface Allowance {

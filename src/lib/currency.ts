@@ -57,6 +57,18 @@ export function parseRpBalance(raw: string): number | null {
   return parseRpStrict(raw)
 }
 
+// A physical quantity, not money: grams of gold, units of a fund. Decimals are
+// meaningful here and must survive — stripping the separator the way the money
+// parsers do turns 10.5 grams into 105 grams, a tenfold overstatement of the
+// holding and of net worth with it. Accepts either separator, since an
+// Indonesian keyboard produces "10,5".
+export function parseQuantity(raw: string): number | null {
+  const s = raw.trim().replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(s)) return null
+  const n = Number(s)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 function parseRpStrict(raw: string): number | null {
   const s = raw.trim()
   if (!s) return null

@@ -14,6 +14,7 @@ import type {
   Assumptions,
   AppSetting,
   BalanceCorrection,
+  Deletion,
   ChatMessage,
   ChatSession,
   ChatMemory,
@@ -47,6 +48,10 @@ export const SYNC_TABLES = [
   'chatMessages',
   'chatMemories',
   'chatCustomSkills',
+  // Last on purpose: applying a tombstone must happen after every table it can
+  // name has been pulled, or a row would be deleted and then re-inserted by its
+  // own table's pull in the same cycle.
+  'deletions',
 ] as const
 export type SyncTable = (typeof SYNC_TABLES)[number]
 
@@ -63,6 +68,7 @@ class FIDatabase extends Dexie {
   milestones!: Table<Milestone, string>
   assumptions!: Table<Assumptions, string>
   balanceCorrections!: Table<BalanceCorrection, string>
+  deletions!: Table<Deletion, string>
   appSettings!: Table<AppSetting, string>
   chatSessions!: Table<ChatSession, string>
   chatMessages!: Table<ChatMessage, string>
@@ -262,6 +268,12 @@ class FIDatabase extends Dexie {
     // adjustment", so a full-table backfill would only slow startup.
     this.version(13).stores({
       balanceCorrections: 'id, account_id, transaction_id, as_of_date, created_at',
+    })
+
+    // v14: the deletion log — see the Deletion type for why deletes needed a
+    // channel of their own.
+    this.version(14).stores({
+      deletions: 'id, table_name, row_id, created_at',
     })
   }
 }
