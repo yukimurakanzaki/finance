@@ -159,10 +159,69 @@ function autoTitle(msg: ApiMessage): string {
   return text.slice(0, 60) || 'New chat'
 }
 
+function toolUseIdsOf(msg: ApiMessage): Set<string> | null {
+  if (msg.role !== 'assistant' || !Array.isArray(msg.content)) return null
+  const ids = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use').map((b) => b.id)
+  return ids.length > 0 ? new Set(ids) : null
+}
+
+function toolResultIdsOf(msg: ApiMessage): string[] | null {
+  if (msg.role !== 'user' || !Array.isArray(msg.content)) return null
+  if (msg.content.length === 0 || !msg.content.every((b) => b.type === 'tool_result')) return null
+  return (msg.content as Anthropic.ToolResultBlockParam[]).map((b) => b.tool_use_id)
+}
+
+// A provider only accepts a user tool_result turn immediately after the
+// assistant tool_use turn whose ids it answers — any other shape (a
+// tool_result referencing an id the immediately preceding assistant message
+// never introduced, or an assistant tool_use never followed by its results)
+// gets rejected outright ("tool result's tool id ... not found"). That
+// mismatch can end up locally persisted — e.g. an interrupted confirm flow,
+// or two tabs on the same session interleaving writes — and once it's in a
+// session's history, every future turn resends the same broken pair and
+// fails identically, forever, until something drops it. Walk the full
+// history and drop any assistant tool_use turn (and, if present, its
+// following user turn) whose ids don't round-trip cleanly, so a corrupted
+// session self-heals on the very next send instead of staying wedged.
+export function sanitizeToolPairing(messages: ApiMessage[]): ApiMessage[] {
+  const out: ApiMessage[] = []
+  let pending: Set<string> | null = null
+
+  for (const msg of messages) {
+    const toolUseIds = toolUseIdsOf(msg)
+    if (toolUseIds) {
+      if (pending) out.pop() // previous assistant tool_use turn was never answered
+      out.push(msg)
+      pending = toolUseIds
+      continue
+    }
+
+    const resultIds = toolResultIdsOf(msg)
+    if (resultIds) {
+      const matches = pending !== null && resultIds.every((id) => pending?.has(id))
+      if (!matches) {
+        if (pending) out.pop() // drop the assistant turn these results don't answer
+        pending = null
+        continue // and drop this mismatched carrier itself
+      }
+      out.push(msg)
+      pending = null
+      continue
+    }
+
+    if (pending) out.pop() // a plain message can't follow an unanswered tool_use either
+    out.push(msg)
+    pending = null
+  }
+
+  if (pending) out.pop() // trailing unanswered tool_use
+  return out
+}
+
 // The API requires the first message to be a user message without orphaned
 // tool_result blocks. Trim from the front until that holds.
 function trimForApi(messages: ApiMessage[]): ApiMessage[] {
-  let slice = messages.slice(-HISTORY_LIMIT)
+  let slice = sanitizeToolPairing(messages).slice(-HISTORY_LIMIT)
   while (slice.length > 0) {
     const first = slice[0]
     if (!first) break
