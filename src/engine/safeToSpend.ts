@@ -54,6 +54,14 @@ export interface SafeToSpendResult {
   personalPool: number
   personalSubTotal: number
   weekendAllocation: number
+  /**
+   * personalPool − weekendAllocation. Returned so Explain My Number can show
+   * the chain's middle step without recomputing it in a component (NFR-4.1);
+   * `weekPool` alone can't be explained, because it is a floored quotient.
+   */
+  monthlyDiscretionary: number
+  /** Weeks in the current month — the divisor behind `weekPool`. */
+  weeks: number
   weekPool: number
   spentThisWeek: number
   remainingPool: number
@@ -112,6 +120,8 @@ export function computeSafeToSpend(
     personalPool,
     personalSubTotal,
     weekendAllocation,
+    monthlyDiscretionary,
+    weeks,
     weekPool,
     spentThisWeek: spendThisWeek,
     remainingPool,

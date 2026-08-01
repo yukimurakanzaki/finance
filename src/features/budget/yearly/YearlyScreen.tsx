@@ -9,15 +9,9 @@ import {
 import { db } from '@db/db'
 import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import type { Cadence, RecurringKind } from '@db/types'
+import { useI18n } from '@i18n/index'
 import { formatRp } from '@lib/currency'
 import { useLiveQuery } from 'dexie-react-hooks'
-
-const KIND_LABELS: Record<RecurringKind, string> = {
-  pay_yourself_first: 'Pay Yourself First',
-  household_bill: 'Household Bills',
-  personal_sub: 'Subscriptions',
-  other: 'Other Committed',
-}
 
 const KIND_COLOR: Record<RecurringKind, string> = {
   pay_yourself_first: 'var(--engine)',
@@ -41,6 +35,7 @@ const KIND_ORDER: RecurringKind[] = [
 ]
 
 export function YearlyScreen() {
+  const { t } = useI18n()
   const items =
     useLiveQuery(() =>
       db.recurringItems.filter((r) => r.is_active).toArray(),
@@ -52,6 +47,12 @@ export function YearlyScreen() {
 
   const takeHomeAnnual = (latestIncome?.take_home_net ?? 0) * 12
   const poolAnnual = (allowance?.monthly_amount ?? 0) * 12
+  const kindLabels: Record<RecurringKind, string> = {
+    pay_yourself_first: t.budget.payYourselfFirst,
+    household_bill: t.budget.billsAndSubs,
+    personal_sub: t.budget.subscriptions,
+    other: t.budget.otherCommitted,
+  }
 
   const byKind = KIND_ORDER.map((kind) => {
     const kindItems = items.filter((i) => i.kind === kind)
@@ -73,9 +74,9 @@ export function YearlyScreen() {
       {/* Annual summary */}
       <Card>
         <StatTile
-          label="Annual picture"
+          label={t.budget.annualPicture}
           value={takeHomeAnnual > 0 ? <Amount value={takeHomeAnnual} /> : '—'}
-          sub="annual take-home"
+          sub={t.budget.annualTakeHome}
         />
         <div
           style={{
@@ -86,19 +87,19 @@ export function YearlyScreen() {
           }}
         >
           <BarRow
-            label="Committed"
+            label={t.budget.committed}
             value={committedAnnual}
             total={takeHomeAnnual}
             color="var(--protected)"
           />
           <BarRow
-            label="Discretionary"
+            label={t.budget.discretionary}
             value={poolAnnual}
             total={takeHomeAnnual}
             color="var(--amber)"
           />
           <BarRow
-            label="Unallocated"
+            label={t.budget.unallocated}
             value={Math.max(0, unallocated)}
             total={takeHomeAnnual}
             color="var(--ink-3)"
@@ -130,7 +131,7 @@ export function YearlyScreen() {
                   color: 'var(--engine)',
                 }}
               >
-                Savings rate
+                {t.home.savingsRate}
               </div>
               <div
                 style={{
@@ -140,7 +141,8 @@ export function YearlyScreen() {
                   marginTop: 2,
                 }}
               >
-                {formatRp(pyf.total)}/yr into pipe
+                {formatRp(pyf.total)}
+                {t.budget.perYearShort} {t.budget.intoPipePerYear}
               </div>
             </div>
             <div
@@ -160,9 +162,11 @@ export function YearlyScreen() {
       {/* Grouped items */}
       {byKind.map((group) => (
         <div key={group.kind}>
-          <SectionHeader trailing={`${formatRp(group.total)}/yr`}>
+          <SectionHeader
+            trailing={`${formatRp(group.total)}${t.budget.perYearShort}`}
+          >
             <span style={{ color: KIND_COLOR[group.kind] }}>
-              {KIND_LABELS[group.kind]}
+              {kindLabels[group.kind]}
             </span>
           </SectionHeader>
           <div>
@@ -172,7 +176,7 @@ export function YearlyScreen() {
                 <Row
                   key={item.id}
                   primary={item.name}
-                  caption={`${formatRp(item.amount)}/${item.cadence.replace('_', ' ')}`}
+                  caption={`${formatRp(item.amount)}/${t.budget.cadences[item.cadence]}`}
                   right={
                     <span
                       style={{
@@ -193,7 +197,7 @@ export function YearlyScreen() {
                           color: 'var(--ink-3)',
                         }}
                       >
-                        per year
+                        {t.budget.perYearShort.replace('/', '')}
                       </span>
                     </span>
                   }
@@ -205,9 +209,7 @@ export function YearlyScreen() {
       ))}
 
       {items.length === 0 && (
-        <div style={emptyStyle}>
-          No recurring items yet. Add them in More → Recurring Register.
-        </div>
+        <div style={emptyStyle}>{t.budget.recurringItemsEmpty}</div>
       )}
     </Screen>
   )

@@ -1,5 +1,9 @@
 import { Amount, Card, StatTile } from '@components/ui'
+import { explainSafeToSpend } from '@engine/explain'
 import type { SafeToSpendResult } from '@engine/safeToSpend'
+import { useI18n } from '@i18n/index'
+import { useState } from 'react'
+import { ExplainSheet } from '../ExplainSheet'
 import { DayDots } from './DayDots'
 
 interface Props {
@@ -20,15 +24,57 @@ export function GaugeCard({ result }: Props) {
     isNegativePool,
     weekendAllocation,
   } = result
+  const { t } = useI18n()
+  const [explaining, setExplaining] = useState(false)
+
+  // Built from the same result object the card rendered its number from
+  // (FR-4.1) — the sheet cannot drift from the gauge.
+  const explanation = explainSafeToSpend(result)
+
+  // NFR-4.3: a real button with an accessible name, not a tappable glyph.
+  const explainButton = (
+    <button
+      type="button"
+      aria-label={t.budget.explain.openLabel}
+      onClick={() => setExplaining(true)}
+      style={{
+        background: 'none',
+        border: '1px solid var(--amber-border)',
+        borderRadius: 999,
+        width: 22,
+        height: 22,
+        padding: 0,
+        cursor: 'pointer',
+        color: 'var(--amber-text)',
+        fontSize: 'var(--text-caption)',
+        lineHeight: 1,
+        flexShrink: 0,
+      }}
+    >
+      ?
+    </button>
+  )
+
+  const sheet = (
+    <ExplainSheet
+      open={explaining}
+      onClose={() => setExplaining(false)}
+      explanation={explanation}
+    />
+  )
 
   if (isNegativePool) {
     return (
       <Card style={gaugeCardStyle}>
-        <StatTile
-          label="Safe to spend today"
-          value={<Amount value={0} full tone="negative" />}
-          sub="Committed items exceed your allowance this month. Review your recurring items."
-        />
+        <div style={headerRowStyle}>
+          <StatTile
+            label={t.budget.safeToSpend}
+            value={<Amount value={0} full tone="negative" />}
+            sub={t.budget.negativePoolWarning}
+          />
+          {explainButton}
+        </div>
+        {sheet}
       </Card>
     )
   }
@@ -39,19 +85,24 @@ export function GaugeCard({ result }: Props) {
     // SafeToSpendHero so the two don't diverge).
     return (
       <Card style={gaugeCardStyle}>
-        <StatTile
-          label="Safe to spend today"
-          value={<Amount value={weekendAllocation} full />}
-          sub="Weekend allowance, pre-carved. Resets Monday."
-        />
+        <div style={headerRowStyle}>
+          <StatTile
+            label={t.budget.safeToSpend}
+            value={<Amount value={weekendAllocation} full />}
+            sub={t.budget.weekendReset}
+          />
+          {explainButton}
+        </div>
+        {sheet}
       </Card>
     )
   }
 
   return (
     <Card style={gaugeCardStyle}>
+      <div style={headerRowStyle}>
       <StatTile
-        label="Safe to spend today"
+        label={t.budget.safeToSpend}
         value={
           <>
             <Amount value={todayCeiling} full />
@@ -63,21 +114,36 @@ export function GaugeCard({ result }: Props) {
               }}
             >
               {' '}
-              /day
+              {t.budget.perDayShort}
             </span>
           </>
         }
         sub={
           <>
-            <Amount value={remainingPool} full tone="muted" /> left ·{' '}
-            {remainingWorkdays} workday{remainingWorkdays !== 1 ? 's' : ''} to
-            go
+            <Amount value={remainingPool} full tone="muted" />{' '}
+            {t.budget.leftSuffix} · {remainingWorkdays}{' '}
+            {remainingWorkdays === 1
+              ? t.budget.workdayToGo
+              : t.budget.workdaysToGo}
           </>
         }
       />
+      {explainButton}
+      </div>
       <DayDots />
+      {sheet}
     </Card>
   )
+}
+
+// The affordance sits beside the tile, not inside its label: StatTile's label is
+// a plain string by design (uppercase-tracked data label, D3) and widening that
+// shared primitive to fit one caller would push the treatment onto every tile.
+const headerRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 'var(--space-3)',
 }
 
 const gaugeCardStyle: React.CSSProperties = {

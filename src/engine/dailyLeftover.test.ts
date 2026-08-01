@@ -1,13 +1,30 @@
 import type { Transaction } from '@db/types'
 import { todayISO } from '@lib/dates'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computeDailyLeftover } from './dailyLeftover'
 
-// Tomorrow, relative to the real system clock — always genuinely in the
-// future, so the isProjected assertions below don't rely on a fixed date that
-// eventually becomes "the past" as the repo ages. Only ever used for the
-// isProjected flag, which is month-agnostic; any assertion about `leftover`
-// uses fixed dates instead, or it breaks every month-end.
+// The clock is pinned mid-month for the whole suite. `todayISO()` reads
+// `new Date()`, so this fully determines what the engine considers "today".
+//
+// Mid-month specifically: the projection assertion below compares a future day
+// against the last real day, and that invariant only holds *within* one
+// calendar month — computeDailyLeftover scopes to the month of `asOfDate`, so
+// crossing a month boundary legitimately resets the ledger to a fresh
+// allowance. Running on the last day of a month used to push "tomorrow" into
+// the next month and fail the suite for that one day.
+const PINNED_TODAY = '2026-07-15'
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(`${PINNED_TODAY}T12:00:00`))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+// Tomorrow relative to the pinned clock — genuinely in the future for
+// isProjected, and guaranteed to stay in the same month as PINNED_TODAY.
 function tomorrow(): string {
   const d = new Date(`${todayISO()}T12:00:00`)
   d.setDate(d.getDate() + 1)
@@ -85,8 +102,12 @@ describe('computeDailyLeftover', () => {
   it('a future date returns isProjected: true, today returns false', () => {
     const transactions = [txn({ date: todayISO(), amount: 100_000 })]
     const opts = { monthlyAmount: 1_000_000, transactions }
-    expect(computeDailyLeftover({ ...opts, asOfDate: todayISO() }).isProjected).toBe(false)
-    expect(computeDailyLeftover({ ...opts, asOfDate: tomorrow() }).isProjected).toBe(true)
+    expect(
+      computeDailyLeftover({ ...opts, asOfDate: todayISO() }).isProjected,
+    ).toBe(false)
+    expect(
+      computeDailyLeftover({ ...opts, asOfDate: tomorrow() }).isProjected,
+    ).toBe(true)
   })
 
   // Projecting forward inside a month just carries the running total — nothing
@@ -97,7 +118,10 @@ describe('computeDailyLeftover', () => {
   it("a later day in the same month equals the last spending day's leftover", () => {
     const transactions = [txn({ date: '2026-03-10', amount: 100_000 })]
     const opts = { monthlyAmount: 1_000_000, transactions }
-    const spendingDay = computeDailyLeftover({ ...opts, asOfDate: '2026-03-10' })
+    const spendingDay = computeDailyLeftover({
+      ...opts,
+      asOfDate: '2026-03-10',
+    })
     const later = computeDailyLeftover({ ...opts, asOfDate: '2026-03-25' })
     expect(spendingDay.leftover).toBe(900_000)
     expect(later.leftover).toBe(spendingDay.leftover)

@@ -2,15 +2,9 @@ import { Amount, Card, Row, Screen, SectionHeader } from '@components/ui'
 import { db } from '@db/db'
 import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import type { RecurringKind } from '@db/types'
+import { useI18n } from '@i18n/index'
 import { formatRp } from '@lib/currency'
 import { useLiveQuery } from 'dexie-react-hooks'
-
-const KIND_LABELS: Record<RecurringKind, string> = {
-  pay_yourself_first: 'Pay Yourself First',
-  household_bill: 'Household Bills',
-  personal_sub: 'Personal Subscriptions',
-  other: 'Other Committed',
-}
 
 const KIND_ORDER: RecurringKind[] = [
   'pay_yourself_first',
@@ -27,6 +21,7 @@ const KIND_COLOR: Record<RecurringKind, string> = {
 }
 
 export function MonthlyScreen() {
+  const { t } = useI18n()
   const items =
     useLiveQuery(() =>
       db.recurringItems.filter((r) => r.is_active).toArray(),
@@ -38,6 +33,12 @@ export function MonthlyScreen() {
 
   const takeHome = latestIncome?.take_home_net ?? 0
   const pool = allowance?.monthly_amount ?? 0
+  const kindLabels: Record<RecurringKind, string> = {
+    pay_yourself_first: t.budget.payYourselfFirst,
+    household_bill: t.budget.billsAndSubs,
+    personal_sub: t.budget.personalSubscriptions,
+    other: t.budget.otherCommitted,
+  }
 
   const byKind = KIND_ORDER.map((kind) => ({
     kind,
@@ -56,31 +57,31 @@ export function MonthlyScreen() {
     <Screen>
       {/* Summary card */}
       <Card>
-        <SectionHeader>Monthly waterfall</SectionHeader>
+        <SectionHeader>{t.budget.monthlyWaterfall}</SectionHeader>
         <div style={{ marginTop: 'var(--space-3)' }}>
           <WaterfallRow
-            label="Take-home net"
+            label={t.budget.takeHomeNet}
             value={takeHome}
             accent="var(--engine)"
             total={takeHome}
           />
           <Divider />
           <WaterfallRow
-            label="Pay Yourself First"
+            label={t.budget.payYourselfFirst}
             value={pyfTotal}
             accent="var(--engine)"
             total={takeHome}
             indent
           />
           <WaterfallRow
-            label="Bills & subs"
+            label={t.budget.billsAndSubs}
             value={committedTotal - pyfTotal}
             accent="var(--protected)"
             total={takeHome}
             indent
           />
           <WaterfallRow
-            label="Discretionary pool"
+            label={t.budget.discretionaryPool}
             value={pool}
             accent="var(--amber)"
             total={takeHome}
@@ -88,7 +89,7 @@ export function MonthlyScreen() {
           />
           <Divider />
           <WaterfallRow
-            label="Unallocated"
+            label={t.budget.unallocated}
             value={takeHome - barsTotal}
             accent="var(--ink-3)"
             total={takeHome}
@@ -99,9 +100,11 @@ export function MonthlyScreen() {
       {/* Grouped recurring items */}
       {byKind.map((group) => (
         <div key={group.kind}>
-          <SectionHeader trailing={`${formatRp(group.total)}/mo`}>
+          <SectionHeader
+            trailing={`${formatRp(group.total)}${t.budget.perMonthShort}`}
+          >
             <span style={{ color: KIND_COLOR[group.kind] }}>
-              {KIND_LABELS[group.kind]}
+              {kindLabels[group.kind]}
             </span>
           </SectionHeader>
           <div>
@@ -123,9 +126,7 @@ export function MonthlyScreen() {
       ))}
 
       {items.length === 0 && (
-        <div style={emptyStyle}>
-          No recurring items yet. Add them in More → Recurring Register.
-        </div>
+        <div style={emptyStyle}>{t.budget.recurringItemsEmpty}</div>
       )}
 
       {/* Pool card */}
@@ -133,7 +134,7 @@ export function MonthlyScreen() {
         <div>
           <SectionHeader>
             <span style={{ color: 'var(--amber-text)' }}>
-              Discretionary pool
+              {t.budget.discretionaryPool}
             </span>
           </SectionHeader>
           <Card
@@ -145,7 +146,7 @@ export function MonthlyScreen() {
             padding={0}
           >
             <Row
-              primary="Monthly allowance"
+              primary={t.budget.monthlyAllowance}
               right={
                 <Amount value={pool} style={{ color: 'var(--amber-text)' }} />
               }

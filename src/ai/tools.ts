@@ -528,6 +528,12 @@ async function logTransactions(input: ToolInput): Promise<string> {
       )
       continue
     }
+    if (!Number.isInteger(t.amount) || t.amount <= 0) {
+      errors.push(
+        `Invalid amount ${t.amount} — must be a positive whole-rupiah integer (note: "${t.note ?? ''}")`,
+      )
+      continue
+    }
     if (input['allow_duplicates'] !== true) {
       const dup = await transactionsRepo.getDuplicateCandidate(
         t.date,

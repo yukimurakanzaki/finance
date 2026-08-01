@@ -198,6 +198,10 @@ export interface Allowance {
   id?: string
   monthly_amount: number
   weekend_allocation: number
+  // ISO datetime. While set in the future (assembled against `todayISO()`),
+  // the AI context suppresses the ONBOARDING STATE section entirely. null =
+  // never snoozed. T1a §7 / TR-1.1.
+  onboarding_snoozed_until: string | null
   updated_at: string
 }
 

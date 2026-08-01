@@ -1,8 +1,9 @@
 import { AmberBanner } from '@components/AmberBanner'
 import { Amount, Card, SectionHeader, StatTile } from '@components/ui'
+import { useI18n } from '@i18n/index'
 import { formatRp } from '@lib/currency'
 import { useAppStore } from '@stores/appStore'
-import { ALL_LANES, LANE_LABELS } from '../../constants/lanes'
+import { ALL_LANES } from '../../constants/lanes'
 import { useFIProjection } from '../../hooks/useFIProjection'
 import { useNetWorth } from '../../hooks/useNetWorth'
 import { NWChart } from './NWChart'
@@ -19,6 +20,7 @@ export function HomeScreen() {
   const { total, byLane, isGoldStale, isLoading } = useNetWorth()
   const { result: fi, savingsRate } = useFIProjection()
   const { showGoldNudge, dismissGoldNudge } = useAppStore()
+  const { t } = useI18n()
 
   if (isLoading) {
     return (
@@ -29,7 +31,7 @@ export function HomeScreen() {
           lineHeight: 'var(--leading-body)',
         }}
       >
-        Loading…
+        {t.common.loading}
       </div>
     )
   }
@@ -45,14 +47,14 @@ export function HomeScreen() {
       {/* Gold staleness nudge */}
       {isGoldStale && (
         <AmberBanner onDismiss={dismissGoldNudge}>
-          Gold price hasn't been updated in 30+ days. Tap Assets to update.
+          {t.home.goldStaleWarning}
         </AmberBanner>
       )}
 
       {/* Net worth hero — the screen's one hero number (Calm Ledger v2 §2). */}
       <Card>
         <StatTile
-          label="Net Worth"
+          label={t.home.netWorth}
           size="display"
           value={total !== null ? <Amount value={total} /> : '—'}
         />
@@ -104,7 +106,7 @@ export function HomeScreen() {
                         color: 'var(--ink-2)',
                       }}
                     >
-                      {LANE_LABELS[lane]}
+                      {t.home.lanes[lane]}
                     </span>
                   </div>
                   {/* Preserves the original glyph/colour exactly: a '−' glyph only
@@ -132,7 +134,7 @@ export function HomeScreen() {
       {/* FI readout */}
       {fi && (
         <Card>
-          <SectionHeader>FI Projection</SectionHeader>
+          <SectionHeader>{t.home.fiProjection}</SectionHeader>
           <div
             style={{
               marginTop: 'var(--space-3)',
@@ -143,7 +145,7 @@ export function HomeScreen() {
           >
             {fi.fi_date_path_b && (
               <StatTile
-                label="Path B (Equity switch)"
+                label={t.home.pathB}
                 size="title"
                 value={
                   <span
@@ -155,7 +157,7 @@ export function HomeScreen() {
                     {fi.fi_date_path_b.getFullYear()}
                   </span>
                 }
-                sub={`${fi.years_to_fi_path_b?.toFixed(1)} years away`}
+                sub={`${fi.years_to_fi_path_b?.toFixed(1)} ${t.home.yearsAway}`}
               />
             )}
 
@@ -167,7 +169,7 @@ export function HomeScreen() {
                 }}
               >
                 <StatTile
-                  label="Savings Rate"
+                  label={t.home.savingsRate}
                   size="title"
                   value={
                     <span
@@ -179,7 +181,9 @@ export function HomeScreen() {
                       {Math.round(savingsRate.rate * 100)}%
                     </span>
                   }
-                  sub={`${formatRp(savingsRate.pipe_total)} pipe / ${formatRp(savingsRate.take_home_net)} net`}
+                  sub={t.home.pipeVsNet
+                    .replace('{pipe}', formatRp(savingsRate.pipe_total))
+                    .replace('{net}', formatRp(savingsRate.take_home_net))}
                 />
               </div>
             )}
@@ -193,12 +197,12 @@ export function HomeScreen() {
               }}
             >
               <StatTile
-                label="Gap to low target"
+                label={t.home.gapToLowTarget}
                 size="title"
                 value={<Amount value={fi.gap_to_low} />}
               />
               <StatTile
-                label="Gap to high target"
+                label={t.home.gapToHighTarget}
                 size="title"
                 value={<Amount value={fi.gap_to_high} />}
                 style={{ alignItems: 'flex-end' }}

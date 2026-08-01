@@ -1,19 +1,24 @@
+import { useI18n } from '@i18n/index'
 import { useState } from 'react'
+import { IncomeLog } from './IncomeLog'
 import { Milestones } from './Milestones'
 import { SpendingLens } from './SpendingLens'
 
-type Tab = 'lens' | 'milestones'
+type Tab = 'lens' | 'income' | 'milestones'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'lens', label: 'Spending Lens' },
-  { id: 'milestones', label: 'Milestones' },
-]
-
-export function PlanScreen() {
+export function DecideScreen() {
+  const { t } = useI18n()
   const [tab, setTab] = useState<Tab>('lens')
+
+  const TABS: { id: Tab; label: string }[] = [
+    { id: 'lens', label: t.decide.spendingLens },
+    { id: 'income', label: t.decide.incomeLog },
+    { id: 'milestones', label: t.decide.milestones },
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Sub-tab bar */}
       <div
         style={{
           display: 'flex',
@@ -56,6 +61,7 @@ export function PlanScreen() {
         }}
       >
         {tab === 'lens' && <SpendingLens />}
+        {tab === 'income' && <IncomeLog />}
         {tab === 'milestones' && <Milestones />}
       </div>
     </div>

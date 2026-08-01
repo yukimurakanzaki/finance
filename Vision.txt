@@ -1,0 +1,241 @@
+# FI Dashboard — Vision
+
+Version: 1.0
+Status: Living document
+
+---
+
+# Why this product exists
+
+Most personal finance apps answer questions about the past.
+
+- Where did my money go?
+- How much did I spend?
+- What's my balance?
+
+Those questions are useful.
+
+They are not the questions people ask before making a purchase.
+
+People ask:
+
+> "Can I afford this today?"
+
+Very few products answer that honestly.
+
+FI Dashboard exists to answer that question with confidence.
+
+---
+
+# Our Mission
+
+Help households make better financial decisions every day.
+
+Not by tracking more data.
+
+Not by producing prettier charts.
+
+But by turning complex financial information into one trustworthy number:
+
+**Safe To Spend Today.**
+
+If that number is trusted,
+everything else becomes easier.
+
+---
+
+# The Core Promise
+
+A household should never have to guess whether they can afford something.
+
+Opening the app should immediately answer:
+
+- How much can I safely spend today?
+- Am I still on track?
+- If I buy this, what changes?
+
+Everything else is secondary.
+
+---
+
+# The Philosophy
+
+## 1. Decisions over bookkeeping
+
+Transactions are history.
+
+Decisions shape the future.
+
+We optimize for tomorrow's decisions, not yesterday's reports.
+
+---
+
+## 2. Simplicity over completeness
+
+We intentionally ignore information that does not improve decisions.
+
+More data is not automatically better.
+
+The best financial dashboard removes uncertainty instead of adding numbers.
+
+---
+
+## 3. Facts over recommendations
+
+The app does not tell users what to do.
+
+It shows the consequences.
+
+Instead of
+
+"Don't buy this."
+
+it says
+
+"This purchase delays your FI date by 11 days."
+
+The decision always belongs to the household.
+
+---
+
+## 4. Savings happen first
+
+Savings are not whatever remains.
+
+Savings are planned before spending begins.
+
+Safe-to-spend is calculated only after savings, obligations, and protected expenses have already been accounted for.
+
+---
+
+## 5. Protected spending stays protected
+
+Some spending should never be optimized away.
+
+Family.
+
+Health.
+
+Education.
+
+Core living expenses.
+
+The app recognizes these as protected categories and never treats them as mistakes.
+
+---
+
+## 6. Financial independence is the destination
+
+Budgeting is not the goal.
+
+Tracking is not the goal.
+
+Net worth is not the goal.
+
+Those are instruments.
+
+The destination is financial independence.
+
+Every feature should help households reach it sooner or with greater confidence.
+
+---
+
+# Design Principles
+
+Every feature should satisfy at least one of these goals.
+
+✓ Helps users make a decision
+
+✓ Reduces uncertainty
+
+✓ Protects long-term wealth
+
+✓ Saves time
+
+✓ Prevents expensive mistakes
+
+If a feature satisfies none of them,
+
+it should not exist.
+
+---
+
+# Product Hierarchy
+
+The product exists in this order.
+
+## Tier 1
+
+Safe To Spend
+
+Without this, nothing else matters.
+
+---
+
+## Tier 2
+
+Financial Position
+
+- Net Worth
+- Cash Position
+- Upcoming Obligations
+
+These explain why today's Safe To Spend has that value.
+
+---
+
+## Tier 3
+
+Financial Direction
+
+- FI Projection
+- Savings Rate
+- Raise Allocation
+- Opportunity Cost
+
+These explain where the household is heading.
+
+---
+
+## Tier 4
+
+Bookkeeping
+
+- Transactions
+- Categories
+- Imports
+- Reports
+- Assets
+
+Necessary infrastructure.
+
+Not the product.
+
+---
+
+# Success Metric
+
+We do not measure success by:
+
+- number of transactions
+- number of reports
+- number of categories
+
+We succeed when households open the app before spending money because they trust the answer.
+
+The highest compliment a user can give is:
+
+"I didn't have to think.
+I already knew how much I could safely spend."
+
+---
+
+# Product Rule
+
+Every new feature must answer one question before it is built:
+
+"How does this improve the user's confidence in today's spending decision?"
+
+If it doesn't,
+
+it belongs somewhere else.

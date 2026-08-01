@@ -3,7 +3,7 @@ import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import type { AssetType, Lane } from '@db/types'
 import { computeFIProjection } from '@engine/fiProjection'
 import { safeToSpendFromLedger } from '@engine/safeToSpend'
-import { deriveBalance } from '@lib/balances'
+import { deriveBalance, overdraftSince, splitOverdraft } from '@lib/balances'
 import { todayISO } from '@lib/dates'
 import { BUILT_IN_SKILLS } from './skills'
 
@@ -66,7 +66,14 @@ export async function buildSystemPrompt(
 
   const accountLines = accounts.map((a) => {
     const bal = deriveBalance(a, allTxns)
-    return `- id ${a.id}: ${a.name} (${a.institution}, ${a.account_type}) — balance Rp ${bal.toLocaleString('id-ID')}${a.is_protected ? ' [PROTECTED]' : ''}`
+    // FR-3.6: the overdraft is stated as its own fact, not left for the model to
+    // infer from a minus sign. Phrased as a state, never as an alarm (NFR-3.3).
+    const since = overdraftSince(a, allTxns)
+    const overdrawn =
+      bal < 0
+        ? ` [OVERDRAWN by Rp ${Math.abs(bal).toLocaleString('id-ID')}${since ? ` since ${since}` : ''}; counts as debt, not as a negative balance, in net worth]`
+        : ''
+    return `- id ${a.id}: ${a.name} (${a.institution}, ${a.account_type}) — balance Rp ${bal.toLocaleString('id-ID')}${a.is_protected ? ' [PROTECTED]' : ''}${overdrawn}`
   })
 
   const assetLines = assets.map((a) => {
@@ -95,8 +102,15 @@ export async function buildSystemPrompt(
     protected_living: 0,
     pass_through: 0,
   }
+  // Overdrawn accounts split: zero into their own lane, the shortfall into
+  // debt_liability (FR-3.3). Mirrors useNetWorth so the assistant and the UI
+  // quote the same net worth.
   for (const a of accounts) {
-    byLane[a.lane] += deriveBalance(a, allTxns)
+    const { assetPortion, overdraftLiability } = splitOverdraft(
+      deriveBalance(a, allTxns),
+    )
+    byLane[a.lane] += assetPortion
+    byLane.debt_liability += overdraftLiability
   }
   for (const a of assets) byLane[a.lane] += a.value
   const netWorth =

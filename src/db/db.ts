@@ -1,24 +1,24 @@
-import Dexie, { type Table } from 'dexie'
 import { scrubNumericStrings } from '@lib/syncMappers'
+import Dexie, { type Table } from 'dexie'
 import type {
   Account,
-  Asset,
-  Transaction,
-  Category,
-  Envelope,
-  RecurringItem,
   Allowance,
-  NetWorthSnapshot,
-  IncomeEvent,
-  Milestone,
-  Assumptions,
   AppSetting,
+  Asset,
+  Assumptions,
   BalanceCorrection,
-  Deletion,
+  Category,
+  ChatCustomSkill,
+  ChatMemory,
   ChatMessage,
   ChatSession,
-  ChatMemory,
-  ChatCustomSkill,
+  Deletion,
+  Envelope,
+  IncomeEvent,
+  Milestone,
+  NetWorthSnapshot,
+  RecurringItem,
+  Transaction,
 } from './types'
 
 // Local sync bookkeeping (never pushed to the cloud).
@@ -109,39 +109,44 @@ class FIDatabase extends Dexie {
           '++id, date, account_id, lane, direction, is_transfer, transfer_pair_id, [date+account_id], [date+account_id+direction]',
       })
       .upgrade((tx) =>
-        Promise.all([
-          tx
-            .table<RecurringItem>('recurringItems')
-            .toCollection()
-            .modify((item) => {
-              if (item.is_active === undefined) item.is_active = true
-              if (item.end_date === undefined) item.end_date = null
-              if (item.note === undefined) item.note = null
-            }),
-          tx
-            .table<Transaction>('transactions')
-            .toCollection()
-            .modify((t) => {
-              if (t.original_amount === undefined) t.original_amount = null
-              if (t.overridden_amount === undefined) t.overridden_amount = null
-              if (t.override_note === undefined) t.override_note = null
-              if (t.overridden_at === undefined) t.overridden_at = null
-              if (t.is_transfer === undefined) t.is_transfer = false
-              if (t.transfer_pair_id === undefined) t.transfer_pair_id = null
-            }),
-        ]),
+        withoutRestamp(() =>
+          Promise.all([
+            tx
+              .table<RecurringItem>('recurringItems')
+              .toCollection()
+              .modify((item) => {
+                if (item.is_active === undefined) item.is_active = true
+                if (item.end_date === undefined) item.end_date = null
+                if (item.note === undefined) item.note = null
+              }),
+            tx
+              .table<Transaction>('transactions')
+              .toCollection()
+              .modify((t) => {
+                if (t.original_amount === undefined) t.original_amount = null
+                if (t.overridden_amount === undefined)
+                  t.overridden_amount = null
+                if (t.override_note === undefined) t.override_note = null
+                if (t.overridden_at === undefined) t.overridden_at = null
+                if (t.is_transfer === undefined) t.is_transfer = false
+                if (t.transfer_pair_id === undefined) t.transfer_pair_id = null
+              }),
+          ]),
+        ),
       )
 
     // v4: milestone gains income_event_id FK
     this.version(4)
       .stores({})
       .upgrade((tx) =>
-        tx
-          .table<Milestone>('milestones')
-          .toCollection()
-          .modify((m) => {
-            if (m.income_event_id === undefined) m.income_event_id = null
-          }),
+        withoutRestamp(() =>
+          tx
+            .table<Milestone>('milestones')
+            .toCollection()
+            .modify((m) => {
+              if (m.income_event_id === undefined) m.income_event_id = null
+            }),
+        ),
       )
 
     // v5: AI finance manager chat history (local-only, stays numeric autoincrement)
@@ -153,14 +158,16 @@ class FIDatabase extends Dexie {
     this.version(6)
       .stores({})
       .upgrade((tx) =>
-        tx
-          .table<Asset>('assets')
-          .toCollection()
-          .modify((a) => {
-            if (a.auto_price === undefined) a.auto_price = null
-            if (a.fx_code === undefined) a.fx_code = null
-            if (a.fx_amount === undefined) a.fx_amount = null
-          }),
+        withoutRestamp(() =>
+          tx
+            .table<Asset>('assets')
+            .toCollection()
+            .modify((a) => {
+              if (a.auto_price === undefined) a.auto_price = null
+              if (a.fx_code === undefined) a.fx_code = null
+              if (a.fx_amount === undefined) a.fx_amount = null
+            }),
+        ),
       )
 
     // v7: cloud-ready. Client-assigned string (UUID) primary keys on synced tables
@@ -205,12 +212,14 @@ class FIDatabase extends Dexie {
     this.version(10)
       .stores({})
       .upgrade((tx) =>
-        tx
-          .table<Transaction>('transactions')
-          .toCollection()
-          .modify((t) => {
-            if (t.title === undefined) t.title = null
-          }),
+        withoutRestamp(() =>
+          tx
+            .table<Transaction>('transactions')
+            .toCollection()
+            .modify((t) => {
+              if (t.title === undefined) t.title = null
+            }),
+        ),
       )
 
     // v11: recreate chatMessages with its v8 schema (string UUID key) now that
@@ -219,12 +228,29 @@ class FIDatabase extends Dexie {
       chatMessages: 'id, session_id, created_at, updated_at',
     })
 
+    // v12: allowance.onboarding_snoozed_until (T1a / TR-1.1). Schema unchanged
+    // (no new index — readers filter by reading the row); the upgrade just
+    // backfills the field to null so existing rows match the v12 type.
+    this.version(12)
+      .stores({})
+      .upgrade((tx) =>
+        withoutRestamp(() =>
+          tx
+            .table<Allowance>('allowance')
+            .toCollection()
+            .modify((a) => {
+              if (a.onboarding_snoozed_until === undefined)
+                a.onboarding_snoozed_until = null
+            }),
+        ),
+      )
+
     // transactions.recurring_item_id (tags a committed recurring payment so it
     // no longer draws the personal pool) needs NO schema version: it is not
     // indexed, and readers treat missing/undefined as untagged (isWeekDraw),
     // so a full-table backfill upgrade would only slow startup for nothing.
 
-    // v12: scrub string-typed numeric fields from synced tables. Before
+    // v13: scrub string-typed numeric fields from synced tables. Before
     // `coerceNumeric` lived in `fromCloudRow`, a cloud pull could land a
     // Postgres bigint (returned as a string over the wire) into a Dexie
     // number column, and the next sync push would 400 on the same bigint
@@ -232,29 +258,68 @@ class FIDatabase extends Dexie {
     // push watermark for any table where at least one row was touched so
     // the corrected values re-upload to the cloud on the next sync cycle.
     // Runs once per device, no-op when no rows match.
-    this.version(12)
-      .stores({})
-      .upgrade(async (tx) => {
-        for (const name of SYNC_TABLES) {
-          let touched = 0
-          await tx
-            .table(name)
-            .toCollection()
-            .modify((row: Record<string, unknown>) => {
-              if (scrubNumericStrings(name as SyncTable, row)) touched++
-            })
-          if (touched > 0) {
-            // Force a re-push of this table by rewinding its push watermark.
-            // Dexie's `.modify()` bypasses our `updating` hook, so `updated_at`
-            // is unchanged and the watermark would otherwise skip the row.
-            await tx
-              .table('syncMeta')
-              .put({ key: `pushed:${name}`, value: '1970-01-01T00:00:00.000Z' })
-          }
-        }
-      })
+    //
+    // Authored as v12 on `sprint1/t4-import-reliability`, which branched
+    // before Sprint 1 Task 1 claimed v12 for `onboarding_snoozed_until`.
+    // Renumbered to 13 on cherry-pick: two `.version(12)` blocks merge
+    // without a git conflict but break the upgrade chain at runtime.
+    // Reconciling `main` and `claude/fi-dashboard-safe-to-spend-ot3w4b` added
+    // `balanceCorrections` (v14) and `deletions` (v15) to SYNC_TABLES below —
+    // tables that don't exist yet in the upgrade transaction Dexie hands this
+    // step. A Dexie upgrade transaction only spans the stores declared as of
+    // *this* version, so looping the live SYNC_TABLES constant here throws
+    // "Table balanceCorrections not part of transaction". Frozen snapshot of
+    // what SYNC_TABLES was when this migration was authored as v13.
+    const V13_SYNC_TABLES = [
+      'accounts',
+      'envelopes',
+      'categories',
+      'assets',
+      'recurringItems',
+      'incomeEvents',
+      'transactions',
+      'milestones',
+      'netWorthSnapshots',
+      'allowance',
+      'assumptions',
+      'chatSessions',
+      'chatMessages',
+      'chatMemories',
+      'chatCustomSkills',
+    ] as const
 
-    // v13: D1 balance corrections — the append-only audit trail behind
+    this.version(13)
+      .stores({})
+      .upgrade((tx) =>
+        // `.modify()` does NOT bypass the 'updating' hook — it fires per row and
+        // restamps updated_at. The original branch assumed otherwise, which made
+        // this upgrade rewrite the watermark on every row it walked: a scrubbed
+        // local row would then beat a NEWER cloud row on last-write-wins. Same
+        // hazard v12's backfill guards against, so use the same guard. The
+        // re-push is driven by the watermark rewind below, never by updated_at.
+        withoutRestamp(async () => {
+          for (const name of V13_SYNC_TABLES) {
+            let touched = 0
+            await tx
+              .table(name)
+              .toCollection()
+              .modify((row: Record<string, unknown>) => {
+                if (scrubNumericStrings(name as SyncTable, row)) touched++
+              })
+            if (touched > 0) {
+              // Force a re-push of this table by rewinding its push watermark.
+              // updated_at is deliberately left untouched (see above), so the
+              // watermark is the only thing that can re-select these rows.
+              await tx.table('syncMeta').put({
+                key: `pushed:${name}`,
+                value: '1970-01-01T00:00:00.000Z',
+              })
+            }
+          }
+        }),
+      )
+
+    // v14: D1 balance corrections — the append-only audit trail behind
     // "Set true balance". Synced: the cloud `balance_corrections` table and its
     // household-scoped RLS policy ship alongside this.
     //
@@ -266,13 +331,19 @@ class FIDatabase extends Dexie {
     // reason recurring_item_id didn't (see the note above v12): it isn't
     // indexed, and every reader treats missing/undefined as "not an
     // adjustment", so a full-table backfill would only slow startup.
-    this.version(13).stores({
-      balanceCorrections: 'id, account_id, transaction_id, as_of_date, created_at',
+    //
+    // Renumbered from v13 to v14 when reconciling with main: main had
+    // independently claimed v13 for the numeric-string scrub above (see its
+    // comment), and that line is the one actually running in production —
+    // this table never shipped past preview, so it's the side that moves.
+    this.version(14).stores({
+      balanceCorrections:
+        'id, account_id, transaction_id, as_of_date, created_at',
     })
 
-    // v14: the deletion log — see the Deletion type for why deletes needed a
-    // channel of their own.
-    this.version(14).stores({
+    // v15: the deletion log — see the Deletion type for why deletes needed a
+    // channel of their own. Renumbered from v14 for the same reason as above.
+    this.version(15).stores({
       deletions: 'id, table_name, row_id, created_at',
     })
   }
@@ -283,6 +354,21 @@ export const db = new FIDatabase()
 // While applying rows pulled from the cloud, suppress the hooks below so we don't
 // re-stamp updated_at (which would make pulled rows look dirty and echo back).
 export const syncControl = { applyingRemote: false }
+
+// Schema-upgrade backfills reuse the applyingRemote flag so the 'updating' hook
+// below leaves updated_at alone. A backfill is not a user edit: a bumped
+// watermark would push every touched row on the next sync and beat a newer
+// cloud row on last-write-wins. Saves/restores rather than clearing the flag so
+// it can never stomp a sync that is already holding it.
+async function withoutRestamp(work: () => PromiseLike<unknown>): Promise<void> {
+  const prev = syncControl.applyingRemote
+  syncControl.applyingRemote = true
+  try {
+    await work()
+  } finally {
+    syncControl.applyingRemote = prev
+  }
+}
 
 const nowIso = () => new Date().toISOString()
 

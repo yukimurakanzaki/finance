@@ -12,7 +12,16 @@ const FX_API = 'https://open.er-api.com/v6/latest/USD'
 const TROY_OUNCE_GRAMS = 31.1034768
 const REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000 // 12h → max ~1 refresh/day in practice
 
-export const FX_CODES = ['USD', 'SGD', 'EUR', 'JPY', 'GBP', 'AUD', 'MYR', 'CNY'] as const
+export const FX_CODES = [
+  'USD',
+  'SGD',
+  'EUR',
+  'JPY',
+  'GBP',
+  'AUD',
+  'MYR',
+  'CNY',
+] as const
 
 export interface MarketPrices {
   xau_usd: number // spot price per troy ounce
@@ -35,9 +44,13 @@ export async function fetchMarketPrices(): Promise<MarketPrices> {
   if (!fxRes.ok) throw new Error(`FX rate API returned ${fxRes.status}`)
 
   const gold = (await goldRes.json()) as { price?: number }
-  const fx = (await fxRes.json()) as { result?: string; rates?: Record<string, number> }
+  const fx = (await fxRes.json()) as {
+    result?: string
+    rates?: Record<string, number>
+  }
 
-  if (typeof gold.price !== 'number' || gold.price <= 0) throw new Error('Gold API returned no price')
+  if (typeof gold.price !== 'number' || gold.price <= 0)
+    throw new Error('Gold API returned no price')
   if (fx.result !== 'success' || typeof fx.rates?.['IDR'] !== 'number') {
     throw new Error('FX API returned no IDR rate')
   }
@@ -64,18 +77,48 @@ export function idrPerUnit(p: MarketPrices, code: string): number | null {
 
 // Recompute values of all auto-priced assets. Skips silently (skipped: true)
 // when a refresh ran within the last 12h, unless force is set.
-export async function refreshAssetPrices(force = false): Promise<RefreshResult> {
-  const none: RefreshResult = { skipped: true, updated_count: 0, gold_per_gram_idr: null, usd_idr: null }
+// Falls back to cached prices if API fails.
+export async function refreshAssetPrices(
+  force = false,
+): Promise<RefreshResult> {
+  const none: RefreshResult = {
+    skipped: true,
+    updated_count: 0,
+    gold_per_gram_idr: null,
+    usd_idr: null,
+  }
 
   if (!force) {
     const last = await settingsRepo.get('prices_last_refreshed_at')
-    if (last && Date.now() - new Date(last).getTime() < REFRESH_INTERVAL_MS) return none
+    if (last && Date.now() - new Date(last).getTime() < REFRESH_INTERVAL_MS)
+      return none
   }
 
-  const autoAssets = await db.assets.filter((a) => a.auto_price !== null).toArray()
+  const autoAssets = await db.assets
+    .filter((a) => a.auto_price !== null)
+    .toArray()
   if (autoAssets.length === 0) return none
 
-  const prices = await fetchMarketPrices()
+  let prices: MarketPrices
+  try {
+    prices = await fetchMarketPrices()
+  } catch (err) {
+    // API failed — try to use cached prices as fallback
+    console.warn('Market price API failed, attempting fallback to cache:', err)
+    const cached = await settingsRepo.get('prices_cached')
+    if (!cached) {
+      console.warn('No cached prices available, skipping refresh')
+      return none
+    }
+    try {
+      prices = JSON.parse(cached) as MarketPrices
+      console.info('Using cached market prices from', prices.fetched_at)
+    } catch {
+      console.warn('Cached prices corrupted, skipping refresh')
+      return none
+    }
+  }
+
   const perGram = goldPerGramIDR(prices)
   const today = todayISO()
 
@@ -99,6 +142,8 @@ export async function refreshAssetPrices(force = false): Promise<RefreshResult> 
     }
   }
 
+  // Cache prices for fallback and update refresh timestamp
+  await settingsRepo.set('prices_cached', JSON.stringify(prices))
   await settingsRepo.set('prices_last_refreshed_at', prices.fetched_at)
   return {
     skipped: false,
