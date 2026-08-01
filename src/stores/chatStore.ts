@@ -179,6 +179,23 @@ export const useChatStore = create<ChatState>((set, get) => {
   // Audit C2: tracks the in-flight request so stopTurn() can abort it.
   let activeAbort: AbortController | null = null
 
+  // 502/503/504 from the proxy mean the upstream AI provider call itself threw
+  // (see anthropic-proxy's catch-all) — often a transient rate limit or blip,
+  // not something retrying with different input would fix. One quiet retry
+  // before surfacing anything to the user.
+  const RETRYABLE_STATUSES = new Set([502, 503, 504])
+
+  function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new Error('ABORTED'))
+      const t = setTimeout(resolve, ms)
+      signal.addEventListener('abort', () => {
+        clearTimeout(t)
+        reject(new Error('ABORTED'))
+      }, { once: true })
+    })
+  }
+
   async function callProxy(
     model: string,
     system: string,
@@ -191,21 +208,41 @@ export const useChatStore = create<ChatState>((set, get) => {
     const modelConfig = getModelConfig(model)
     const maxTokens = modelConfig?.maxOutput ?? MAX_TOKENS
 
-    const { data, error } = await supabase.functions.invoke('anthropic-proxy', {
-      body: {
-        model, max_tokens: maxTokens, system, tools: TOOL_DEFINITIONS, messages,
-        prompt_version: PROMPT_VERSION,
-      },
-      signal,
-    })
-    if (error) {
-      const context = (error as { context?: { status?: number; name?: string } }).context
+    for (let attempt = 0; ; attempt++) {
+      const { data, error } = await supabase.functions.invoke('anthropic-proxy', {
+        body: {
+          model, max_tokens: maxTokens, system, tools: TOOL_DEFINITIONS, messages,
+          prompt_version: PROMPT_VERSION,
+        },
+        signal,
+      })
+      if (!error) return data as Anthropic.Message
+
+      const context = (error as { context?: Response & { name?: string } }).context
       if (context?.name === 'AbortError') throw new Error('ABORTED')
       // The proxy returns 429 with a budget marker when the daily AI cap is hit.
       if (context?.status === 429) throw new Error('BUDGET_EXCEEDED')
-      throw new Error(error.message ?? 'Chat request failed')
+
+      if (attempt === 0 && context?.status !== undefined && RETRYABLE_STATUSES.has(context.status)) {
+        await abortableDelay(1500, signal)
+        continue
+      }
+
+      // supabase-js's own error.message is always the generic "Edge Function
+      // returned a non-2xx status code" — the actual reason the proxy sent
+      // back only lives in the (unread) response body on error.context.
+      // Read it so a failure is debuggable instead of a dead end.
+      let detail: string | undefined
+      if (context && typeof context.json === 'function') {
+        try {
+          const body = await context.clone().json()
+          detail = typeof body?.error === 'string' ? body.error : body?.error?.message
+        } catch {
+          // body wasn't JSON, or was already consumed — fall back below
+        }
+      }
+      throw new Error(detail ?? error.message ?? 'Chat request failed')
     }
-    return data as Anthropic.Message
   }
 
   async function appendMessage(msg: ApiMessage) {
