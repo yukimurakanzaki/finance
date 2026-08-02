@@ -238,23 +238,26 @@ export const useChatStore = create<ChatState>((set, get) => {
   // Audit C2: tracks the in-flight request so stopTurn() can abort it.
   let activeAbort: AbortController | null = null
 
-  // 502/503/504 from the proxy mean the upstream AI provider call itself threw
-  // (see anthropic-proxy's catch-all) — often a transient rate limit or blip,
-  // not something retrying with different input would fix. One quiet retry
-  // before surfacing anything to the user.
+  // The proxy now forwards upstream HTTP status with a typed body. Classify:
+  //  - 429 → budget (handled below)
+  //  - 4xx → forwarded from upstream provider — user's input won't improve on
+  //    retry; surface immediately
+  //  - 502/503/504 → transient infra (transport throw, provider 5xx, missing
+  //    secret caught server-side). One quiet retry before surfacing.
   const RETRYABLE_STATUSES = new Set([502, 503, 504])
-
+  
   function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       if (signal.aborted) return reject(new Error('ABORTED'))
       const t = setTimeout(resolve, ms)
-      signal.addEventListener('abort', () => {
+      const onAbort = () => {
         clearTimeout(t)
         reject(new Error('ABORTED'))
-      }, { once: true })
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
     })
   }
-
+  
   async function callProxy(
     model: string,
     system: string,
@@ -279,28 +282,42 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       const context = (error as { context?: Response & { name?: string } }).context
       if (context?.name === 'AbortError') throw new Error('ABORTED')
-      // The proxy returns 429 with a budget marker when the daily AI cap is hit.
-      if (context?.status === 429) throw new Error('BUDGET_EXCEEDED')
 
-      if (attempt === 0 && context?.status !== undefined && RETRYABLE_STATUSES.has(context.status)) {
+      // Read the body once. The proxy sends three typed shapes:
+      //  - { error: { type: "budget", message } }              → user budget error
+      //  - { error: { type: "upstream_4xx", upstream_status, message } }
+      //       → permanent user-input failure, no retry
+      //  - { error: { type: "transient", upstream_status, message } }
+      //       → retry class (502 wrapper around 408/409/429/5xx/transport)
+      // We branch on the typed envelope, NEVER on the bare HTTP status — that's
+      // what caused the v2 regression where an upstream rate-limit got
+      // mis-classified as the user-budget sentinel.
+      let body: any = null
+      if (context && typeof context.json === 'function') {
+        try {
+          body = await context.clone().json()
+        } catch {
+          // body unreadable — fall back to status-based behavior below
+        }
+      }
+      const errObj = body && typeof body.error === 'object' ? body.error : null
+      const errorType = errObj?.type
+      const detail: string | undefined =
+        errObj && typeof errObj.message === 'string' ? errObj.message : undefined
+
+      if (errorType === 'budget') throw new Error('BUDGET_EXCEEDED')
+      const isTransient = errorType === 'transient'
+      if (attempt === 0 && (isTransient || (context?.status !== undefined && RETRYABLE_STATUSES.has(context.status)))) {
         await abortableDelay(1500, signal)
         continue
       }
 
-      // supabase-js's own error.message is always the generic "Edge Function
-      // returned a non-2xx status code" — the actual reason the proxy sent
-      // back only lives in the (unread) response body on error.context.
-      // Read it so a failure is debuggable instead of a dead end.
-      let detail: string | undefined
-      if (context && typeof context.json === 'function') {
-        try {
-          const body = await context.clone().json()
-          detail = typeof body?.error === 'string' ? body.error : body?.error?.message
-        } catch {
-          // body wasn't JSON, or was already consumed — fall back below
-        }
-      }
-      throw new Error(detail ?? error.message ?? 'Chat request failed')
+      // Belt-and-suspenders: older proxy revisions wrapped user-visible text in
+      // "Proxy error: …". Strip if it leaks through from a stale deploy.
+      const finalDetail = detail?.startsWith('Proxy error: ')
+        ? detail.slice('Proxy error: '.length)
+        : detail
+      throw new Error(finalDetail ?? error.message ?? 'Chat request failed')
     }
   }
 

@@ -6,6 +6,7 @@
 // Auth is enforced by Supabase (verify_jwt) — only signed-in users can invoke.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { classifyProxyError, sanitizeError, UpstreamError } from "../_shared/errors.ts"
 
 const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY")
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")
@@ -225,6 +226,7 @@ function toAnthropicResponse(geminiData: any, modelName: string): any {
 
 // ===== PROVIDERS =====
 
+
 async function callGemini(
   apiModel: string,
   maxTokens: number,
@@ -251,16 +253,21 @@ async function callGemini(
     if (converted) geminiBody.tools = converted
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${GOOGLE_API_KEY}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent`
   const res = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      // Key as header (not query string) so a fetch() reject (DNS/TLS/conn-reset)
+      // can't leak it via Deno's TypeError — those messages embed the request URL.
+      "x-goog-api-key": GOOGLE_API_KEY,
+    },
     body: JSON.stringify(geminiBody),
   })
 
   const data = await res.json()
   if (!res.ok) {
-    throw new Error(data.error?.message || `Gemini API error (${res.status})`)
+    throw new UpstreamError(res.status, data.error?.message || `Gemini API error (${res.status})`)
   }
 
   return toAnthropicResponse(data, apiModel)
@@ -295,7 +302,7 @@ async function callAnthropic(
 
   const data = await res.json()
   if (!res.ok) {
-    throw new Error(data.error?.message || `Anthropic API error (${res.status})`)
+    throw new UpstreamError(res.status, data.error?.message || `Anthropic API error (${res.status})`)
   }
 
   return data
@@ -331,7 +338,7 @@ async function callMinimax(
   const data = await res.json()
   if (!res.ok) {
     console.error("Minimax API error", res.status, JSON.stringify(data))
-    throw new Error(data.error?.message || `Minimax API error (${res.status})`)
+    throw new UpstreamError(res.status, data.error?.message || `Minimax API error (${res.status})`)
   }
 
   return data
@@ -401,10 +408,20 @@ Deno.serve(async (req: Request) => {
       ? await callMinimax(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
       : await callAnthropic(route.apiModel, maxTokens, system as string | undefined, tools as unknown[] | undefined, messages)
   } catch (err) {
-    console.error("Proxy error", modelId, String(err))
-    result = { error: `Proxy error: ${String(err)}` }
+    // Log the full (un-sanitized) error for ops; send only the scrubbed form to
+    // the client. See _shared/errors.ts for the classification rules.
+    const isUpstream = err instanceof UpstreamError
+    console.error(
+      "Proxy error",
+      modelId,
+      isUpstream ? err.upstreamStatus : 0,
+      sanitizeError(err instanceof Error ? err.message : String(err)),
+      isUpstream ? "" : String(err),
+    )
+    const classified = classifyProxyError(err)
+    result = classified.body
+    httpStatus = classified.httpStatus
     status = "api_error"
-    httpStatus = 502
   }
 
   // Log the turn (best-effort; never blocks the response).
