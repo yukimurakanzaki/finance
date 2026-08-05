@@ -92,7 +92,7 @@ export function OnboardingWizard({ onComplete, initialStep }: OnboardingWizardPr
           // Older drafts (pre-O2) have no `mode` field — they were always mid
           // detailed setup, so treat a missing mode as 'full'.
           setMode(draft.mode ?? 'full')
-          setStep(draft.step ?? 1)
+          setStep(resolveWizardStep(initialStep, draft.step))
           setGross(draft.gross ?? '')
           setTakeHome(draft.takeHome ?? '')
           setPipes(draft.pipes?.length ? draft.pipes : DEFAULT_DRAFT.pipes)

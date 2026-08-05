@@ -128,4 +128,44 @@ describe('buildSystemPrompt — ONBOARDING STATE (T1a)', () => {
     expect(prompt).toMatch(/activeTab|More tab/i)
     expect(prompt).not.toMatch(/\/onboarding|url.*router/i)
   })
+
+  // TR-1.2: existing populated households must never see onboarding
+  it('omits ONBOARDING STATE for populated household with transactions and income (TR-1.2)', async () => {
+    await seed({ recurring: true, memory: true, monthlyAmount: 2_000_000 })
+    await db.transactions.add({
+      date: '2026-07-01', amount: 50_000, direction: 'out',
+      account_id: ACC_ID, category_id: null, lane: 'protected_living',
+      source: 'manual', title: 'Lunch', note: 'Warteg',
+      original_amount: null, overridden_amount: null, override_note: null,
+      overridden_at: null, is_transfer: false, transfer_pair_id: null,
+      recurring_item_id: null, created_at: '',
+    })
+    await db.incomeEvents.add({
+      id: 'inc-1', date: '2026-07-01', amount: 15_000_000,
+      take_home_net: 12_000_000, pay_day: 25,
+      note: 'salary', created_at: '',
+    })
+    const prompt = await buildSystemPrompt()
+    expect(prompt).not.toContain('=== ONBOARDING STATE ===')
+  })
+
+  it('snooze works with date-only format (no UTC/local mismatch)', async () => {
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, '0')
+    const d = String(today.getDate()).padStart(2, '0')
+    const dateOnly = `${y}-${m}-${d}`
+    await seed({ snoozedUntil: dateOnly })
+    const prompt = await buildSystemPrompt()
+    expect(prompt).not.toContain('=== ONBOARDING STATE ===')
+  })
+
+  it('snooze works with ISO Z-suffixed timestamp', async () => {
+    const today = new Date()
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+    const isoZ = endOfDay.toISOString()
+    await seed({ snoozedUntil: isoZ })
+    const prompt = await buildSystemPrompt()
+    expect(prompt).not.toContain('=== ONBOARDING STATE ===')
+  })
 })

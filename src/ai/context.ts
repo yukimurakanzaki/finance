@@ -244,7 +244,7 @@ export async function buildSystemPrompt(
     recurring.length === 0 && chatMemories.length === 0 && monthlyAmount === 0
   const snoozedUntil = allowance?.onboarding_snoozed_until ?? null
   const snoozeActive =
-    snoozedUntil !== null && new Date(snoozedUntil) >= new Date(`${iso}T00:00:00`)
+    snoozedUntil !== null && snoozedUntil.slice(0, 10) >= iso
   if (isUnconfigured && !snoozeActive) {
     onboardingBlock = `=== ONBOARDING STATE ===
 Unconfigured household — all numbers are placeholders. Three steps:
