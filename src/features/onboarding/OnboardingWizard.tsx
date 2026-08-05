@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 
 interface OnboardingWizardProps {
   onComplete: () => void
+  initialStep?: number
 }
 
 // 'choose' — the O2 entry picker (quick vs. full). 'full' — the original
@@ -52,11 +53,22 @@ const DEFAULT_DRAFT: DraftState = {
   startingBalance: '',
 }
 
-export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+// Step-resolution priority: a persisted draft always wins over the initialStep
+// prop so a programmatic jump never discards in-progress answers (FR-1.3b).
+// Extracted for testability — the wizard calls this on mount.
+export function resolveWizardStep(
+  initialStep: number | undefined,
+  draftStep: number | null | undefined,
+): number {
+  if (draftStep != null) return draftStep
+  return initialStep ?? 1
+}
+
+export function OnboardingWizard({ onComplete, initialStep }: OnboardingWizardProps) {
   const { t } = useI18n()
   const [loaded, setLoaded] = useState(false)
   const [mode, setMode] = useState<Mode>('choose')
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(initialStep ?? 1)
 
   const [gross, setGross] = useState('')
   const [takeHome, setTakeHome] = useState('')
