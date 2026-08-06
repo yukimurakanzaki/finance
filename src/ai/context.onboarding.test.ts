@@ -56,6 +56,7 @@ async function seed(opts: {
     await db.chatMemories.add({
       id: 'mem-1',
       content: 'pay day 25',
+      source_session_id: null,
       created_at: '',
       updated_at: '',
     })
@@ -141,9 +142,10 @@ describe('buildSystemPrompt — ONBOARDING STATE (T1a)', () => {
       recurring_item_id: null, created_at: '',
     })
     await db.incomeEvents.add({
-      id: 'inc-1', date: '2026-07-01', amount: 15_000_000,
-      take_home_net: 12_000_000, pay_day: 25,
-      note: 'salary', created_at: '',
+      id: 'inc-1', date: '2026-07-01', gross: 15_000_000,
+      take_home_net: 12_000_000, delta_vs_prev: null,
+      routed_to_pipe: 0, routed_to_lifestyle: 12_000_000,
+      note: 'salary', source: 'manual', created_at: '',
     })
     const prompt = await buildSystemPrompt()
     expect(prompt).not.toContain('=== ONBOARDING STATE ===')
