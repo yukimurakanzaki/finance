@@ -1,6 +1,6 @@
 # Backlog — Phases 1–4 (all delivered)
 
-> **Status as of 2026-07-31: everything in this document has shipped.**
+> **Status as of 2026-08-01: everything in this document has shipped.**
 > This file is now a **historical record**, not a queue. It was written on
 > 2026-07-13, when Phases 3 and 4 were still unbuilt; every ticket below has since
 > been built and merged. The scope text is kept verbatim as the record of what was
@@ -25,6 +25,7 @@ Verified against `git log` and the source tree on 2026-07-31 at `a81e4f2`.
 | Phase 3 | Today screen rebuild (standing strip, daily leftover ledger, unified transaction surface, one-action FAB, icons, slim AppBar) | ✅ Merged | PR #23 |
 | Phase 4 | Remaining screens migrate to the primitives (§B, B1–B6) | ✅ All six merged | PR #24–#29 |
 | Standalone | C1 — recurring-item tagging for AI & import (§C) | ✅ Merged | PR #31 |
+| Ledger Control | Correct a balance without logging a transaction + full CRUD on accounts/assets, income, recurring, allowance | ✅ Merged (D1–D3) | PR #48–#51 + `docs/plans/2026-07-31-ledger-control-requirements.md` |
 
 Style-token debt tracked by `scripts/check-style-tokens.mjs`: **507 → 120** across
 Phases 2–4.
@@ -38,13 +39,14 @@ Phases 2–4.
 | `computeAffordability` engine + `check_affordability` tool | PR #35 |
 | Sprint 1 Task 1 — Dexie `version(12)`, `onboarding_snoozed_until` | PR #37 |
 | i18n en/id module wired into 14 screens; market-price cache fallback | PR #40, #41 |
+| Ledger Control D1 — balance corrections (audit trail, sync, dup-correction detection) | PR #48 |
+| Ledger Control D2 — delete accounts/assets without orphaning | PR #49 |
+| Ledger Control D3 — edit an income event instead of delete-and-retype | PR #50, #51 |
+| Sync — deletion log (tombstones) so deletes don't reappear from another device | PR #51 |
 
 ### Still open
 
 Sprint 1 Tasks 2–5 — see `docs/plans/2026-07-25-sprint-1-builder-brief.md`.
-Verified absent from the source tree on 2026-07-31: no `splitOverdraft`, no
-Explain-My-Number component, no onboarding logic in `src/ai/context.ts` (the
-`onboarding_snoozed_until` field Task 1 added is currently an unused stub), and
 `create_account` predates the sprint (PR #3), so Task 4's own scope is untouched.
 
 ---
@@ -318,6 +320,127 @@ can match against them itself, similar to how it already lists accounts and
 categories.
 **Depends on:** nothing from Phase 3/4 — this is independent and can be built any
 time.
+
+---
+
+## §D — Ledger Control (epic L1)
+
+Elicited 2026-07-31 from a post-use complaint that no existing ticket covers:
+*"can I change the account balance to the correct one without having to log the
+transaction, because I forgot what I had used it for"* — plus a request for full
+CRUD freedom over accounts/assets, income, recurring bills, and the weekly /
+workday allowance.
+
+**The full requirement lives in
+`docs/plans/2026-07-31-ledger-control-requirements.md`** — business through test
+plan, 11 sections, with the five design decisions (D1–D5) already made and
+recorded in its §0.1. Do not re-derive it, and do not re-open D1–D5 without
+saying why. What follows is the ticket split only.
+
+**Read before starting:** that doc's §0.1 (decisions), §3 (functional
+requirements), §7 (edge cases). The edge cases are where the real work is.
+
+**Shared foundation — do this once, in D1's ticket, before anything else:**
+`Transaction` gains `is_adjustment: boolean` (default `false`), and
+`isWeekDraw()` in `src/engine/safeToSpend.ts:14` gains `!t.is_adjustment`. That
+one function is shared by the safe-to-spend hook, `dailyLeftover.ts`, the AI
+context builder and `check_affordability` — fixing it there fixes all four.
+Legacy rows arrive with `is_adjustment === undefined`, so test truthiness, never
+`=== false` (same convention the file already documents for `recurring_item_id`
+at `safeToSpend.ts:19-22`).
+
+### D1 — Balance correction ("Set true balance") 🔴 the headline ask
+
+**Scope:** A correction is recorded as a **transaction**, not as a silent field
+overwrite. Entering the true balance writes one `Transaction` carrying the delta
+with `is_adjustment: true`, `category_id: null`. It moves the account balance and
+net worth; it must **not** move safe-to-spend, the daily leftover ledger, the
+category breakdown, or Report actuals. Later, the user can give it a category
+once they remember what it was — which converts it into an ordinary transaction
+(warn first if that lands in the current week and would draw the pool).
+
+`manual_balance_override` keeps exactly one job — the onboarding opening balance
+— and is **not** the correction mechanism. `AccountForm.tsx`'s
+`accountType !== 'bank'` gate therefore stays as-is; bank accounts get
+corrections through adjustment transactions like every other type.
+
+Also in scope: the `balanceCorrections` audit table (append-only, attributed,
+undoable), the correction sheet (three fields, delta preview, no category
+picker), and distinct rendering of adjustments in every transaction list.
+
+**Two traps, both mandatory to handle:**
+1. **D1×D2 anchor collision.** `deriveBalance` skips transactions dated
+   `<= last_balance_updated_at` (`src/lib/balances.ts:17`). An adjustment dated
+   inside an onboarding anchor window is **silently discarded** — no error, the
+   balance just doesn't move. Reject that as-of date at the boundary and say why.
+2. **Offline duplicate.** Two devices correcting the same account offline both
+   apply, leaving the balance wrong by the duplicate — unlike a last-write-wins
+   overwrite, this cannot self-resolve. Detect same-account/same-date
+   adjustments on sync and prompt. Do not auto-merge.
+
+**Depends on:** PR #14 primitives. Nothing else.
+
+### D2 — Accounts & assets CRUD
+
+**Scope:** Assets currently have **no delete at all** — `assets.repo.ts` has no
+`remove()` and `AssetForm.tsx` has no delete button. Add a tombstone delete
+(`Asset.deleted_at`, filtered at every read, same pattern as
+`incomeEvents.repo.ts`) plus a quick re-value action. Accounts: split
+Deactivate from Delete; Delete is a tombstone and is **blocked while
+transactions reference the account** — offer "move transactions to another
+account" (which must move adjustments too) or "deactivate instead". Never offer
+to delete the transactions. `accountsRepo.remove()` is currently a hard delete,
+which the watermark sync will resurrect on the next pull — fix that.
+
+### D3 — Income / salary CRUD
+
+**Scope:** `incomeEventsRepo.update` exists and **the UI never calls it** —
+there is no edit path, so a mistyped salary can only be deleted and re-entered.
+Make an income card tappable into a pre-filled edit form. On save, recompute
+`delta_vs_prev` for the edited row **and its neighbours** (a date edit reorders
+the series), recompute the pipe/lifestyle split, and show it before committing.
+Deleting the latest event must state which salary the FI projection falls back
+to.
+
+### D4 — Recurring bills CRUD
+
+**Scope:** Mostly done already — create/edit/pause/tombstone-delete all work.
+Two gaps: `next_due` and `end_date` are unreachable after creation (`next_due`
+is hardcoded to `todayISO()` at `RecurringRegister.tsx:113`), and there are no
+`update_recurring_item` / `delete_recurring_item` AI tools. Add both. An
+`end_date` in the past must exclude the item from `getActive()`, which today
+filters on `is_active` alone. Amount edits are prospective only — never rewrite
+already-tagged historical transactions.
+
+### D5 — Weekly & workday allowance
+
+**Scope:** `AllowanceEditor.tsx` is two blind number inputs; the weekly pool and
+today's ceiling that the user actually lives by are derived and never shown
+there. Add a live derived preview driven by `computeSafeToSpend` ("Rp
+2.500.000/month → Rp 480.000 this week → Rp 96.000 today across 5 workdays"),
+let the user type the **weekly** figure instead (back-solved to monthly —
+storage stays monthly, so `computeSafeToSpend` is untouched), and record changes
+in an `allowanceHistory` table.
+
+**Explicitly cut:** a *this-week-only* override. Decided against on
+2026-07-31 — it needs its own table plus a new parameter on
+`computeSafeToSpend`, and no one has asked for a travel-week adjustment yet.
+Revisit as its own ticket if that changes.
+
+### Sequencing
+
+D1 first (it carries the shared `is_adjustment` foundation). D2–D5 are
+independent of each other afterwards.
+
+**Collision warning:** D1/D2 touch the same files as **§B1** (Assets screen) and
+D5 touches the same files as **§B4** (More sheets, incl. `AllowanceEditor`).
+Land B1/B4 first as pure restyles, then §D on top — or fold D1/D2 into B1 and D5
+into B4 and drop the separate tickets. **Do not run them in parallel.**
+
+**One live hazard these tickets must not spread:** `AllowanceEditor.tsx:22-23`,
+`AccountForm.tsx:50` and `IncomeLog.tsx:185` still parse money with a bare
+`.replace(/[.,]/g, '')`, which turns `12.5` into `125` — PAIN-POINTS.md T5, never
+fixed in those three files. Any §D ticket touching them uses `parseRpInput`.
 
 ---
 

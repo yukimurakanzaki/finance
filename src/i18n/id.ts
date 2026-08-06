@@ -62,6 +62,31 @@ export const id: Translations = {
   },
 
   budget: {
+    explain: {
+      openLabel: 'Jelaskan angka ini',
+      title: 'Cara angka ini dihitung',
+      youSetThis: 'kamu yang atur',
+      weCalculated: 'dihitung',
+      alreadyExcludedTitle: 'Sudah dikeluarkan dari jatah bulanan',
+      alreadyExcludedNote:
+        'Jatah bulananmu adalah sisa setelah pos-pos ini. Tidak dikurangi lagi di bawah.',
+      flooredNote: 'dibulatkan ke bawah',
+      clampedNote: 'ditahan di nol',
+      rows: {
+        allowance: 'Jatah bulanan',
+        weekendAllocation: 'Alokasi akhir pekan',
+        discretionary: 'Diskresioner',
+        weeks: 'Minggu dalam bulan',
+        weekPool: 'Jatah minggu ini',
+        spentThisWeek: 'Terpakai minggu ini',
+        remainingPool: 'Sisa',
+        remainingWorkdays: 'Sisa hari kerja',
+        todayCeiling: 'Aman dibelanjakan hari ini',
+        payYourselfFirst: 'Tabungan',
+        householdBills: 'Tagihan rumah tangga',
+        personalSubs: 'Langganan',
+      },
+    },
     title: 'Budget',
     subtitle: 'Minggu kerja ini',
     safeToSpend: 'Aman untuk Dibelanjakan',

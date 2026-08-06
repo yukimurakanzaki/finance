@@ -7,6 +7,7 @@ import {
   StatTile,
 } from '@components/ui'
 import { db } from '@db/db'
+import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import type { Cadence, RecurringKind } from '@db/types'
 import { useI18n } from '@i18n/index'
 import { formatRp } from '@lib/currency'
@@ -41,7 +42,7 @@ export function YearlyScreen() {
     ) ?? []
   const allowance = useLiveQuery(() => db.allowance.get('local'))
   const latestIncome = useLiveQuery(() =>
-    db.incomeEvents.orderBy('date').last(),
+    incomeEventsRepo.getLatest(),
   )
 
   const takeHomeAnnual = (latestIncome?.take_home_net ?? 0) * 12

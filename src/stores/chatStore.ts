@@ -159,10 +159,69 @@ function autoTitle(msg: ApiMessage): string {
   return text.slice(0, 60) || 'New chat'
 }
 
+function toolUseIdsOf(msg: ApiMessage): Set<string> | null {
+  if (msg.role !== 'assistant' || !Array.isArray(msg.content)) return null
+  const ids = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use').map((b) => b.id)
+  return ids.length > 0 ? new Set(ids) : null
+}
+
+function toolResultIdsOf(msg: ApiMessage): string[] | null {
+  if (msg.role !== 'user' || !Array.isArray(msg.content)) return null
+  if (msg.content.length === 0 || !msg.content.every((b) => b.type === 'tool_result')) return null
+  return (msg.content as Anthropic.ToolResultBlockParam[]).map((b) => b.tool_use_id)
+}
+
+// A provider only accepts a user tool_result turn immediately after the
+// assistant tool_use turn whose ids it answers — any other shape (a
+// tool_result referencing an id the immediately preceding assistant message
+// never introduced, or an assistant tool_use never followed by its results)
+// gets rejected outright ("tool result's tool id ... not found"). That
+// mismatch can end up locally persisted — e.g. an interrupted confirm flow,
+// or two tabs on the same session interleaving writes — and once it's in a
+// session's history, every future turn resends the same broken pair and
+// fails identically, forever, until something drops it. Walk the full
+// history and drop any assistant tool_use turn (and, if present, its
+// following user turn) whose ids don't round-trip cleanly, so a corrupted
+// session self-heals on the very next send instead of staying wedged.
+export function sanitizeToolPairing(messages: ApiMessage[]): ApiMessage[] {
+  const out: ApiMessage[] = []
+  let pending: Set<string> | null = null
+
+  for (const msg of messages) {
+    const toolUseIds = toolUseIdsOf(msg)
+    if (toolUseIds) {
+      if (pending) out.pop() // previous assistant tool_use turn was never answered
+      out.push(msg)
+      pending = toolUseIds
+      continue
+    }
+
+    const resultIds = toolResultIdsOf(msg)
+    if (resultIds) {
+      const matches = pending !== null && resultIds.every((id) => pending?.has(id))
+      if (!matches) {
+        if (pending) out.pop() // drop the assistant turn these results don't answer
+        pending = null
+        continue // and drop this mismatched carrier itself
+      }
+      out.push(msg)
+      pending = null
+      continue
+    }
+
+    if (pending) out.pop() // a plain message can't follow an unanswered tool_use either
+    out.push(msg)
+    pending = null
+  }
+
+  if (pending) out.pop() // trailing unanswered tool_use
+  return out
+}
+
 // The API requires the first message to be a user message without orphaned
 // tool_result blocks. Trim from the front until that holds.
 function trimForApi(messages: ApiMessage[]): ApiMessage[] {
-  let slice = messages.slice(-HISTORY_LIMIT)
+  let slice = sanitizeToolPairing(messages).slice(-HISTORY_LIMIT)
   while (slice.length > 0) {
     const first = slice[0]
     if (!first) break
@@ -179,6 +238,26 @@ export const useChatStore = create<ChatState>((set, get) => {
   // Audit C2: tracks the in-flight request so stopTurn() can abort it.
   let activeAbort: AbortController | null = null
 
+  // The proxy now forwards upstream HTTP status with a typed body. Classify:
+  //  - 429 → budget (handled below)
+  //  - 4xx → forwarded from upstream provider — user's input won't improve on
+  //    retry; surface immediately
+  //  - 502/503/504 → transient infra (transport throw, provider 5xx, missing
+  //    secret caught server-side). One quiet retry before surfacing.
+  const RETRYABLE_STATUSES = new Set([502, 503, 504])
+  
+  function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new Error('ABORTED'))
+      const t = setTimeout(resolve, ms)
+      const onAbort = () => {
+        clearTimeout(t)
+        reject(new Error('ABORTED'))
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+    })
+  }
+  
   async function callProxy(
     model: string,
     system: string,
@@ -191,21 +270,55 @@ export const useChatStore = create<ChatState>((set, get) => {
     const modelConfig = getModelConfig(model)
     const maxTokens = modelConfig?.maxOutput ?? MAX_TOKENS
 
-    const { data, error } = await supabase.functions.invoke('anthropic-proxy', {
-      body: {
-        model, max_tokens: maxTokens, system, tools: TOOL_DEFINITIONS, messages,
-        prompt_version: PROMPT_VERSION,
-      },
-      signal,
-    })
-    if (error) {
-      const context = (error as { context?: { status?: number; name?: string } }).context
+    for (let attempt = 0; ; attempt++) {
+      const { data, error } = await supabase.functions.invoke('anthropic-proxy', {
+        body: {
+          model, max_tokens: maxTokens, system, tools: TOOL_DEFINITIONS, messages,
+          prompt_version: PROMPT_VERSION,
+        },
+        signal,
+      })
+      if (!error) return data as Anthropic.Message
+
+      const context = (error as { context?: Response & { name?: string } }).context
       if (context?.name === 'AbortError') throw new Error('ABORTED')
-      // The proxy returns 429 with a budget marker when the daily AI cap is hit.
-      if (context?.status === 429) throw new Error('BUDGET_EXCEEDED')
-      throw new Error(error.message ?? 'Chat request failed')
+
+      // Read the body once. The proxy sends three typed shapes:
+      //  - { error: { type: "budget", message } }              → user budget error
+      //  - { error: { type: "upstream_4xx", upstream_status, message } }
+      //       → permanent user-input failure, no retry
+      //  - { error: { type: "transient", upstream_status, message } }
+      //       → retry class (502 wrapper around 408/409/429/5xx/transport)
+      // We branch on the typed envelope, NEVER on the bare HTTP status — that's
+      // what caused the v2 regression where an upstream rate-limit got
+      // mis-classified as the user-budget sentinel.
+      let body: any = null
+      if (context && typeof context.json === 'function') {
+        try {
+          body = await context.clone().json()
+        } catch {
+          // body unreadable — fall back to status-based behavior below
+        }
+      }
+      const errObj = body && typeof body.error === 'object' ? body.error : null
+      const errorType = errObj?.type
+      const detail: string | undefined =
+        errObj && typeof errObj.message === 'string' ? errObj.message : undefined
+
+      if (errorType === 'budget') throw new Error('BUDGET_EXCEEDED')
+      const isTransient = errorType === 'transient'
+      if (attempt === 0 && (isTransient || (context?.status !== undefined && RETRYABLE_STATUSES.has(context.status)))) {
+        await abortableDelay(1500, signal)
+        continue
+      }
+
+      // Belt-and-suspenders: older proxy revisions wrapped user-visible text in
+      // "Proxy error: …". Strip if it leaks through from a stale deploy.
+      const finalDetail = detail?.startsWith('Proxy error: ')
+        ? detail.slice('Proxy error: '.length)
+        : detail
+      throw new Error(finalDetail ?? error.message ?? 'Chat request failed')
     }
-    return data as Anthropic.Message
   }
 
   async function appendMessage(msg: ApiMessage) {

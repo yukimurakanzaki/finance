@@ -1,22 +1,24 @@
-import Dexie, { type Table } from 'dexie'
 import { scrubNumericStrings } from '@lib/syncMappers'
+import Dexie, { type Table } from 'dexie'
 import type {
   Account,
-  Asset,
-  Transaction,
-  Category,
-  Envelope,
-  RecurringItem,
   Allowance,
-  NetWorthSnapshot,
-  IncomeEvent,
-  Milestone,
-  Assumptions,
   AppSetting,
+  Asset,
+  Assumptions,
+  BalanceCorrection,
+  Category,
+  ChatCustomSkill,
+  ChatMemory,
   ChatMessage,
   ChatSession,
-  ChatMemory,
-  ChatCustomSkill,
+  Deletion,
+  Envelope,
+  IncomeEvent,
+  Milestone,
+  NetWorthSnapshot,
+  RecurringItem,
+  Transaction,
 } from './types'
 
 // Local sync bookkeeping (never pushed to the cloud).
@@ -35,6 +37,9 @@ export const SYNC_TABLES = [
   'recurringItems',
   'incomeEvents',
   'transactions',
+  // After transactions: a correction row references the adjustment transaction
+  // it created, and hydrate/push walk this list parents-first.
+  'balanceCorrections',
   'milestones',
   'netWorthSnapshots',
   'allowance',
@@ -43,6 +48,10 @@ export const SYNC_TABLES = [
   'chatMessages',
   'chatMemories',
   'chatCustomSkills',
+  // Last on purpose: applying a tombstone must happen after every table it can
+  // name has been pulled, or a row would be deleted and then re-inserted by its
+  // own table's pull in the same cycle.
+  'deletions',
 ] as const
 export type SyncTable = (typeof SYNC_TABLES)[number]
 
@@ -58,6 +67,8 @@ class FIDatabase extends Dexie {
   incomeEvents!: Table<IncomeEvent, string>
   milestones!: Table<Milestone, string>
   assumptions!: Table<Assumptions, string>
+  balanceCorrections!: Table<BalanceCorrection, string>
+  deletions!: Table<Deletion, string>
   appSettings!: Table<AppSetting, string>
   chatSessions!: Table<ChatSession, string>
   chatMessages!: Table<ChatMessage, string>
@@ -113,7 +124,8 @@ class FIDatabase extends Dexie {
               .toCollection()
               .modify((t) => {
                 if (t.original_amount === undefined) t.original_amount = null
-                if (t.overridden_amount === undefined) t.overridden_amount = null
+                if (t.overridden_amount === undefined)
+                  t.overridden_amount = null
                 if (t.override_note === undefined) t.override_note = null
                 if (t.overridden_at === undefined) t.overridden_at = null
                 if (t.is_transfer === undefined) t.is_transfer = false
@@ -227,7 +239,8 @@ class FIDatabase extends Dexie {
             .table<Allowance>('allowance')
             .toCollection()
             .modify((a) => {
-              if (a.onboarding_snoozed_until === undefined) a.onboarding_snoozed_until = null
+              if (a.onboarding_snoozed_until === undefined)
+                a.onboarding_snoozed_until = null
             }),
         ),
       )
@@ -250,6 +263,31 @@ class FIDatabase extends Dexie {
     // before Sprint 1 Task 1 claimed v12 for `onboarding_snoozed_until`.
     // Renumbered to 13 on cherry-pick: two `.version(12)` blocks merge
     // without a git conflict but break the upgrade chain at runtime.
+    // Reconciling `main` and `claude/fi-dashboard-safe-to-spend-ot3w4b` added
+    // `balanceCorrections` (v14) and `deletions` (v15) to SYNC_TABLES below —
+    // tables that don't exist yet in the upgrade transaction Dexie hands this
+    // step. A Dexie upgrade transaction only spans the stores declared as of
+    // *this* version, so looping the live SYNC_TABLES constant here throws
+    // "Table balanceCorrections not part of transaction". Frozen snapshot of
+    // what SYNC_TABLES was when this migration was authored as v13.
+    const V13_SYNC_TABLES = [
+      'accounts',
+      'envelopes',
+      'categories',
+      'assets',
+      'recurringItems',
+      'incomeEvents',
+      'transactions',
+      'milestones',
+      'netWorthSnapshots',
+      'allowance',
+      'assumptions',
+      'chatSessions',
+      'chatMessages',
+      'chatMemories',
+      'chatCustomSkills',
+    ] as const
+
     this.version(13)
       .stores({})
       .upgrade((tx) =>
@@ -260,7 +298,7 @@ class FIDatabase extends Dexie {
         // hazard v12's backfill guards against, so use the same guard. The
         // re-push is driven by the watermark rewind below, never by updated_at.
         withoutRestamp(async () => {
-          for (const name of SYNC_TABLES) {
+          for (const name of V13_SYNC_TABLES) {
             let touched = 0
             await tx
               .table(name)
@@ -272,13 +310,42 @@ class FIDatabase extends Dexie {
               // Force a re-push of this table by rewinding its push watermark.
               // updated_at is deliberately left untouched (see above), so the
               // watermark is the only thing that can re-select these rows.
-              await tx
-                .table('syncMeta')
-                .put({ key: `pushed:${name}`, value: '1970-01-01T00:00:00.000Z' })
+              await tx.table('syncMeta').put({
+                key: `pushed:${name}`,
+                value: '1970-01-01T00:00:00.000Z',
+              })
             }
           }
         }),
       )
+
+    // v14: D1 balance corrections — the append-only audit trail behind
+    // "Set true balance". Synced: the cloud `balance_corrections` table and its
+    // household-scoped RLS policy ship alongside this.
+    //
+    // No updated_at index, unlike the v7 tables: pushTable filters dirty rows
+    // in memory rather than querying that index, so adding one would cost
+    // writes and buy nothing.
+    //
+    // transactions.is_adjustment needs no version of its own, for the same
+    // reason recurring_item_id didn't (see the note above v12): it isn't
+    // indexed, and every reader treats missing/undefined as "not an
+    // adjustment", so a full-table backfill would only slow startup.
+    //
+    // Renumbered from v13 to v14 when reconciling with main: main had
+    // independently claimed v13 for the numeric-string scrub above (see its
+    // comment), and that line is the one actually running in production —
+    // this table never shipped past preview, so it's the side that moves.
+    this.version(14).stores({
+      balanceCorrections:
+        'id, account_id, transaction_id, as_of_date, created_at',
+    })
+
+    // v15: the deletion log — see the Deletion type for why deletes needed a
+    // channel of their own. Renumbered from v14 for the same reason as above.
+    this.version(15).stores({
+      deletions: 'id, table_name, row_id, created_at',
+    })
   }
 }
 

@@ -6,7 +6,12 @@ import 'fake-indexeddb/auto'
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Anthropic from '@anthropic-ai/sdk'
 import { db } from '@db/db'
-import { loadSessionMessages, stripImagesFromHistory, type ApiMessage } from './chatStore'
+import {
+  loadSessionMessages,
+  sanitizeToolPairing,
+  stripImagesFromHistory,
+  type ApiMessage,
+} from './chatStore'
 import { DEFAULT_MODEL } from '../ai/models'
 
 const now = () => new Date().toISOString()
@@ -148,5 +153,90 @@ describe('loadSessionMessages (audit B1)', () => {
     expect(loaded.length).toBe(1)
     expect(loaded[0]!.role).toBe('user')
     expect(droppedDangling).toBe(true)
+  })
+})
+
+describe('sanitizeToolPairing', () => {
+  it('leaves a well-formed tool_use/tool_result history untouched', () => {
+    const messages: ApiMessage[] = [
+      { role: 'user', content: 'log this' },
+      { role: 'assistant', content: [
+        { type: 'tool_use', id: 'tu-1', name: 'query_transactions', input: {} },
+      ] },
+      { role: 'user', content: [
+        { type: 'tool_result', tool_use_id: 'tu-1', content: '[]' },
+      ] },
+      { role: 'assistant', content: [{ type: 'text', text: 'No transactions found.' }] },
+    ]
+    expect(sanitizeToolPairing(messages)).toEqual(messages)
+  })
+
+  // The exact shape reported: a session where a tool_result's tool_use_id
+  // does not match any tool_use in the assistant turn it follows — the
+  // provider rejects this ("tool result's tool id ... not found") on every
+  // resend until the bad pair is dropped.
+  it('drops an assistant/user pair whose tool_result id does not match', () => {
+    const messages: ApiMessage[] = [
+      { role: 'user', content: 'gaji 24 juli' },
+      { role: 'assistant', content: [
+        { type: 'tool_use', id: 'tu-real', name: 'log_income', input: {} },
+      ] },
+      { role: 'user', content: [
+        // Stale/foreign id — doesn't match 'tu-real'.
+        { type: 'tool_result', tool_use_id: 'call_stale123', content: 'saved: true' },
+      ] },
+      { role: 'user', content: '1 ya, 2 ya, 3 ya, 4 pakai gaji 24 juli' },
+    ]
+    const cleaned = sanitizeToolPairing(messages)
+    expect(cleaned).toEqual([
+      { role: 'user', content: 'gaji 24 juli' },
+      { role: 'user', content: '1 ya, 2 ya, 3 ya, 4 pakai gaji 24 juli' },
+    ])
+  })
+
+  it('drops a trailing assistant tool_use with no answer at all', () => {
+    const messages: ApiMessage[] = [
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: [
+        { type: 'tool_use', id: 'tu-1', name: 'log_income', input: {} },
+      ] },
+    ]
+    expect(sanitizeToolPairing(messages)).toEqual([{ role: 'user', content: 'hi' }])
+  })
+
+  it('only removes the broken pair, keeping valid turns before and after it', () => {
+    const messages: ApiMessage[] = [
+      { role: 'user', content: 'first question' },
+      { role: 'assistant', content: [{ type: 'text', text: 'first answer' }] },
+      { role: 'assistant', content: [
+        { type: 'tool_use', id: 'tu-bad', name: 'log_income', input: {} },
+      ] },
+      { role: 'user', content: [
+        { type: 'tool_result', tool_use_id: 'tu-wrong', content: 'x' },
+      ] },
+      { role: 'user', content: 'second question' },
+      { role: 'assistant', content: [{ type: 'text', text: 'second answer' }] },
+    ]
+    expect(sanitizeToolPairing(messages)).toEqual([
+      { role: 'user', content: 'first question' },
+      { role: 'assistant', content: [{ type: 'text', text: 'first answer' }] },
+      { role: 'user', content: 'second question' },
+      { role: 'assistant', content: [{ type: 'text', text: 'second answer' }] },
+    ])
+  })
+
+  it('drops a partial match: a tool_result batch answering only some of the ids', () => {
+    const messages: ApiMessage[] = [
+      { role: 'user', content: 'log two things' },
+      { role: 'assistant', content: [
+        { type: 'tool_use', id: 'tu-1', name: 'log_income', input: {} },
+        { type: 'tool_use', id: 'tu-2', name: 'query_transactions', input: {} },
+      ] },
+      { role: 'user', content: [
+        // Missing tu-1 entirely, and tu-3 doesn't belong to this turn.
+        { type: 'tool_result', tool_use_id: 'tu-3', content: 'x' },
+      ] },
+    ]
+    expect(sanitizeToolPairing(messages)).toEqual([{ role: 'user', content: 'log two things' }])
   })
 })

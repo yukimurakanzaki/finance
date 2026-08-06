@@ -1,6 +1,7 @@
 import { Field, Input } from '@components/FormField'
 import { Card } from '@components/ui'
 import { db } from '@db/db'
+import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import type { Lane } from '@db/types'
 import { formatRp, parseRpInput } from '@lib/currency'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -53,7 +54,7 @@ export function SpendingLens() {
 
   const allowance = useLiveQuery(() => db.allowance.get('local'))
   const latestIncome = useLiveQuery(() =>
-    db.incomeEvents.orderBy('date').last(),
+    incomeEventsRepo.getLatest(),
   )
 
   const amount = parseRpInput(raw) ?? 0

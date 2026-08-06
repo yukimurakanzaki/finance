@@ -62,6 +62,31 @@ export const en: Translations = {
   },
 
   budget: {
+    explain: {
+      openLabel: 'Explain this number',
+      title: 'How this is calculated',
+      youSetThis: 'you set this',
+      weCalculated: 'calculated',
+      alreadyExcludedTitle: 'Already excluded from your allowance',
+      alreadyExcludedNote:
+        'Your monthly allowance is what remains after these. They are not subtracted again below.',
+      flooredNote: 'rounded down to whole rupiah',
+      clampedNote: 'held at zero',
+      rows: {
+        allowance: 'Monthly allowance',
+        weekendAllocation: 'Weekend allocation',
+        discretionary: 'Discretionary',
+        weeks: 'Weeks in month',
+        weekPool: "This week's pool",
+        spentThisWeek: 'Spent this week',
+        remainingPool: 'Remaining',
+        remainingWorkdays: 'Workdays left',
+        todayCeiling: 'Safe to spend today',
+        payYourselfFirst: 'Savings',
+        householdBills: 'Household bills',
+        personalSubs: 'Subscriptions',
+      },
+    },
     title: 'Budget',
     subtitle: 'This workweek',
     safeToSpend: 'Safe to Spend',

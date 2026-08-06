@@ -131,3 +131,48 @@ describe('round-trip', () => {
     expect(back).toEqual(local)
   })
 })
+
+// D1 — balance corrections sync like any other household-scoped table. The
+// numeric fields are bigints in Postgres and come back as strings over the
+// wire, which is the exact class of bug that made pushes 400 before
+// coerceNumeric existed in fromCloudRow.
+describe('balanceCorrections sync mapping', () => {
+  const UUID = '11111111-1111-4111-8111-111111111111'
+
+  it('coerces bigint balances back to numbers on pull', () => {
+    const out = fromCloudRow('balanceCorrections', {
+      id: UUID,
+      household_id: 'hh1',
+      previous_balance: '690000',
+      new_balance: '412000',
+    })
+    expect(out.previous_balance).toBe(690_000)
+    expect(out.new_balance).toBe(412_000)
+  })
+
+  it('drops household_id on the way in and stamps it on the way out', () => {
+    const local = { id: UUID, account_id: 'acc1', new_balance: 412_000 }
+    const cloud = toCloudRow('balanceCorrections', local, 'hh1', 'user1')
+    expect(cloud.household_id).toBe('hh1')
+    expect(fromCloudRow('balanceCorrections', cloud).household_id).toBeUndefined()
+  })
+
+  // SEC-2 — attribution is stamped by the cloud's `default auth.uid()`. Pushing
+  // the column at all (even as null) would defeat that default and let a client
+  // choose who a correction is attributed to.
+  it('never pushes created_by', () => {
+    const cloud = toCloudRow(
+      'balanceCorrections',
+      { id: UUID, account_id: 'acc1' },
+      'hh1',
+      'user1',
+    )
+    expect('created_by' in cloud).toBe(false)
+  })
+
+  it('scrubs a balance that already landed locally as a string', () => {
+    const row: Record<string, unknown> = { previous_balance: '690000' }
+    expect(scrubNumericStrings('balanceCorrections', row)).toBe(true)
+    expect(row.previous_balance).toBe(690_000)
+  })
+})

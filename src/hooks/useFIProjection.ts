@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@db/db'
+import { incomeEventsRepo } from '@db/repositories/incomeEvents.repo'
 import { computeFIProjection, type FIProjectionResult } from '@engine/fiProjection'
 import { computeSavingsRate, type SavingsRateResult } from '@engine/savingsRate'
 import type { AssetType } from '@db/types'
@@ -15,7 +16,7 @@ export function useFIProjection(): {
       db.assumptions.get('local'),
       db.assets.toArray(),
       db.recurringItems.filter((r) => r.is_active && r.kind === 'pay_yourself_first').toArray(),
-      db.incomeEvents.orderBy('date').last(),
+      incomeEventsRepo.getLatest(),
     ])
 
     const asm = assumptions ?? { id: 'local', ...DEFAULT_ASSUMPTIONS }
