@@ -83,7 +83,10 @@ npx biome lint src   # Lint only (~220 pre-existing — don't fix untouched file
 npx biome check src  # Lint + format. Reports ~408 on a Windows checkout: the extra
                      # ~188 are CRLF line endings from core.autocrlf=true with no
                      # .gitattributes, not code problems. Prefer `biome lint` for signal.
-npx tsc --noEmit     # Type check (use during development for faster feedback)
+npx tsc -b --noEmit  # Type check (use during development for faster feedback).
+                     # Must be `-b`: the root tsconfig.json is `"files": []` + project
+                     # references, so a plain `npx tsc --noEmit` checks 0 files and
+                     # always exits 0 — a silent no-op, not a passing type check.
 
 # Supabase
 # Migrations applied via Supabase CLI or dashboard
@@ -97,7 +100,7 @@ npx tsc --noEmit     # Type check (use during development for faster feedback)
 3. **Understand task:** Read referenced Findings in plan docs before writing code
 4. **Implement:** Make changes through `patch`/`write_file`. Match existing style.
 5. **Verify:**
-   - `npx tsc --noEmit` clean
+   - `npx tsc -b --noEmit` clean
    - `npx vitest run` green
    - `npx biome lint src` — no NEW errors in touched files
 6. **Commit:** One commit per task. Message: `feat(v2): T{n} — {summary}` (or `fix`, `refactor`, `docs`, `test`)
@@ -127,7 +130,7 @@ npx vitest run src/engine/safeToSpend       # Specific engine
 
 Before claiming work is done:
 
-- [ ] `npx tsc --noEmit` clean
+- [ ] `npx tsc -b --noEmit` clean
 - [ ] `npx vitest run` green (existing tests untouched, new tests pass)
 - [ ] `npx biome lint src` — no NEW errors in touched files (~220 pre-existing are out of scope)
 - [ ] No floats in money paths (integer rupiah everywhere)
@@ -145,7 +148,7 @@ Before claiming work is done:
 ## Definition of Done
 
 A task is done when:
-1. Code compiles (`npx tsc --noEmit` clean)
+1. Code compiles (`npx tsc -b --noEmit` clean)
 2. Tests pass (`npx vitest run` green)
 3. No new lint errors (`npx biome lint src` — touched files only)
 4. Task verification steps pass (from plan doc)
