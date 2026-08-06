@@ -50,6 +50,7 @@ export async function buildSystemPrompt(
     allowance,
     assumptions,
     lastIncome,
+    chatMemories,
   ] = await Promise.all([
     db.accounts.filter((a) => a.is_active).toArray(),
     db.assets.toArray(),
@@ -58,6 +59,7 @@ export async function buildSystemPrompt(
     db.allowance.get('local'),
     db.assumptions.orderBy('id').last(),
     incomeEventsRepo.getLatest(),
+    db.chatMemories.toArray(),
   ])
 
   // Account balances: same derivation as the Assets screen (override anchor +
@@ -196,11 +198,13 @@ export async function buildSystemPrompt(
   }
 
   // Persistent memory
-  const memories = await db.chatMemories.toArray()
-  const totalMemoryChars = memories.reduce((s, m) => s + m.content.length, 0)
+  const totalMemoryChars = chatMemories.reduce(
+    (s, m) => s + m.content.length,
+    0,
+  )
   let memoryBlock =
-    memories.length > 0
-      ? memories.map((m) => `- [id: ${m.id}] ${m.content}`).join('\n')
+    chatMemories.length > 0
+      ? chatMemories.map((m) => `- [id: ${m.id}] ${m.content}`).join('\n')
       : '(none)'
   if (totalMemoryChars > 2000) {
     memoryBlock +=
@@ -226,6 +230,30 @@ export async function buildSystemPrompt(
   }
   const skillsBlock =
     skillInjections.length > 0 ? skillInjections.join('\n\n') : ''
+
+  // ONBOARDING STATE (T1a §7) — emitted only when the household has no
+  // recurring items, no chat memory, AND no allowance (monthly_amount=0).
+  // Once any of the three has data the predicate self-satisfies and the
+  // section vanishes permanently (FR-1.4). Snooze (allowance.
+  // onboarding_snoozed_until) suppresses the section for the rest of today
+  // (FR-1.2). Suppression is in context assembly, never a prompt instruction
+  // (NFR-X4). NFR-1.1: ≤ 400 characters. No router exists; navigation is the
+  // app store's activeTab + the wizard's entry step (FR-1.3, C-5).
+  let onboardingBlock = ''
+  const monthlyAmount = allowance?.monthly_amount ?? 0
+  const isUnconfigured =
+    recurring.length === 0 && chatMemories.length === 0 && monthlyAmount === 0
+  const snoozedUntil = allowance?.onboarding_snoozed_until ?? null
+  const snoozeActive =
+    snoozedUntil !== null && snoozedUntil.slice(0, 10) >= iso
+  if (isUnconfigured && !snoozeActive) {
+    onboardingBlock = `=== ONBOARDING STATE ===
+Unconfigured household — all numbers are placeholders. Three steps:
+1. Log income (log_income)
+2. Add recurring items (add_recurring_item)
+3. Set monthly allowance
+In-app: open Onboarding or Allowance from More tab. Navigation uses activeTab in app store, not URL routes.`
+  }
 
   return `${PERSONA}
 
@@ -264,5 +292,5 @@ ${notices.join('\n') || '(none)'}
 === MEMORY ===
 ${memoryBlock}
 
-${skillsBlock}`
+${onboardingBlock ? `${onboardingBlock}\n\n` : ''}${skillsBlock}`
 }

@@ -227,6 +227,8 @@ export const en: Translations = {
     allowanceCaption: 'Monthly pool & weekend allocation',
     recurringRegister: 'Recurring Register',
     recurringRegisterCaption: "Pipe, bills, subs — what's committed monthly",
+    setupWizard: 'Setup wizard',
+    setupWizardCaption: 'Income, pipes, allowance — reopens where you left off',
     pinLock: 'PIN lock',
     pinLockSet: 'Change / Remove PIN',
     pinLockNotSet: 'Set up PIN lock',
