@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 
 interface OnboardingWizardProps {
   onComplete: () => void
-  initialStep?: number
+  initialStep?: number | undefined
 }
 
 // 'choose' — the O2 entry picker (quick vs. full). 'full' — the original
@@ -64,10 +64,23 @@ export function resolveWizardStep(
   return initialStep ?? 1
 }
 
+// Every step body is gated on mode === 'full', so a jump that only set the
+// step would land on a blank screen. A draft that is already past the picker
+// wins; a draft still sitting on 'choose' holds no answers to protect, so the
+// requested jump takes it straight into the detailed flow.
+export function resolveWizardMode(
+  initialStep: number | undefined,
+  draftMode: Mode | null | undefined,
+): Mode {
+  if (draftMode != null && draftMode !== 'choose') return draftMode
+  if (initialStep != null) return 'full'
+  return draftMode ?? 'choose'
+}
+
 export function OnboardingWizard({ onComplete, initialStep }: OnboardingWizardProps) {
   const { t } = useI18n()
   const [loaded, setLoaded] = useState(false)
-  const [mode, setMode] = useState<Mode>('choose')
+  const [mode, setMode] = useState<Mode>(resolveWizardMode(initialStep, null))
   const [step, setStep] = useState(initialStep ?? 1)
 
   const [gross, setGross] = useState('')
@@ -91,7 +104,7 @@ export function OnboardingWizard({ onComplete, initialStep }: OnboardingWizardPr
           const draft = JSON.parse(raw) as DraftState
           // Older drafts (pre-O2) have no `mode` field — they were always mid
           // detailed setup, so treat a missing mode as 'full'.
-          setMode(draft.mode ?? 'full')
+          setMode(resolveWizardMode(initialStep, draft.mode ?? 'full'))
           setStep(resolveWizardStep(initialStep, draft.step))
           setGross(draft.gross ?? '')
           setTakeHome(draft.takeHome ?? '')

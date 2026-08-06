@@ -203,6 +203,9 @@ export const id: Translations = {
     recurringRegister: 'Daftar Rutin',
     recurringRegisterCaption:
       'Pipe, tagihan, langganan — apa yang dikomit tiap bulan',
+    setupWizard: 'Wizard penyiapan',
+    setupWizardCaption:
+      'Pemasukan, pipe, jatah — lanjut dari langkah terakhir kamu',
     pinLock: 'Kunci PIN',
     pinLockSet: 'Ubah / Hapus PIN',
     pinLockNotSet: 'Atur kunci PIN',

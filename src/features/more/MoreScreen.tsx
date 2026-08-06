@@ -35,7 +35,7 @@ type Sheet =
 export function MoreScreen() {
   const { t, language, setLanguage } = useI18n()
   const { start: startReconcile } = useReconcileStore()
-  const { setTab } = useAppStore()
+  const { setTab, openOnboarding } = useAppStore()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [pinConfigured, setPinConfigured] = useState(hasPin())
   const [theme, setTheme] = useState(
@@ -157,6 +157,11 @@ export function MoreScreen() {
           onClick={() => setSheet('recurring')}
           primary={t.more.recurringRegister}
           caption={t.more.recurringRegisterCaption}
+        />
+        <Row
+          onClick={() => openOnboarding(1)}
+          primary={t.more.setupWizard}
+          caption={t.more.setupWizardCaption}
         />
         <Row
           onClick={() => setSheet('assumptions')}

@@ -212,6 +212,8 @@ export interface Translations {
     allowanceCaption: string
     recurringRegister: string
     recurringRegisterCaption: string
+    setupWizard: string
+    setupWizardCaption: string
     pinLock: string
     pinLockSet: string
     pinLockNotSet: string

@@ -39,7 +39,7 @@ function useSetupComplete() {
 }
 
 function AppShell() {
-  const { activeTab } = useAppStore()
+  const { activeTab, onboardingStep, closeOnboarding } = useAppStore()
   const { isInProgress, step } = useReconcileStore()
   const { ready, markDone } = useSetupComplete()
   const { t, init: initI18n } = useI18n()
@@ -57,8 +57,52 @@ function AppShell() {
     return <div style={{ height: '100dvh', background: 'var(--bg-0)' }} />
   }
 
-  if (ready === false) {
-    return <OnboardingWizard onComplete={markDone} />
+  // Two ways in: setup was never completed, or something asked to reopen the
+  // wizard at a step (T1a FR-1.3 — the jump target, since there is no router).
+  if (ready === false || onboardingStep !== null) {
+    const wizard = (
+      <OnboardingWizard
+        initialStep={onboardingStep ?? undefined}
+        onComplete={() => {
+          closeOnboarding()
+          markDone()
+        }}
+      />
+    )
+    // First-run onboarding has no way out — it is the app. A reopened wizard
+    // does: the draft is already persisted, so closing loses nothing.
+    if (ready === false) return wizard
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '12px 16px',
+            paddingTop: 'calc(12px + env(safe-area-inset-top))',
+            borderBottom: '1px solid var(--border-1)',
+            background: 'var(--bg-1)',
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            onClick={closeOnboarding}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--ink-2)',
+              fontSize: 15,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            {t.common.close}
+          </button>
+        </div>
+        <main style={{ flex: 1, overflowY: 'auto' }}>{wizard}</main>
+      </div>
+    )
   }
 
   if (isInProgress && activeTab === 'budget') {
